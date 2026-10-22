@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# timbrebox-ctl — control a running TimbreBox player from the command line.
+#
+# TimbreBox exposes a loopback HTTP control API (Settings → General → Agent
+# control, on by default). This script auto-discovers the endpoint from
+# ~/.timbrebox/control.json (written by the app while the API is enabled) so an
+# agent or shell never needs to know the ephemeral port.
+#
+# Usage:
+#   timbrebox-ctl status
+#   timbrebox-ctl search "周杰伦"
+#   timbrebox-ctl play-ref <source> <item>
+#   timbrebox-ctl play | pause | toggle | next | prev | stop
+#   timbrebox-ctl seek <ms> | volume <0..1> | mode <queue|track|off|shuffle>
+#   timbrebox-ctl queue | sources | lyric | play-queue <index>
+#   timbrebox-ctl source <id> <true|false>
+#   timbrebox-ctl quit          # quit the whole app (background instance)
+set -euo pipefail
+
+EP_FILE="${TIMBREBOX_CONTROL:-${HOME}/.timbrebox/control.json}"
+
+die() { echo "timbrebox-ctl: $*" >&2; exit 1; }
+
+# Verify a base URL is actually the TimbreBox control API (not some other app).
+is_timbrebox() { curl -s "${1}/" 2>/dev/null | grep -q 'TimbreBox control API'; }
+
+base_url() {
+  # 1) discovery file (works for non-sandboxed installs).
+  if [ -f "${EP_FILE}" ]; then
+    local a
+    a="$(python3 -c "import json;print(json.load(open('${EP_FILE}'))['address'])" 2>/dev/null \
+        || grep -oE 'http://127\.0\.0\.1:[0-9]+' "${EP_FILE}" | head -1 || true)"
+    if [ -n "${a}" ] && is_timbrebox "${a}"; then printf '%s' "${a}"; return; fi
+  fi
+  # 2) scan the preferred loopback port range (the macOS sandbox hides the file
+  #    from an external CLI, but the fixed ports are always reachable).
+  local p
+  for p in 8787 8788 8789 8790 8791 8792 8793 8794 8795 8796; do
+    if is_timbrebox "http://127.0.0.1:${p}"; then
+      printf 'http://127.0.0.1:%s' "${p}"; return
+    fi
+  done
+  die "找不到运行中的 TimbreBox 控制接口（确认应用已启动且已开启 Agent 控制）"
+}
+
+req() { curl -sS "${@}"; echo; }
+
+main() {
+  local cmd="${1:-help}"; shift || true
+  case "${cmd}" in
+    help|-h|--help)
+      grep '^#' "${0}" | sed 's/^# \{0,1\}//' | sed '1d'
+      return 0 ;;
+  esac
+  local BASE; BASE="$(base_url)"
+  case "${cmd}" in
+    status|queue|sources|lyric|play|pause|toggle|next|previous|stop|quit)
+      req "${BASE}/${cmd}" ;;
+    prev)         req "${BASE}/previous" ;;
+    seek)         [ ${#} -ge 1 ] || die "用法: seek <ms>"; req -G "${BASE}/seek" --data-urlencode "ms=${1}" ;;
+    volume)       [ ${#} -ge 1 ] || die "用法: volume <0..1>"; req -G "${BASE}/volume" --data-urlencode "level=${1}" ;;
+    mode)         [ ${#} -ge 1 ] || die "用法: mode <queue|track|off|shuffle>"; req -G "${BASE}/mode" --data-urlencode "loop=${1}" ;;
+    search)       [ ${#} -ge 1 ] || die "用法: search <query>"; req -G "${BASE}/search" --data-urlencode "q=${1}" ;;
+    play-ref)     [ ${#} -ge 2 ] || die "用法: play-ref <source> <item>"; req -G "${BASE}/play-ref" --data-urlencode "source=${1}" --data-urlencode "item=${2}" ;;
+    play-queue)   [ ${#} -ge 1 ] || die "用法: play-queue <index>"; req -G "${BASE}/play-queue" --data-urlencode "i=${1}" ;;
+    source)       [ ${#} -ge 2 ] || die "用法: source <id> <true|false>"; req -G "${BASE}/source" --data-urlencode "id=${1}" --data-urlencode "enabled=${2}" ;;
+    *)            die "未知命令: ${cmd}（运行 'timbrebox-ctl help'）" ;;
+  esac
+}
+
+main "${@}"

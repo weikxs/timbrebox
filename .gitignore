@@ -1,0 +1,33 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Flutter platform ephemeral
+**/ephemeral/
+**/Flutter/Generated.xcconfig
+**/Flutter/flutter_export_environment.sh
+
+node_modules/
+dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local runtime
+.timbrebox/
+
+# PRD is internal — do not publish
+docs/prd/
+
+# 内部开发/设计文档，仅本地不发布
+docs/internal/

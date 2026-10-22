@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="record" cx="48%" cy="48%" r="50%">
+      <stop offset="0" stop-color="#fff9ec"/>
+      <stop offset="7%" stop-color="#fff9ec"/>
+      <stop offset="8%" stop-color="#e1b27b"/>
+      <stop offset="12%" stop-color="#e1b27b"/>
+      <stop offset="13%" stop-color="#25201b"/>
+      <stop offset="100%" stop-color="#25201b"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity=".42"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="226" fill="#10110f"/>
+  <circle cx="512" cy="512" r="404" fill="none" stroke="#e1b27b" stroke-opacity=".58" stroke-width="26"/>
+  <path d="M315 842A474 474 0 0 1 315 182" fill="none" stroke="#9ac0c9" stroke-opacity=".34" stroke-linecap="round" stroke-width="22"/>
+  <circle cx="512" cy="512" r="306" fill="url(#record)" filter="url(#shadow)"/>
+  <circle cx="512" cy="512" r="130" fill="none" stroke="#e1b27b" stroke-width="58"/>
+  <circle cx="512" cy="512" r="31" fill="#fff9ec"/>
+  <text x="548" y="646" fill="#fff8eb" font-family="Georgia,serif" font-size="450" text-anchor="middle">♪</text>
+</svg>

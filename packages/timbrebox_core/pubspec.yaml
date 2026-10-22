@@ -1,0 +1,9 @@
+name: timbrebox_core
+description: Lightweight domain logic for TimbreBox.
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+dev_dependencies:
+  test: ^1.25.0

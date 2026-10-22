@@ -1,0 +1,13 @@
+name: timbrebox_cli
+description: One-shot local control client for TimbreBox desktop.
+publish_to: none
+environment:
+  sdk: ^3.12.0
+dependencies:
+  timbrebox_core:
+    path: ../timbrebox_core
+dev_dependencies:
+  test: ^1.25.0
+executables:
+  timbrebox: timbrebox
+  timbrebox_mcp: timbrebox_mcp
