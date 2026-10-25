@@ -13,7 +13,7 @@ class SettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PageScaffold(
-    kicker: 'SETTINGS',
+    kicker: AppStrings.t('kicker.settings'),
     title: AppStrings.t('nav.settings'),
     detail: _detailFor(controller.settingsSection),
     compact: true,

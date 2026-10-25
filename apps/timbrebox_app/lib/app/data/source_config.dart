@@ -33,7 +33,14 @@ final class SourceEndpoint {
         Uri.encodeComponent(entry.value),
       );
     }
-    return Uri.https(host, path!, query.isEmpty ? null : query);
+    // `Uri(path:)` keeps the escapes made above; `Uri.https` would encode
+    // their `%` again (a space would reach the server as `%2520`).
+    return Uri(
+      scheme: 'https',
+      host: host,
+      path: path,
+      queryParameters: query.isEmpty ? null : query,
+    );
   }
 }
 

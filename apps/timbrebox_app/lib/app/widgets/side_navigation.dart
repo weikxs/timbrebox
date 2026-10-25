@@ -29,7 +29,7 @@ class SideNavigation extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _Brand(),
-            const _Label('BROWSE'),
+            _Label(AppStrings.t('nav.browse')),
             _NavItem(
               AppStrings.t('nav.home'),
               Icons.home_outlined,
@@ -52,7 +52,7 @@ class SideNavigation extends StatelessWidget {
               onSelected,
             ),
             const SizedBox(height: 16),
-            const _Label('YOUR SPACE'),
+            _Label(AppStrings.t('nav.yourSpace')),
             _NavItem(
               AppStrings.t('nav.myMusic'),
               Icons.library_music_outlined,
@@ -77,7 +77,7 @@ class SideNavigation extends StatelessWidget {
             const Spacer(),
             const Divider(height: 28),
             Text(
-              'LOCAL LIBRARY',
+              AppStrings.t('nav.localLibrary'),
               style: TextStyle(
                 color: TimbreColors.muted,
                 fontSize: 9,

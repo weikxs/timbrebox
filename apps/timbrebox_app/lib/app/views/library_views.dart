@@ -16,7 +16,7 @@ class LibraryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => PageScaffold(
-    kicker: 'YOUR LIBRARY',
+    kicker: AppStrings.t('kicker.library'),
     title: AppStrings.t('nav.myMusic'),
     detail: AppStrings.t('library.favoritesDetail'),
     child: Column(
@@ -63,7 +63,7 @@ class DownloadsView extends StatelessWidget {
     final active = controller.downloadingTracks;
     final failed = controller.failedDownloads;
     return PageScaffold(
-      kicker: 'OFFLINE',
+      kicker: AppStrings.t('kicker.offline'),
       title: AppStrings.t('nav.localMusic'),
       detail: AppStrings.t('library.localDetail'),
       child: Column(
@@ -214,7 +214,7 @@ class RecentView extends StatelessWidget {
     final queue = controller.queue;
     final hasTracks = queue.isNotEmpty;
     return PageScaffold(
-      kicker: 'UP NEXT',
+      kicker: AppStrings.t('kicker.upNext'),
       title: AppStrings.t('queue.title'),
       detail: AppStrings.t('queue.detail'),
       child: Column(

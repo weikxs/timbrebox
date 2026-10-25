@@ -157,4 +157,31 @@ void main() {
       ),
     );
   });
+
+  test(
+    'resolves an Internet Archive file name with spaces to a playable URL',
+    () async {
+      final source = InternetArchiveCatalogSource(
+        readJson: (_, _) async =>
+            '{"files":[{"name":"01 - Clair de lune (Suite bergamasque).flac","format":"Flac"}]}',
+      );
+
+      final resolved = await source.resolve(
+        StreamRequest(
+          ref: const MediaRef(
+            sourceId: 'internet_archive',
+            itemId: 'piano-set',
+          ),
+          quality: 'public',
+          cancellation: CancellationToken(),
+        ),
+      );
+
+      expect(
+        resolved.uri.toString(),
+        'https://archive.org/download/piano-set/'
+        '01%20-%20Clair%20de%20lune%20(Suite%20bergamasque).flac',
+      );
+    },
+  );
 }

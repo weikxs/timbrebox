@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_app/app/model/player_shortcut.dart';
@@ -47,7 +49,7 @@ void main() {
       LogicalKeyboardKey.arrowRight.keyId,
       shift: true,
     );
-    expect(binding.label, contains('⇧'));
-    expect(binding.label, contains('→'));
+    // macOS uses Apple symbols; Windows and Linux spell modifiers out.
+    expect(binding.label, Platform.isMacOS ? '⇧→' : 'Shift+→');
   });
 }

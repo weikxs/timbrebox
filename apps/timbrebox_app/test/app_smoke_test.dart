@@ -127,6 +127,37 @@ void main() {
     expect(controller.currentTrack?.title, '夜窗');
     expect(controller.isPlaying, isTrue);
   });
+
+  testWidgets('section labels follow the Chinese interface on every page', (
+    tester,
+  ) async {
+    useDesktopViewport(tester);
+    await tester.pumpWidget(testApp());
+    const english = [
+      'BROWSE',
+      'YOUR SPACE',
+      'LOCAL LIBRARY',
+      'TRENDING',
+      'YOUR LIBRARY',
+      'OFFLINE',
+      'UP NEXT',
+      'SETTINGS',
+    ];
+    void expectNoEnglishLabels() {
+      for (final label in english) {
+        expect(find.text(label), findsNothing, reason: label);
+      }
+    }
+
+    expect(find.text('浏览'), findsOneWidget);
+    expect(find.text('本地曲库'), findsOneWidget);
+    expectNoEnglishLabels();
+    for (final page in ['热门库', '我的音乐', '本地音乐', '最近播放', '设置']) {
+      await tester.tap(find.text(page).first);
+      await tester.pump();
+      expectNoEnglishLabels();
+    }
+  });
 }
 
 class _Catalog implements MusicCatalog {
