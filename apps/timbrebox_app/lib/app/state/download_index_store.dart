@@ -6,6 +6,7 @@ import 'package:timbrebox_core/timbrebox_core.dart';
 import '../model/catalog_track.dart';
 import 'download_paths.dart';
 import '../design/app_strings.dart';
+import 'atomic_file.dart';
 
 /// One persisted local-music record. It holds only the metadata needed to
 /// rebuild a [CatalogTrack] and the on-disk path — never a source URL, header,
@@ -115,7 +116,7 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
         if (_inside(directory, entry.path) case final path?)
           DownloadedEntry(track: entry.track, path: _baseName(path)).toJson(),
     ]);
-    await file.writeAsString(payload, flush: true);
+    await writeFileAtomically(file, payload);
   }
 
   /// The normalized path of [stored] if it names a file directly inside

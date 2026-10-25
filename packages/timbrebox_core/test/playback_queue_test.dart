@@ -44,6 +44,53 @@ void main() {
       expect(queue.tracks.map((track) => track.title), ['one', 'three']);
     },
   );
+
+  test('next after removing the current item plays the following item', () {
+    final queue = PlaybackQueue([...tracks, _track('four')])..select(0);
+
+    queue.removeAt(0);
+
+    expect(queue.next()?.title, 'two');
+    expect(queue.next()?.title, 'three');
+  });
+
+  test('previous after removing the current item plays the one before', () {
+    final queue = PlaybackQueue([...tracks, _track('four')])..select(2);
+
+    queue.removeAt(2);
+
+    expect(queue.previous()?.title, 'two');
+  });
+
+  test('removing the current last item ends the queue unless it wraps', () {
+    final queue = PlaybackQueue(tracks)..select(2);
+
+    queue.removeAt(2);
+
+    expect(queue.next(), isNull);
+    final wrapping = PlaybackQueue(tracks)..select(2);
+    wrapping.removeAt(2);
+    expect(wrapping.next(wrap: true)?.title, 'one');
+  });
+
+  test('play-next after removing the current item becomes the next item', () {
+    final queue = PlaybackQueue(tracks)..select(0);
+
+    queue.removeAt(0);
+    queue.add(_track('inserted'), playNext: true);
+
+    expect(queue.next()?.title, 'inserted');
+    expect(queue.next()?.title, 'two');
+  });
+
+  test('exposes the selected index, also for repeated tracks', () {
+    final queue = PlaybackQueue([tracks[0], tracks[0], tracks[1]])..select(0);
+
+    expect(queue.next()?.title, 'one');
+    expect(queue.currentIndex, 1);
+    expect(queue.next()?.title, 'two');
+    expect(queue.currentIndex, 2);
+  });
 }
 
 TrackSummary _track(String id) => TrackSummary(

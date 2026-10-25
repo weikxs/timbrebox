@@ -9,7 +9,11 @@ import 'player_backend.dart';
 /// (YouTube) and remote URLs with request headers natively, so no loopback relay
 /// or file buffering is needed.
 final class MediaKitBackend
-    implements AudioBackend, ProgressAudioBackend, RateAudioBackend {
+    implements
+        AudioBackend,
+        ProgressAudioBackend,
+        RateAudioBackend,
+        StartPositionAudioBackend {
   MediaKitBackend({Player? player}) : _player = player ?? Player();
 
   final Player _player;
@@ -38,17 +42,29 @@ final class MediaKitBackend
   );
 
   @override
-  Future<void> setSource(AudioSourceSpec source) {
+  Future<void> setSource(AudioSourceSpec source) => _open(source, null);
+
+  /// Opens [source] at [start]: libmpv applies `start` while opening, where a
+  /// seek sent right after opening may be dropped before the stream is ready.
+  @override
+  Future<void> setSourceFrom(AudioSourceSpec source, Duration start) =>
+      _open(source, start);
+
+  Future<void> _open(AudioSourceSpec source, Duration? start) {
     _ensureLive();
     return switch (source) {
       RemoteAudioSource(:final uri, :final headers) => _player.open(
         Media(
           uri.toString(),
           httpHeaders: headers.isEmpty ? null : Map<String, String>.of(headers),
+          start: start,
         ),
         play: false,
       ),
-      LocalAudioSource(:final path) => _player.open(Media(path), play: false),
+      LocalAudioSource(:final path) => _player.open(
+        Media(path, start: start),
+        play: false,
+      ),
     };
   }
 

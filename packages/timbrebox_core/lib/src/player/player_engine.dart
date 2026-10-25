@@ -36,3 +36,9 @@ abstract interface class RateControllablePlayerEngine {
 abstract interface class PlaybackCompletionEvents {
   Stream<void> get completed;
 }
+
+/// Optional capability for engines that can open a source at a position, so
+/// resuming does not depend on a seek that a not-yet-loaded stream may drop.
+abstract interface class StartPositionLoad {
+  Future<void> loadFrom(StreamCandidate candidate, Duration start);
+}

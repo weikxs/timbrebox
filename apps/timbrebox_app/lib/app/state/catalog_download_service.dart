@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../model/catalog_track.dart';
@@ -39,7 +41,10 @@ final class CatalogDownloadService {
     token.throwIfCancelled();
     final directory = await _directoryProvider();
     await directory.create(recursive: true);
-    final base = _safeName('${track.artist} - ${track.title}');
+    // The short id keeps two different tracks with the same artist and title
+    // (or the same song from two sources) from sharing one file.
+    final base = '${_safeName('${track.artist} - ${track.title}')} '
+        '[${_shortId(track.ref)}]';
     final extension = _extension(stream.mimeType, stream.uri);
     final target = File('${directory.path}/$base.$extension');
 
@@ -74,22 +79,46 @@ final class CatalogDownloadService {
         await sink.close();
       }
       if (await target.exists()) await target.delete();
-      return partial.rename(target.path);
+      // Awaited so `finally` below runs after the rename, not during it.
+      return await partial.rename(target.path);
     } finally {
       client.close(force: true);
       if (await partial.exists()) await partial.delete();
     }
   }
 
+  static const _mimeExtensions = {
+    'mp4': 'm4a',
+    'm4a': 'm4a',
+    'aac': 'aac',
+    'webm': 'webm',
+    'mpeg': 'mp3',
+    'mp3': 'mp3',
+    'flac': 'flac',
+    'ogg': 'ogg',
+    'opus': 'opus',
+    'wav': 'wav',
+  };
+
+  static const _audioSuffixes = {
+    'm4a', 'mp4', 'aac', 'webm', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'wav',
+  };
+
+  /// The file extension from the stream's MIME type, else from a known audio
+  /// suffix in the URL. Proxied streams have URLs like `/s/3`, so an unknown
+  /// suffix falls back to `audio` rather than becoming the extension.
   String _extension(String? mime, Uri uri) {
-    if (mime?.contains('mp4') ?? false) return 'm4a';
-    if (mime?.contains('webm') ?? false) return 'webm';
+    final type = mime?.toLowerCase() ?? '';
+    for (final entry in _mimeExtensions.entries) {
+      if (type.contains(entry.key)) return entry.value;
+    }
     final name = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
-    final suffix = name.split('.').last.toLowerCase();
-    return suffix.length <= 4 && RegExp(r'^[a-z0-9]+$').hasMatch(suffix)
-        ? suffix
-        : 'audio';
+    final suffix = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    return _audioSuffixes.contains(suffix) ? suffix : 'audio';
   }
+
+  String _shortId(MediaRef ref) =>
+      sha256.convert(utf8.encode(ref.toString())).toString().substring(0, 8);
 
   String _safeName(String value) {
     final cleaned = value.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), ' ');

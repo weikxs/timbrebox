@@ -91,11 +91,58 @@ void main() {
       expect(outside.existsSync(), isTrue);
     });
   });
+
+  group('CatalogDownloadService file names', () {
+    late HttpServer server;
+
+    setUp(() async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) {
+        final mime = request.uri.queryParameters['mime'];
+        if (mime != null) {
+          request.response.headers.contentType = ContentType.parse(mime);
+        }
+        request.response
+          ..write('audio-${request.uri.path}')
+          ..close();
+      });
+    });
+
+    tearDown(() => server.close(force: true));
+
+    Future<File> download(CatalogTrack track, String path, {String? mime}) {
+      final uri = Uri.parse('http://127.0.0.1:${server.port}$path');
+      return CatalogDownloadService(
+        resolver: _FixedResolver(uri, mimeType: mime),
+        directoryProvider: () async => library,
+      ).download(track);
+    }
+
+    test(
+      'two tracks with the same artist and title keep separate files',
+      () async {
+        final first = await download(_track('one', title: 'Same'), '/one.mp3');
+        final second = await download(_track('two', title: 'Same'), '/two.mp3');
+
+        expect(first.path, isNot(second.path));
+        expect(first.readAsStringSync(), 'audio-/one.mp3');
+        expect(second.readAsStringSync(), 'audio-/two.mp3');
+      },
+    );
+
+    test('names the file from the stream type, not a proxy token', () async {
+      final viaProxy = await download(_track('p'), '/s/3', mime: 'audio/mpeg');
+      final unknown = await download(_track('q'), '/s/4');
+
+      expect(viaProxy.path, endsWith('.mp3'));
+      expect(unknown.path, isNot(endsWith('.4')));
+    });
+  });
 }
 
-CatalogTrack _track(String id) => CatalogTrack(
+CatalogTrack _track(String id, {String? title}) => CatalogTrack(
   id: id,
-  title: 'Track $id',
+  title: title ?? 'Track $id',
   artist: 'Test artist',
   sourceId: 'audius',
   sourceName: 'Audius',
@@ -104,11 +151,12 @@ CatalogTrack _track(String id) => CatalogTrack(
 );
 
 class _FixedResolver implements StreamResolver {
-  _FixedResolver(this.uri);
+  _FixedResolver(this.uri, {this.mimeType});
 
   final Uri uri;
+  final String? mimeType;
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async =>
-      ResolvedStream(uri: uri);
+      ResolvedStream(uri: uri, mimeType: mimeType);
 }

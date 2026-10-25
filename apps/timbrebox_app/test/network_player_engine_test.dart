@@ -84,6 +84,43 @@ void main() {
       throwsStateError,
     );
   });
+
+  test(
+    'a failed load stops the previous track instead of leaving it playing',
+    () async {
+      final backend = _FakeAudioBackend();
+      final engine = NetworkPlayerEngine(
+        backend: backend,
+        resolver: _FailingAfterFirstResolver(
+          AudioSourceSpec.remote(Uri.parse('https://cdn.example.test/a.m4a')),
+        ),
+      );
+      await engine.load(candidate);
+      await engine.play();
+      backend.calls.clear();
+
+      await expectLater(engine.load(candidate), throwsA(isA<StateError>()));
+
+      expect(backend.calls, ['stop', 'releaseSource']);
+      await expectLater(engine.play(), throwsA(isA<StateError>()));
+      await engine.release();
+    },
+  );
+
+  test('opens the source at a start position when the backend can', () async {
+    final backend = _StartingAudioBackend();
+    final engine = NetworkPlayerEngine(
+      backend: backend,
+      resolver: _FixedResolver(
+        AudioSourceSpec.remote(Uri.parse('https://cdn.example.test/a.m4a')),
+      ),
+    );
+
+    await engine.loadFrom(candidate, const Duration(seconds: 42));
+
+    expect(backend.calls, contains('source from 0:00:42.000000'));
+    await engine.release();
+  });
 }
 
 class _FixedResolver implements PlayerSourceResolver {
@@ -133,5 +170,27 @@ class _FakeAudioBackend implements AudioBackend {
   Future<void> dispose() async {
     calls.add('dispose');
     await _completed.close();
+  }
+}
+
+class _FailingAfterFirstResolver implements PlayerSourceResolver {
+  _FailingAfterFirstResolver(this.source);
+
+  final AudioSourceSpec source;
+  var _calls = 0;
+
+  @override
+  Future<AudioSourceSpec> resolve(StreamCandidate candidate) async {
+    if (_calls++ > 0) throw StateError('stream unavailable');
+    return source;
+  }
+}
+
+class _StartingAudioBackend extends _FakeAudioBackend
+    implements StartPositionAudioBackend {
+  @override
+  Future<void> setSourceFrom(AudioSourceSpec value, Duration start) async {
+    source = value;
+    calls.add('source from $start');
   }
 }

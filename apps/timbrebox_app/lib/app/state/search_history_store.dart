@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'atomic_file.dart';
 
 /// Persists recent search queries (plain strings only) so they survive restarts.
 abstract interface class SearchHistoryStore {
@@ -28,7 +29,7 @@ final class FileSearchHistoryStore implements SearchHistoryStore {
   Future<void> save(List<String> queries) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode(queries), flush: true);
+    await writeFileAtomically(file, jsonEncode(queries));
   }
 
   Future<File> _file() async {

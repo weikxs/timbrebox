@@ -97,7 +97,16 @@ class AppController extends ChangeNotifier {
         : null;
     if (progress != null) {
       _positionSubscription = progress.positions.listen((value) {
+        // A paused track does not move; the only report while paused is the
+        // 0 sent when the idle source is released, which must not erase the
+        // paused position (shown, saved, and resumed from).
+        if (_player.value.status == PlaybackStatus.paused) return;
         _position = value;
+        // Keep the saved session close to where playback is, so a crash or a
+        // quit resumes near the same spot.
+        if ((value - _savedPosition).abs() >= _sessionSaveInterval) {
+          _persistSession();
+        }
         notifyListeners();
       });
       _durationSubscription = progress.durations.listen((value) {
@@ -160,6 +169,12 @@ class AppController extends ChangeNotifier {
   // True while playback is paused because the output device (Bluetooth /
   // headphones) went away — so we auto-resume only what we auto-paused.
   bool _pausedByRoute = false;
+
+  /// Bumped by every [play]; see there.
+  var _playGeneration = 0;
+
+  /// The sleep timer ran out while a track was still loading.
+  var _pauseWhenStarted = false;
 
   // A one-shot "resume where the last session left off" position for a specific
   // track, applied the first time that track is played after a restore.
@@ -281,13 +296,24 @@ class AppController extends ChangeNotifier {
   bool isLoadingTrack(CatalogTrack track) =>
       isLoading && _currentTrack?.ref == track.ref;
 
-  Future<void> play(CatalogTrack track) async {
+  /// Plays [track]. [queueIndex] names the queue entry when the caller already
+  /// chose it (next / previous / shuffle / queue rows), so a track that sits
+  /// in the queue twice keeps the chosen copy instead of the first one.
+  Future<void> play(CatalogTrack track, {int? queueIndex}) async {
     // Consume a pending session-resume position only for its own track.
     final resumeTo = track.ref == _resumeRef ? _resumePosition : null;
     _resumeRef = null;
     _resumePosition = null;
     _knownTracks[track.ref.toString()] = track;
-    final index = _queue.tracks.indexWhere((item) => item.ref == track.ref);
+    final tracks = _queue.tracks;
+    final chosen =
+        queueIndex != null &&
+        queueIndex >= 0 &&
+        queueIndex < tracks.length &&
+        tracks[queueIndex].ref == track.ref;
+    final index = chosen
+        ? queueIndex
+        : tracks.indexWhere((item) => item.ref == track.ref);
     if (index >= 0) {
       _queue.select(index);
     } else {
@@ -309,12 +335,25 @@ class AppController extends ChangeNotifier {
             label: 'offline',
           );
     DiagnosticLog.record('play ${track.sourceName}: ${track.title}');
-    await _player.play(candidate);
+    final generation = ++_playGeneration;
+    final startAt = resumeTo != null && resumeTo > Duration.zero
+        ? resumeTo
+        : null;
+    if (startAt != null) _position = startAt;
+    await _player.play(candidate, startAt: startAt);
+    // A newer play() took over while this one loaded; its state wins.
+    if (generation != _playGeneration) return;
     _playbackError = _player.value.errorMessage;
+    final pauseNow = _pauseWhenStarted;
+    _pauseWhenStarted = false;
+    if (pauseNow && _playbackError == null) {
+      await _player.pause();
+      _syncPlaybackState();
+    }
     if (_playbackError != null) {
       DiagnosticLog.record('play error: $_playbackError');
-    } else if (resumeTo != null && resumeTo > Duration.zero) {
-      await seek(resumeTo); // Resume the restored session where it left off.
+    } else if (startAt != null && _playerEngine is! StartPositionLoad) {
+      await seek(startAt); // Engines without start support resume by seeking.
     }
     _persistSession();
     notifyListeners();
@@ -329,17 +368,30 @@ class AppController extends ChangeNotifier {
     if (isPlaying) {
       await _player.pause();
       _playbackError = _player.value.errorMessage;
+      _persistSession();
     } else if (track != null) {
-      // Resume from the paused position when possible; only reload from 0 if the
-      // source was already released (e.g. after a long pause).
-      final resumed = await _player.resume();
-      if (!resumed) {
-        await play(track);
-        return;
-      }
-      _playbackError = _player.value.errorMessage;
+      await _resumeOrReload(track);
+      return;
     }
     notifyListeners();
+  }
+
+  /// Resumes the loaded source in place. When it is gone (released after a
+  /// long pause, failed, or played to its end) the track is reloaded, at the
+  /// paused position unless it had finished.
+  Future<void> _resumeOrReload(CatalogTrack track) async {
+    if (await _player.resume()) {
+      _playbackError = _player.value.errorMessage;
+      notifyListeners();
+      return;
+    }
+    final finished =
+        _playbackDuration > Duration.zero && _position >= _playbackDuration;
+    if (!finished && _position > Duration.zero) {
+      _resumeRef = track.ref;
+      _resumePosition = _position;
+    }
+    await play(track, queueIndex: _queue.currentIndex);
   }
 
   Future<void> next() => _advance(
@@ -349,12 +401,16 @@ class AppController extends ChangeNotifier {
 
   Future<void> previous() async {
     final previous = _queue.previous(wrap: _loop == PlaybackLoop.queue);
-    if (previous != null) await play(_trackFor(previous));
+    if (previous != null) {
+      await play(_trackFor(previous), queueIndex: _queue.currentIndex);
+    }
   }
 
   Future<void> _advance({required bool wrap, required bool shuffled}) async {
     final next = shuffled ? _randomNext() : _queue.next(wrap: wrap);
-    if (next != null) await play(_trackFor(next));
+    if (next != null) {
+      await play(_trackFor(next), queueIndex: _queue.currentIndex);
+    }
   }
 
   TrackSummary? _randomNext() {
@@ -375,7 +431,7 @@ class AppController extends ChangeNotifier {
     switch (_loop) {
       case PlaybackLoop.track:
         final track = _currentTrack;
-        if (track != null) await play(track);
+        if (track != null) await play(track, queueIndex: _queue.currentIndex);
         return;
       case PlaybackLoop.queue:
       case PlaybackLoop.off:
@@ -394,16 +450,15 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Queues a whole list (a playlist / category) and starts the first track.
+  /// Replaces the queue with a whole list (a playlist / category) in its own
+  /// order and starts the first track.
   Future<void> playAll(List<CatalogTrack> tracks) async {
     if (tracks.isEmpty) return;
     for (final track in tracks) {
       _knownTracks[track.ref.toString()] = track;
-      if (!_queue.tracks.any((item) => item.ref == track.ref)) {
-        _queue.add(track.summary);
-      }
     }
-    await play(tracks.first);
+    _queue.replace([for (final track in tracks) track.summary]);
+    await play(tracks.first, queueIndex: 0);
   }
 
   /// Plays [tracks] in a random order.
@@ -454,12 +509,22 @@ class AppController extends ChangeNotifier {
       if (!sourceEnabled(entry.key)) continue;
       try {
         all.addAll(await entry.value.topLists());
-      } catch (_) {}
+      } catch (error) {
+        DiagnosticLog.record('plugin ${entry.key} top lists failed: $error');
+      }
     }
     _pluginTopLists
       ..clear()
       ..addAll(all);
     notifyListeners();
+  }
+
+  /// Plugins were restored, installed, updated, removed or switched on/off:
+  /// charts already shown must reflect that (ones not shown yet load when
+  /// the hot library opens).
+  void _pluginsChanged() {
+    if (!_pluginTopListsLoaded) return;
+    unawaited(loadPluginTopLists(force: true));
   }
 
   bool get currentTrackHasLyric {
@@ -487,7 +552,10 @@ class AppController extends ChangeNotifier {
     for (final source in sources) {
       _adoptSource(mutable, source, enabledDefault: source.manifest.enabled);
     }
-    if (sources.isNotEmpty) notifyListeners();
+    if (sources.isNotEmpty) {
+      _pluginsChanged();
+      notifyListeners();
+    }
   }
 
   /// Registers [source] (replacing any prior one with the same id, disposing it)
@@ -523,6 +591,7 @@ class AppController extends ChangeNotifier {
     for (final source in sources) {
       _adoptSource(mutable, source);
     }
+    _pluginsChanged();
     notifyListeners();
     return sources.length;
   }
@@ -548,7 +617,10 @@ class AppController extends ChangeNotifier {
         // A single failed update must not abort the rest.
       }
     }
-    if (updated > 0) notifyListeners();
+    if (updated > 0) {
+      _pluginsChanged();
+      notifyListeners();
+    }
     return updated;
   }
 
@@ -561,6 +633,7 @@ class AppController extends ChangeNotifier {
     _pluginSources.remove(id)?.dispose();
     _enabledSources.remove(id);
     _plugins.removeWhere((manifest) => manifest.id == id);
+    _pluginsChanged();
     notifyListeners();
   }
 
@@ -720,6 +793,7 @@ class AppController extends ChangeNotifier {
     await (_playerEngine as PlaybackProgressEvents).seek(position);
     _position = position;
     _syncPlaybackState();
+    _persistSession();
   }
 
   // ---- System media session (media keys / Bluetooth headset buttons) ----
@@ -761,9 +835,10 @@ class AppController extends ChangeNotifier {
       case AudioRouteEvent.outputConnected:
         // The device came back: resume only what we auto-paused (a manual
         // pause/play in between clears the flag, so we never fight the user).
-        if (_pausedByRoute && !isPlaying && _currentTrack != null) {
+        final track = _currentTrack;
+        if (_pausedByRoute && !isPlaying && track != null) {
           _pausedByRoute = false;
-          await _player.resume();
+          await _resumeOrReload(track);
           _syncPlaybackState();
           notifyListeners();
         }
@@ -795,6 +870,7 @@ class AppController extends ChangeNotifier {
 
   /// Pauses playback after [total]. Pass null (or non-positive) to cancel.
   void setSleepTimer(Duration? total) {
+    _pauseWhenStarted = false;
     _sleepTimer?.cancel();
     _sleepTimer = null;
     _sleepRemaining = null;
@@ -812,7 +888,11 @@ class AppController extends ChangeNotifier {
         _sleepTimer?.cancel();
         _sleepTimer = null;
         _sleepRemaining = null;
-        if (isPlaying) unawaited(_player.pause());
+        if (isPlaying) {
+          unawaited(_player.pause().then((_) => _persistSession()));
+        } else if (isLoading) {
+          _pauseWhenStarted = true; // play() pauses once the track starts
+        }
         _syncPlaybackState();
       } else {
         _sleepRemaining = next;
@@ -825,6 +905,7 @@ class AppController extends ChangeNotifier {
   /// Stops playback and clears the OS media session (headset/OS "stop").
   Future<void> stopPlayback() async {
     await _player.stop();
+    _persistSession();
     _syncPlaybackState();
     notifyListeners();
   }
@@ -1056,6 +1137,10 @@ class AppController extends ChangeNotifier {
     if (_query.isEmpty) return;
     if (!hasMoreResults(sourceId)) return;
     if (_loadingMore.contains(sourceId)) return;
+    // After a failure, wait before asking again: the list asks for more on
+    // every frame while it is shorter than the screen.
+    final retryAt = _loadMoreRetryAt[sourceId];
+    if (retryAt != null && DateTime.now().isBefore(retryAt)) return;
     final catalog = _catalog;
     if (catalog is! PagedMusicCatalog) return;
     _loadingMore.add(sourceId);
@@ -1087,8 +1172,15 @@ class AppController extends ChangeNotifier {
       }
       // Only a genuinely empty page ends the waterfall — a partial page may
       // still have a next one, so we keep loading until nothing new arrives.
-      if (group.failure == null && fresh.isEmpty) {
+      final failure = group.failure;
+      if (failure == null && fresh.isEmpty) {
         _sourceExhausted.add(sourceId);
+      } else if (failure != null && !failure.retryable) {
+        _sourceExhausted.add(sourceId);
+      } else if (failure != null) {
+        _loadMoreRetryAt[sourceId] = DateTime.now().add(_loadMoreCooldown);
+      } else {
+        _loadMoreRetryAt.remove(sourceId);
       }
     } finally {
       _loadingMore.remove(sourceId);
@@ -1096,7 +1188,11 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  static const _loadMoreCooldown = Duration(seconds: 15);
+  final Map<String, DateTime> _loadMoreRetryAt = {};
+
   void _resetPaging() {
+    _loadMoreRetryAt.clear();
     _pagedResults.clear();
     _sourcePage.clear();
     _sourceExhausted.clear();
@@ -1178,6 +1274,7 @@ class AppController extends ChangeNotifier {
     if (index >= 0) {
       _plugins[index] = _plugins[index].copyWith(enabled: enabled);
       unawaited(_pluginRepository?.setEnabled(sourceId, enabled));
+      _pluginsChanged();
     }
     unawaited(search(_query));
   }
@@ -1269,9 +1366,13 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  static const _sessionSaveInterval = Duration(seconds: 10);
+  var _savedPosition = Duration.zero;
+
   void _persistSession() {
     final store = _sessionStore;
     if (store == null) return;
+    _savedPosition = _position;
     final tracks = queue;
     final currentRef = _currentTrack?.ref;
     final index = currentRef == null
@@ -1314,7 +1415,7 @@ class AppController extends ChangeNotifier {
   Future<bool> playQueueIndex(int index) async {
     final tracks = queue;
     if (index < 0 || index >= tracks.length) return false;
-    await play(tracks[index]);
+    await play(tracks[index], queueIndex: index);
     return true;
   }
 
@@ -1405,6 +1506,7 @@ class AppController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _persistSession(); // Keep the position when the app closes.
     _searchCancellation?.cancel();
     _loadMoreCancellation?.cancel();
     unawaited(_completionSubscription?.cancel() ?? Future<void>.value());

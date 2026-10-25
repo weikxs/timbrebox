@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import '../model/catalog_track.dart';
+import 'atomic_file.dart';
 
 /// Persists the last listening session (the queue, which track was current, and
 /// its playback position in milliseconds) so "restore last session" can rebuild
@@ -26,13 +27,13 @@ final class FileSessionStore implements SessionStore {
   }) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeFileAtomically(
+      file,
       jsonEncode({
         'currentIndex': currentIndex,
         'positionMs': positionMs,
         'queue': [for (final track in queue) track.toJson()],
       }),
-      flush: true,
     );
   }
 

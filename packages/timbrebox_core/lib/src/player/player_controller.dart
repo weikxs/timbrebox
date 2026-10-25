@@ -10,6 +10,7 @@ class PlayerController {
     if (engine is PlaybackCompletionEvents) {
       final completionEvents = engine as PlaybackCompletionEvents;
       _completionSubscription = completionEvents.completed.listen((_) {
+        _ended = true;
         _emit(
           PlaybackState(
             status: PlaybackStatus.idle,
@@ -27,19 +28,40 @@ class PlayerController {
   StreamSubscription<void>? _completionSubscription;
   PlaybackState _value = const PlaybackState.idle();
 
+  /// Bumped by every [play]; a load that finishes after a newer [play] began
+  /// must neither start playing nor publish its state.
+  var _generation = 0;
+
+  /// The loaded source played to its end, so resuming it would play nothing.
+  var _ended = false;
+
   PlaybackState get value => _value;
   Stream<PlaybackState> get states => _states.stream;
   Stream<void> get completions => _completions.stream;
 
-  Future<void> play(StreamCandidate candidate) async {
+  /// Loads and plays [candidate], from [startAt] when the engine supports
+  /// starting at a position (see [StartPositionLoad]).
+  Future<void> play(StreamCandidate candidate, {Duration? startAt}) async {
+    final generation = ++_generation;
+    _ended = false;
     _emit(PlaybackState(status: PlaybackStatus.loading, candidate: candidate));
     try {
-      await _engine.load(candidate);
+      final engine = _engine;
+      if (startAt != null &&
+          startAt > Duration.zero &&
+          engine is StartPositionLoad) {
+        await (engine as StartPositionLoad).loadFrom(candidate, startAt);
+      } else {
+        await engine.load(candidate);
+      }
+      if (generation != _generation) return;
       await _engine.play();
+      if (generation != _generation) return;
       _emit(
         PlaybackState(status: PlaybackStatus.playing, candidate: candidate),
       );
     } catch (error) {
+      if (generation != _generation) return;
       _emit(
         PlaybackState(
           status: PlaybackStatus.failed,
@@ -51,10 +73,12 @@ class PlayerController {
   }
 
   /// Resumes the currently-loaded source in place (keeping its position),
-  /// without reloading from 0. Returns false if nothing is resumable (e.g. the
-  /// source was released after a long pause), so the caller can reload instead.
+  /// without reloading from 0. Returns false if nothing is resumable (the
+  /// source was released after a long pause, failed to load, or played to its
+  /// end), so the caller can reload instead.
   Future<bool> resume() async {
-    if (_value.candidate == null) return false;
+    if (_value.candidate == null || _ended) return false;
+    if (_value.status == PlaybackStatus.failed) return false;
     try {
       await _engine.play();
       _emit(

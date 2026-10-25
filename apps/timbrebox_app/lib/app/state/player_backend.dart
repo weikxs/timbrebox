@@ -42,3 +42,9 @@ abstract interface class ProgressAudioBackend {
 
   Future<void> seek(Duration position);
 }
+
+/// Optional capability for backends that can open a source at a position
+/// (libmpv's `start`), which works before the stream is ready to seek.
+abstract interface class StartPositionAudioBackend {
+  Future<void> setSourceFrom(AudioSourceSpec source, Duration start);
+}

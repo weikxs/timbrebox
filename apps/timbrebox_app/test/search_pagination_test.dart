@@ -85,6 +85,32 @@ void main() {
     );
     controller.dispose();
   });
+
+  test('a failed page is not requested again right away', () async {
+    final catalog = _FailingMoreCatalog([_page('p1', _full)], retryable: true);
+    final controller = AppController(engine: TestPlayerEngine(), catalog: catalog);
+    addTearDown(controller.dispose);
+    await controller.search('x');
+
+    await controller.loadMore('audius');
+    await controller.loadMore('audius');
+    await controller.loadMore('audius');
+
+    expect(catalog.moreCalls, 1);
+    expect(controller.hasMoreResults('audius'), isTrue);
+  });
+
+  test('a page that cannot be retried ends the list', () async {
+    final catalog = _FailingMoreCatalog([_page('p1', _full)], retryable: false);
+    final controller = AppController(engine: TestPlayerEngine(), catalog: catalog);
+    addTearDown(controller.dispose);
+    await controller.search('x');
+
+    await controller.loadMore('audius');
+
+    expect(catalog.moreCalls, 1);
+    expect(controller.hasMoreResults('audius'), isFalse);
+  });
 }
 
 List<CatalogTrack> _page(String prefix, int count) => [
@@ -167,6 +193,30 @@ class _PagedCatalog
           ? SourceSearchStatus.empty
           : SourceSearchStatus.success,
       tracks: tracks,
+    );
+  }
+}
+
+class _FailingMoreCatalog extends _PagedCatalog {
+  _FailingMoreCatalog(super.pages, {required this.retryable});
+
+  final bool retryable;
+  var moreCalls = 0;
+
+  @override
+  Future<CatalogSearchGroup> searchMore(
+    String sourceId,
+    String query, {
+    required int page,
+    required CancellationToken cancellation,
+  }) async {
+    moreCalls++;
+    return CatalogSearchGroup(
+      sourceId: sourceId,
+      sourceName: 'Audius',
+      status: SourceSearchStatus.failure,
+      tracks: const [],
+      failure: SourceFailure('offline', retryable: retryable),
     );
   }
 }

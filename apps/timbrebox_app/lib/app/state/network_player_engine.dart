@@ -13,7 +13,8 @@ class NetworkPlayerEngine
         VolumeControllablePlayerEngine,
         RateControllablePlayerEngine,
         PlaybackCompletionEvents,
-        PlaybackProgressEvents {
+        PlaybackProgressEvents,
+        StartPositionLoad {
   NetworkPlayerEngine({
     required AudioBackend backend,
     PlayerSourceResolver? resolver,
@@ -60,16 +61,32 @@ class NetworkPlayerEngine
   });
 
   @override
-  Future<void> load(StreamCandidate candidate) => _run(() async {
-    _ensureLive();
-    _generation++;
-    _releaseTimer?.cancel();
-    final source = await _resolver.resolve(candidate);
-    _ensureLive();
-    await _backend.setReleaseMode(AudioReleaseMode.stop);
-    await _backend.setSource(source);
-    _loaded = true;
-  });
+  Future<void> load(StreamCandidate candidate) => _load(candidate, null);
+
+  @override
+  Future<void> loadFrom(StreamCandidate candidate, Duration start) =>
+      _load(candidate, start);
+
+  Future<void> _load(StreamCandidate candidate, Duration? start) =>
+      _run(() async {
+        _ensureLive();
+        // Stop the previous track first: if resolving the new one fails,
+        // nothing must keep playing (or be resumable) under the new name.
+        await _releaseLoadedSource();
+        final source = await _resolver.resolve(candidate);
+        _ensureLive();
+        await _backend.setReleaseMode(AudioReleaseMode.stop);
+        final backend = _backend;
+        if (start != null && backend is StartPositionAudioBackend) {
+          await (backend as StartPositionAudioBackend).setSourceFrom(
+            source,
+            start,
+          );
+        } else {
+          await backend.setSource(source);
+        }
+        _loaded = true;
+      });
 
   @override
   Future<void> play() => _run(() async {

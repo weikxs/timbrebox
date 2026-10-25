@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'atomic_file.dart';
 
 /// Persists the user's appearance choices: the selected built-in theme id and
 /// an optional custom background skin image.
@@ -23,7 +24,7 @@ final class AppearanceStore {
   Future<void> saveThemeId(String id) async {
     final directory = await _directory();
     await directory.create(recursive: true);
-    await File('${directory.path}/$_themeFileName').writeAsString(id, flush: true);
+    await writeFileAtomically(File('${directory.path}/$_themeFileName'), id);
   }
 
   /// Returns the current skin file, or null if none has been set.

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import '../model/catalog_track.dart';
+import 'atomic_file.dart';
 
 /// Persists the favorite tracks (full metadata only — never a source URL,
 /// header, token or cookie) so the favorites list survives restarts.
@@ -34,9 +35,9 @@ final class FileFavoritesStore implements FavoritesStore {
   Future<void> save(List<CatalogTrack> favorites) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeFileAtomically(
+      file,
       jsonEncode([for (final track in favorites) track.toJson()]),
-      flush: true,
     );
   }
 

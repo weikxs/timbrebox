@@ -411,6 +411,7 @@ class _Playlist extends StatelessWidget {
               category.key,
               audiusGenre: category.audiusGenre,
               bilibiliQuery: category.bilibiliQuery,
+              pluginTopList: category.pluginRef,
               force: true,
             ),
           )
