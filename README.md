@@ -12,6 +12,8 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
+<img src="docs/screenshots/home-en.webp" alt="TimbreBox on macOS: the home page playing a track from Audius, with the play queue on the right" width="860">
+
 </div>
 
 ---
@@ -24,6 +26,7 @@ The product goal is honesty and calm: no sign-up wall, real (not promised) audio
 
 ## Table of Contents
 
+- [Screenshots](#screenshots)
 - [Features](#features)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
@@ -35,6 +38,30 @@ The product goal is honesty and calm: no sign-up wall, real (not promised) audio
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Screenshots
+
+Taken from the macOS app with real results from the open sources (Audius, Internet Archive, Radio Browser); the UI
+also comes in Chinese ([简体中文 README](README.zh-CN.md#截图)).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home-en.webp" alt="Home: now playing and the play queue"></td>
+    <td width="50%"><img src="docs/screenshots/search-en.webp" alt="Search: results for a query, one tab per source"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Home</b> — now playing, seekable progress and the play queue</td>
+    <td align="center"><b>Search</b> — one query across sources, with favorite, queue and download on every row</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/charts-en.webp" alt="Charts: genre playlists from Audius"></td>
+    <td><img src="docs/screenshots/settings-en.webp" alt="Settings: language, playback, theme, sources, plugins, downloads and shortcuts"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>Charts</b> — genre playlists backed by real trending data</td>
+    <td align="center"><b>Settings</b> — language, playback, theme, sources, plugins, downloads, shortcuts</td>
+  </tr>
+</table>
 
 ## Features
 
@@ -135,6 +162,8 @@ Key pieces:
 
 ## Getting Started
 
+TimbreBox does not publish prebuilt packages yet; build it from source as below.
+
 ### Prerequisites
 - **Flutter SDK** with Dart **`^3.12.0`** (`flutter --version`).
 - Platform toolchains for your targets:
@@ -146,7 +175,7 @@ Key pieces:
 
 ### Clone & install
 ```bash
-git clone <repository-url> timbrebox
+git clone https://github.com/weikxs/timbrebox.git
 cd timbrebox/apps/timbrebox_app
 flutter pub get
 ```
@@ -259,7 +288,7 @@ cd ../../packages/timbrebox_core
 dart test                # Core domain tests
 ```
 
-Current status: app + core unit/widget tests passing, static analysis clean, macOS debug build clean.
+Current status: app, core and CLI tests passing, static analysis clean, macOS release build clean.
 
 ## Roadmap
 

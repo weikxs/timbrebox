@@ -12,6 +12,8 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
+<img src="docs/screenshots/home-zh.webp" alt="macOS 上的 TimbreBox：首页正在播放一首 Audius 曲目，右侧是播放队列" width="860">
+
 </div>
 
 ---
@@ -24,6 +26,7 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 
 ## 目录
 
+- [截图](#截图)
 - [功能特性](#功能特性)
 - [架构](#架构)
 - [快速开始](#快速开始)
@@ -35,6 +38,30 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 - [路线图](#路线图)
 - [贡献](#贡献)
 - [许可证](#许可证)
+
+## 截图
+
+截自 macOS 版，内容是开放音源（Audius、Internet Archive、Radio Browser）返回的真实结果；界面也有英文版（见
+[English README](README.md#screenshots)）。
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/home-zh.webp" alt="首页：正在播放与播放队列"></td>
+    <td width="50%"><img src="docs/screenshots/search-zh.webp" alt="搜索：一次搜索的结果，按音源分页签"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>首页</b>——正在播放、可拖动的进度条和播放队列</td>
+    <td align="center"><b>搜索</b>——一次搜索覆盖多个音源，每一行都能收藏、加入队列和下载</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/charts-zh.webp" alt="热门库：来自 Audius 的流派歌单"></td>
+    <td><img src="docs/screenshots/settings-zh.webp" alt="设置：语言、播放、主题、音源、插件、下载和快捷键"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>热门库</b>——由真实热门数据生成的流派歌单</td>
+    <td align="center"><b>设置</b>——语言、播放、主题、音源、插件、下载、快捷键</td>
+  </tr>
+</table>
 
 ## 功能特性
 
@@ -135,6 +162,8 @@ flowchart TD
 
 ## 快速开始
 
+TimbreBox 目前还没有发布预编译安装包，请按下面的步骤从源码构建。
+
 ### 先决条件
 - **Flutter SDK**，Dart **`^3.12.0`**（`flutter --version`）。
 - 面向目标平台的工具链：
@@ -146,7 +175,7 @@ flowchart TD
 
 ### 克隆与安装
 ```bash
-git clone <repository-url> timbrebox
+git clone https://github.com/weikxs/timbrebox.git
 cd timbrebox/apps/timbrebox_app
 flutter pub get
 ```
@@ -259,7 +288,7 @@ cd ../../packages/timbrebox_core
 dart test                # 核心领域测试
 ```
 
-当前状态：应用 + 核心的单元/组件测试通过，静态分析无告警，macOS debug 构建干净。
+当前状态：应用、核心包和 CLI 的测试全部通过，静态分析无告警，macOS release 构建干净。
 
 ## 路线图
 
