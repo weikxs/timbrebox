@@ -6,6 +6,7 @@ import '../data/stream_header_proxy.dart';
 import '../model/catalog_track.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
+import 'plugin_stream_url.dart';
 
 /// Exposes a loaded plugin as a first-class catalog source.
 ///
@@ -120,14 +121,7 @@ final class PluginCatalogSource implements CatalogSource {
       );
     }
     final url = raw['url']?.toString();
-    final parsed = Uri.tryParse(url ?? '');
-    if (url == null || url.isEmpty || parsed == null) {
-      throw SourceException(
-        AppStrings.t('plugin.src.noUrl'),
-        retryable: false,
-        code: 'source_stream_unavailable',
-      );
-    }
+    final parsed = await checkedPluginStreamUri(url);
     final headers = <String, String>{};
     final rawHeaders = raw['headers'];
     if (rawHeaders is Map) {
@@ -143,9 +137,9 @@ final class PluginCatalogSource implements CatalogSource {
     // through the loopback proxy which injects the headers per hop.
     if (headers.isNotEmpty) {
       final local = await _proxy.publish(parsed, headers);
-      return ResolvedStream(uri: local, mimeType: _mimeType(url));
+      return ResolvedStream(uri: local, mimeType: _mimeType(url!));
     }
-    return ResolvedStream(uri: parsed, mimeType: _mimeType(url));
+    return ResolvedStream(uri: parsed, mimeType: _mimeType(url!));
   }
 
   /// Flattens the plugin's `getTopLists` groups into a single list of charts.

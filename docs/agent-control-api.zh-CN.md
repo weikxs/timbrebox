@@ -21,9 +21,12 @@
 
 ## 安全
 
-- 仅绑定 **本机回环**（`127.0.0.1`）随机端口。回环即安全边界：机器之外无法访问，
-  只有本地进程能连接。
-- **无令牌 / 无认证** —— 既然只有本地进程能连，令牌只会增加麻烦而不增加保护。
+- 仅绑定 **本机回环**（`127.0.0.1`），机器之外无法访问。
+- **拒绝网页发来的请求。** 浏览器里的网页同样可以向 `127.0.0.1` 发请求，所以服务端还会：
+  - 只接受 `Host` 为 `127.0.0.1:<端口>` 或 `localhost:<端口>` 的请求（防 DNS rebinding）；
+  - 拒绝带 `Origin` 头、或 `Sec-Fetch-Site` 不是 `none` 的请求（浏览器会给网页发出的请求加上这些头）；
+  - 动作只接受 `POST`，普通链接或 `<img>` 无法触发（否则返回 `405`；读取用 `GET`）。
+- 对本机程序 **不设令牌 / 认证**：已经以你的身份运行在本机上的程序，本来也能操作 app 的界面。
 - macOS 需要 `com.apple.security.network.server` 权限（已内置）。
 
 ## 发现与 CLI
@@ -46,7 +49,7 @@ AI agent 可用 `.claude/skills/timbrebox-control/` 技能。
 
 ## 端点
 
-所有响应为 JSON。读操作用 `GET`，动作用 `POST`（服务端不强制方法，此为约定）。
+所有响应为 JSON。读取用 `GET`，其余一律用 `POST`；用错方法时服务端返回 `405`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -55,7 +58,7 @@ AI agent 可用 `.claude/skills/timbrebox-control/` 技能。
 | GET | `/queue` | 播放队列（`items[]`） |
 | GET | `/sources` | 音源列表（`id`、`name`、`enabled`） |
 | GET | `/lyric` | 当前曲目歌词（仅插件音源），否则 `null` |
-| GET | `/search?q=` | 搜索所有启用音源，返回 `results[]`（`source`、`item`、`title`、`artist`） |
+| POST | `/search?q=` | 搜索所有启用音源，返回 `results[]`（`source`、`item`、`title`、`artist`） |
 | POST | `/play` `/pause` `/toggle` `/next` `/previous` `/stop` | 播放控制 |
 | POST | `/seek?ms=<毫秒>` | 跳转到指定位置（毫秒） |
 | POST | `/volume?level=<0..1>` | 设置音量 |
@@ -76,14 +79,14 @@ BASE="http://127.0.0.1:<端口>"   # 地址见 设置 → 常规 → Agent 控�
 curl "$BASE/status"
 
 # 搜索后播放第一条结果
-curl "$BASE/search?q=jazz"
-curl "$BASE/play-ref?source=audius&item=abc123"
+curl -X POST "$BASE/search?q=jazz"
+curl -X POST "$BASE/play-ref?source=audius&item=abc123"
 
 # 控制 + 音量 + 循环
-curl "$BASE/toggle"
-curl "$BASE/volume?level=0.6"
-curl "$BASE/mode?loop=shuffle"
+curl -X POST "$BASE/toggle"
+curl -X POST "$BASE/volume?level=0.6"
+curl -X POST "$BASE/mode?loop=shuffle"
 
 # 播放队列中的某项
-curl "$BASE/play-queue?i=2"
+curl -X POST "$BASE/play-queue?i=2"
 ```

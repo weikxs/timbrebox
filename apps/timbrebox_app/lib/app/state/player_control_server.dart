@@ -3,15 +3,16 @@ import 'dart:io';
 
 import '../model/catalog_track.dart';
 import 'app_controller.dart';
+import 'control_request_guard.dart';
 
 /// A loopback HTTP control API so a local agent / CLI / script can drive the
-/// player. Bound to 127.0.0.1 on an ephemeral port — loopback-only is the
-/// security boundary (nothing off the machine can reach it), so there is no
-/// token: only local processes can connect. On by default.
+/// player. Bound to 127.0.0.1, so nothing off the machine can reach it; the
+/// checks in [controlRequestRejection] keep web pages in the user's browser
+/// out as well. There is no token. On by default.
 ///
 /// Endpoints (all return JSON):
-///   GET  / /status /queue /sources /lyric /search?q=
-///   POST /play /pause /toggle /next /previous /stop
+///   GET  / /status /queue /sources /lyric
+///   POST /search?q= /play /pause /toggle /next /previous /stop /quit
 ///   POST /seek?ms= /volume?level= /mode?loop= /play-ref?source=&item=
 ///   POST /play-queue?i= /source?id=&enabled=
 final class PlayerControlServer {
@@ -87,6 +88,17 @@ final class PlayerControlServer {
   }
 
   Future<void> _handle(HttpRequest request) async {
+    final rejection = controlRequestRejection(
+      method: request.method,
+      path: request.uri.path,
+      host: request.headers.value(HttpHeaders.hostHeader),
+      origin: request.headers.value('origin'),
+      fetchSite: request.headers.value('sec-fetch-site'),
+      port: request.connectionInfo?.localPort ?? port ?? 0,
+    );
+    if (rejection != null) {
+      return _json(request, rejection.status, {'error': rejection.error});
+    }
     final query = request.uri.queryParameters;
     try {
       switch (request.uri.path) {
@@ -217,14 +229,14 @@ final class PlayerControlServer {
   Map<String, Object?> _discovery() => {
     'name': 'TimbreBox control API',
     'version': 1,
-    'auth': 'none (loopback only)',
+    'auth': 'none (loopback only; requests from web pages are refused)',
     'endpoints': const {
       'GET /': 'this discovery document',
       'GET /status': 'current playback state',
       'GET /queue': 'the play queue',
       'GET /sources': 'sources with enabled state',
       'GET /lyric': "current track's lyric (plugin sources)",
-      'GET /search?q=': 'search all enabled sources',
+      'POST /search?q=': 'search all enabled sources',
       'POST /play /pause /toggle /next /previous /stop': 'transport',
       'POST /seek?ms=': 'seek to position (ms)',
       'POST /volume?level=': 'set volume (0..1)',

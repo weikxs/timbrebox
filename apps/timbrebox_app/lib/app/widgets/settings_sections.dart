@@ -537,8 +537,9 @@ class _AgentControlInfo extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             '${AppStrings.t('agent.exampleLabel')}curl "$example"\n'
-            '${AppStrings.t('agent.endpointsLabel')}/status /play /pause /toggle /next /previous /stop '
-            '/seek?ms= /volume?level= /search?q= /play-ref?source=&item=',
+            '${AppStrings.t('agent.endpointsLabel')}GET /status /queue /sources /lyric · '
+            'POST /search?q= /play-ref?source=&item= /play /pause /toggle /next '
+            '/previous /stop /seek?ms= /volume?level= /mode?loop= /quit',
             style: TextStyle(
               color: TimbreColors.muted,
               fontSize: 10.5,

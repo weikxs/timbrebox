@@ -58,25 +58,25 @@ turned off — tell the user to launch TimbreBox (it's on by default).
 
 ## Step 2 — Commands
 
-Every response is JSON. Prefer the wrapper; the raw curl equivalent is shown too.
+Every response is JSON. Prefer the wrapper; the raw curl equivalent is shown too. Actions are POST (the player refuses them as GET); reads are GET.
 
 | Intent | Wrapper | Raw request |
 |---|---|---|
 | Current state | `timbrebox-ctl status` | `curl -s "$BASE/status"` |
-| Search all enabled sources | `timbrebox-ctl search "周杰伦"` | `curl -sG "$BASE/search" --data-urlencode "q=周杰伦"` |
-| Play a search/queue result | `timbrebox-ctl play-ref <source> <item>` | `curl -sG "$BASE/play-ref" --data-urlencode source=<s> --data-urlencode item=<i>` |
-| Resume / Pause / Toggle | `timbrebox-ctl play` \| `pause` \| `toggle` | `curl -s "$BASE/play"` \| `/pause` \| `/toggle` |
-| Next / Previous | `timbrebox-ctl next` \| `prev` | `curl -s "$BASE/next"` \| `/previous` |
-| Stop (clears playback) | `timbrebox-ctl stop` | `curl -s "$BASE/stop"` |
-| Seek to position (ms) | `timbrebox-ctl seek 30000` | `curl -sG "$BASE/seek" --data-urlencode ms=30000` |
-| Volume (0..1) | `timbrebox-ctl volume 0.6` | `curl -sG "$BASE/volume" --data-urlencode level=0.6` |
-| Loop mode | `timbrebox-ctl mode shuffle` | `curl -sG "$BASE/mode" --data-urlencode loop=shuffle` |
+| Search all enabled sources | `timbrebox-ctl search "周杰伦"` | `curl -sG -X POST "$BASE/search" --data-urlencode "q=周杰伦"` |
+| Play a search/queue result | `timbrebox-ctl play-ref <source> <item>` | `curl -sG -X POST "$BASE/play-ref" --data-urlencode source=<s> --data-urlencode item=<i>` |
+| Resume / Pause / Toggle | `timbrebox-ctl play` \| `pause` \| `toggle` | `curl -s -X POST "$BASE/play"` \| `/pause` \| `/toggle` |
+| Next / Previous | `timbrebox-ctl next` \| `prev` | `curl -s -X POST "$BASE/next"` \| `/previous` |
+| Stop (clears playback) | `timbrebox-ctl stop` | `curl -s -X POST "$BASE/stop"` |
+| Seek to position (ms) | `timbrebox-ctl seek 30000` | `curl -sG -X POST "$BASE/seek" --data-urlencode ms=30000` |
+| Volume (0..1) | `timbrebox-ctl volume 0.6` | `curl -sG -X POST "$BASE/volume" --data-urlencode level=0.6` |
+| Loop mode | `timbrebox-ctl mode shuffle` | `curl -sG -X POST "$BASE/mode" --data-urlencode loop=shuffle` |
 | Show queue | `timbrebox-ctl queue` | `curl -s "$BASE/queue"` |
-| Play queue index | `timbrebox-ctl play-queue 2` | `curl -sG "$BASE/play-queue" --data-urlencode i=2` |
+| Play queue index | `timbrebox-ctl play-queue 2` | `curl -sG -X POST "$BASE/play-queue" --data-urlencode i=2` |
 | List sources | `timbrebox-ctl sources` | `curl -s "$BASE/sources"` |
-| Enable/disable a source | `timbrebox-ctl source youtube false` | `curl -sG "$BASE/source" --data-urlencode id=youtube --data-urlencode enabled=false` |
+| Enable/disable a source | `timbrebox-ctl source youtube false` | `curl -sG -X POST "$BASE/source" --data-urlencode id=youtube --data-urlencode enabled=false` |
 | Current lyric | `timbrebox-ctl lyric` | `curl -s "$BASE/lyric"` |
-| Quit the app | `timbrebox-ctl quit` | `curl -s "$BASE/quit"` |
+| Quit the app | `timbrebox-ctl quit` | `curl -s -X POST "$BASE/quit"` |
 
 `loop` / `mode` accept exactly `queue`, `track`, `off`, `shuffle`. `volume` and
 `level` are `0.0`–`1.0`. `seek`/`ms` is an absolute position in milliseconds.

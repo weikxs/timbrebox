@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../net/egress_policy.dart';
+
 /// Loopback proxy that makes header-gated / range-limited remote audio playable
 /// by media_kit.
 ///
@@ -15,6 +17,12 @@ import 'dart:io';
 /// The player only ever talks to a well-behaved local server, so playback and
 /// seeking work normally. Pure Dart — identical on every platform.
 final class StreamHeaderProxy {
+  StreamHeaderProxy({this.policy = const EgressPolicy()});
+
+  /// Upstream connections (including every redirect hop) may only reach
+  /// public hosts: some upstream URLs come from third-party plugins.
+  final EgressPolicy policy;
+
   HttpServer? _server;
   final _entries = <String, _ProxyTarget>{};
   var _token = 0;
@@ -60,6 +68,7 @@ final class StreamHeaderProxy {
       return;
     }
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
+    policy.attach(client);
     try {
       if (target.chunked) {
         final total = _totalBytes(target.upstream);

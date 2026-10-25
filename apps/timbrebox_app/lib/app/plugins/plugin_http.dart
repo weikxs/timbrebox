@@ -2,14 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../design/app_strings.dart';
+import '../net/egress_policy.dart';
 
 /// The single privileged capability handed to plugins: HTTP. Every plugin
 /// network call flows through here, so egress policy (scheme, private-IP
 /// blocking on every redirect hop, size/timeout caps) is enforced in one place.
 final class PluginHttpClient {
-  PluginHttpClient({this.maxBytes = 8 * 1024 * 1024});
+  PluginHttpClient({
+    this.maxBytes = 8 * 1024 * 1024,
+    this.policy = const EgressPolicy(),
+  });
 
   final int maxBytes;
+  final EgressPolicy policy;
 
   static const _timeout = Duration(seconds: 20);
   static const _maxRedirects = 4;
@@ -30,27 +35,36 @@ final class PluginHttpClient {
     final params = _stringMap(request['params']);
     var uri = params.isEmpty
         ? start
-        : start.replace(
-            queryParameters: {...start.queryParameters, ...params},
-          );
+        : start.replace(queryParameters: {...start.queryParameters, ...params});
     Object? body = request['data'];
 
     final client = HttpClient()..connectionTimeout = _timeout;
+    policy.attach(client);
     try {
       for (var redirect = 0; ; redirect++) {
-        _enforcePolicy(uri);
+        await _enforcePolicy(uri);
         final httpRequest = await client.openUrl(method, uri);
         httpRequest.followRedirects = false;
         headers.forEach(httpRequest.headers.set);
         if (body != null && method != 'GET' && method != 'HEAD') {
-          httpRequest.add(utf8.encode(body is String ? body : jsonEncode(body)));
+          httpRequest.add(
+            utf8.encode(body is String ? body : jsonEncode(body)),
+          );
         }
         final response = await httpRequest.close().timeout(_timeout);
-        if (response.isRedirect && redirect < _maxRedirects) {
+        if (response.isRedirect && redirect >= _maxRedirects) {
+          await response.drain<void>();
+          throw PluginHttpException(
+            AppStrings.t('plugin.http.tooManyRedirects'),
+          );
+        }
+        if (response.isRedirect) {
           final location = response.headers.value(HttpHeaders.locationHeader);
           await response.drain<void>();
           if (location == null) {
-            throw PluginHttpException(AppStrings.t('plugin.http.redirectMissing'));
+            throw PluginHttpException(
+              AppStrings.t('plugin.http.redirectMissing'),
+            );
           }
           uri = uri.resolve(location);
           method = 'GET'; // Follow redirects as GET, drop the body.
@@ -69,51 +83,19 @@ final class PluginHttpClient {
     }
   }
 
-  void _enforcePolicy(Uri uri) {
-    if (uri.scheme != 'https' && uri.scheme != 'http') {
-      throw PluginHttpException(AppStrings.t('plugin.http.scheme').replaceFirst('{s}', uri.scheme));
+  /// Checks [uri] up front so the plugin gets a clear message; [policy] is
+  /// also attached to the client, which re-checks the address it connects to.
+  Future<void> _enforcePolicy(Uri uri) async {
+    try {
+      await policy.vet(uri);
+    } on EgressDeniedException catch (error) {
+      throw PluginHttpException(error.message);
     }
-    if (_isBlockedHost(uri.host)) {
-      throw PluginHttpException(AppStrings.t('plugin.http.privateHost').replaceFirst('{h}', uri.host));
-    }
-  }
-
-  /// Blocks loopback / link-local / private / ULA targets in every encoding
-  /// (dotted-quad, IPv6, numeric-looking hosts) so a plugin can't reach the
-  /// local machine or LAN (SSRF).
-  bool _isBlockedHost(String host) {
-    final lower = host.toLowerCase();
-    if (lower == 'localhost' || lower.endsWith('.local')) return true;
-    final bare = lower.startsWith('[') && lower.endsWith(']')
-        ? lower.substring(1, lower.length - 1)
-        : lower;
-    final address = InternetAddress.tryParse(bare);
-    if (address != null) {
-      if (address.isLoopback ||
-          address.isLinkLocal ||
-          address.isMulticast) {
-        return true;
-      }
-      final raw = address.rawAddress;
-      if (address.type == InternetAddressType.IPv4) {
-        if (raw[0] == 10 || raw[0] == 0) return true;
-        if (raw[0] == 192 && raw[1] == 168) return true;
-        if (raw[0] == 169 && raw[1] == 254) return true;
-        if (raw[0] == 172 && raw[1] >= 16 && raw[1] <= 31) return true;
-      } else if (raw.isNotEmpty && (raw[0] & 0xfe) == 0xfc) {
-        return true; // IPv6 unique-local fc00::/7
-      }
-      return false;
-    }
-    // A host that looks numeric but didn't parse (decimal/hex/octal IPv4
-    // encodings of internal addresses) is treated as untrusted.
-    if (RegExp(r'^(0x)?[0-9a-f]+$').hasMatch(bare)) return true;
-    return false;
   }
 
   Future<List<int>> _readCapped(HttpClientResponse response) async {
     final bytes = <int>[];
-    await for (final chunk in response) {
+    await for (final chunk in response.timeout(_timeout)) {
       bytes.addAll(chunk);
       if (bytes.length > maxBytes) {
         throw PluginHttpException(AppStrings.t('plugin.http.tooLarge'));

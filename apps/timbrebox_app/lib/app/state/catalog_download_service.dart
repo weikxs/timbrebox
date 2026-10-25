@@ -43,12 +43,10 @@ final class CatalogDownloadService {
     final extension = _extension(stream.mimeType, stream.uri);
     final target = File('${directory.path}/$base.$extension');
 
-    // Sources that acquire audio to a local temp file (YouTube) resolve to a
-    // file:// URI — move that file into the library instead of re-downloading.
-    if (stream.uri.scheme == 'file') {
-      final source = File(stream.uri.toFilePath());
-      if (await target.exists()) await target.delete();
-      return source.copy(target.path);
+    // Only network streams are downloaded. A `file://` URI here could only
+    // come from a plugin and would copy an arbitrary local file.
+    if (stream.uri.scheme != 'https' && stream.uri.scheme != 'http') {
+      throw StateError(AppStrings.t('download.errScheme'));
     }
 
     final partial = File('${target.path}.part');

@@ -44,6 +44,9 @@ base_url() {
 }
 
 req() { curl -sS "${@}"; echo; }
+# Actions must be POST: the player refuses them as GET so a web page cannot
+# trigger them through the browser.
+act() { curl -sS -X POST "${@}"; echo; }
 
 main() {
   local cmd="${1:-help}"; shift || true
@@ -54,16 +57,18 @@ main() {
   esac
   local BASE; BASE="$(base_url)"
   case "${cmd}" in
-    status|queue|sources|lyric|play|pause|toggle|next|previous|stop|quit)
+    status|queue|sources|lyric)
       req "${BASE}/${cmd}" ;;
-    prev)         req "${BASE}/previous" ;;
-    seek)         [ ${#} -ge 1 ] || die "用法: seek <ms>"; req -G "${BASE}/seek" --data-urlencode "ms=${1}" ;;
-    volume)       [ ${#} -ge 1 ] || die "用法: volume <0..1>"; req -G "${BASE}/volume" --data-urlencode "level=${1}" ;;
-    mode)         [ ${#} -ge 1 ] || die "用法: mode <queue|track|off|shuffle>"; req -G "${BASE}/mode" --data-urlencode "loop=${1}" ;;
-    search)       [ ${#} -ge 1 ] || die "用法: search <query>"; req -G "${BASE}/search" --data-urlencode "q=${1}" ;;
-    play-ref)     [ ${#} -ge 2 ] || die "用法: play-ref <source> <item>"; req -G "${BASE}/play-ref" --data-urlencode "source=${1}" --data-urlencode "item=${2}" ;;
-    play-queue)   [ ${#} -ge 1 ] || die "用法: play-queue <index>"; req -G "${BASE}/play-queue" --data-urlencode "i=${1}" ;;
-    source)       [ ${#} -ge 2 ] || die "用法: source <id> <true|false>"; req -G "${BASE}/source" --data-urlencode "id=${1}" --data-urlencode "enabled=${2}" ;;
+    play|pause|toggle|next|previous|stop|quit)
+      act "${BASE}/${cmd}" ;;
+    prev)         act "${BASE}/previous" ;;
+    seek)         [ ${#} -ge 1 ] || die "用法: seek <ms>"; act -G "${BASE}/seek" --data-urlencode "ms=${1}" ;;
+    volume)       [ ${#} -ge 1 ] || die "用法: volume <0..1>"; act -G "${BASE}/volume" --data-urlencode "level=${1}" ;;
+    mode)         [ ${#} -ge 1 ] || die "用法: mode <queue|track|off|shuffle>"; act -G "${BASE}/mode" --data-urlencode "loop=${1}" ;;
+    search)       [ ${#} -ge 1 ] || die "用法: search <query>"; act -G "${BASE}/search" --data-urlencode "q=${1}" ;;
+    play-ref)     [ ${#} -ge 2 ] || die "用法: play-ref <source> <item>"; act -G "${BASE}/play-ref" --data-urlencode "source=${1}" --data-urlencode "item=${2}" ;;
+    play-queue)   [ ${#} -ge 1 ] || die "用法: play-queue <index>"; act -G "${BASE}/play-queue" --data-urlencode "i=${1}" ;;
+    source)       [ ${#} -ge 2 ] || die "用法: source <id> <true|false>"; act -G "${BASE}/source" --data-urlencode "id=${1}" --data-urlencode "enabled=${2}" ;;
     *)            die "未知命令: ${cmd}（运行 'timbrebox-ctl help'）" ;;
   esac
 }

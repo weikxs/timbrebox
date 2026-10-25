@@ -15,7 +15,9 @@ import 'plugin_shims.dart';
 final class PluginRuntime {
   PluginRuntime({PluginHttpClient? http})
     : _http = http ?? PluginHttpClient(),
-      _rt = getJavascriptRuntime();
+      // `xhr: false` keeps flutter_js from installing its own fetch /
+      // XMLHttpRequest, which would bypass PluginHttpClient's egress policy.
+      _rt = getJavascriptRuntime(xhr: false);
 
   final PluginHttpClient _http;
   final JavascriptRuntime _rt;
@@ -128,6 +130,9 @@ final class PluginRuntime {
   }
 
   static const _prelude = r'''
+    // HTTP must go through __hostHttp, never a built-in network API.
+    delete globalThis.fetch;
+    delete globalThis.XMLHttpRequest;
     var module = { exports: {} };
     var exports = module.exports;
     var console = {

@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../design/app_strings.dart';
+import '../net/egress_policy.dart';
 import 'plugin_catalog_source.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
@@ -17,6 +18,12 @@ import 'plugin_runtime.dart';
 /// once to read its metadata, then stores it. Loading rebuilds a live
 /// [PluginCatalogSource] per stored plugin.
 final class PluginRepository {
+  PluginRepository({this.policy = const EgressPolicy()});
+
+  /// Plugin code is fetched over https from public hosts only, on every
+  /// redirect hop too: a plain-http or LAN source could hand us any script.
+  final EgressPolicy policy;
+
   static const _maxBytes = 6 * 1024 * 1024;
 
   /// Installs from [rawUrl], which may be a single plugin `.js` OR a
@@ -178,10 +185,11 @@ final class PluginRepository {
   }
 
   Future<String> _fetch(Uri uri) async {
-    if (uri.scheme != 'https' && uri.scheme != 'http') {
+    if (uri.scheme != 'https') {
       throw PluginInstallException(AppStrings.t('plugin.err.invalidUrl'));
     }
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+    policy.attach(client, httpsOnly: true);
     try {
       final request = await client.getUrl(uri);
       request.headers.set(HttpHeaders.userAgentHeader, 'TimbreBox');
@@ -195,13 +203,15 @@ final class PluginRepository {
         );
       }
       final bytes = <int>[];
-      await for (final chunk in response) {
+      await for (final chunk in response.timeout(const Duration(seconds: 30))) {
         bytes.addAll(chunk);
         if (bytes.length > _maxBytes) {
           throw PluginInstallException(AppStrings.t('plugin.err.tooLarge'));
         }
       }
       return utf8.decode(bytes, allowMalformed: true);
+    } on EgressDeniedException catch (error) {
+      throw PluginInstallException(error.message);
     } on SocketException {
       throw PluginInstallException(AppStrings.t('plugin.err.network'));
     } on TimeoutException {
