@@ -171,5 +171,5 @@ MyApplication* my_application_new() {
   // second copy + control server.
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_FLAGS_NONE, nullptr));
+                                     G_APPLICATION_DEFAULT_FLAGS, nullptr));
 }

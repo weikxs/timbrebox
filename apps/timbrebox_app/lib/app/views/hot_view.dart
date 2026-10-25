@@ -110,7 +110,11 @@ class _HotViewState extends State<HotView> {
   @override
   void initState() {
     super.initState();
-    widget.controller.loadPluginTopLists();
+    // Without plugins the load finishes synchronously and notifies listeners,
+    // which must not happen while this page is still being built.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.controller.loadPluginTopLists();
+    });
   }
 
   void _openCategory(_Category category) {
@@ -177,7 +181,7 @@ class _CategoryGrid extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(2, 16, 2, 16),
       children: [
-        const _Kicker('TRENDING'),
+        _Kicker(AppStrings.t('kicker.trending')),
         const SizedBox(height: 8),
         Text(
           AppStrings.t('nav.hot'),
