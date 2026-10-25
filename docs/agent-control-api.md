@@ -25,10 +25,18 @@ platform (handy when the window is hidden and there is no Cmd+Q).
 
 ## Security
 
-- Bound to **loopback only** (`127.0.0.1`) on an ephemeral port. Loopback is the
-  security boundary: nothing off the machine can reach it, only local processes.
-- **No token / authentication** — since only local processes can connect, a
-  token would add friction without adding protection.
+- Bound to **loopback only** (`127.0.0.1`), so nothing off the machine can
+  reach it.
+- **Web pages are refused.** A page in your browser can also send requests to
+  `127.0.0.1`, so the server additionally:
+  - accepts only a `Host` of `127.0.0.1:<port>` or `localhost:<port>` (this
+    defeats DNS rebinding);
+  - refuses any request with an `Origin` header or a `Sec-Fetch-Site` other
+    than `none`, which browsers add to requests made by pages;
+  - runs actions only for `POST`, so a plain link or `<img>` cannot trigger
+    them (`405` otherwise; reads are `GET`).
+- **No token / authentication** for local programs: anything already running
+  as you on this machine could drive the app's UI anyway.
 - macOS requires the `com.apple.security.network.server` entitlement (already
   shipped).
 
@@ -54,8 +62,8 @@ above is the reliable cross-platform discovery.)
 
 ## Endpoints
 
-All responses are JSON. `GET` is used for reads, `POST` for actions (the server
-does not enforce the method, but this is the intended convention).
+All responses are JSON. Reads are `GET`; everything else is `POST`, and the
+server answers `405` to the other method.
 
 | Method | Path | Description |
 |---|---|---|
@@ -64,7 +72,7 @@ does not enforce the method, but this is the intended convention).
 | GET | `/queue` | The play queue (`items[]`) |
 | GET | `/sources` | Sources with `id`, `name`, `enabled` |
 | GET | `/lyric` | Current track's lyric (plugin sources only), or `null` |
-| GET | `/search?q=` | Search all enabled sources; returns `results[]` (`source`, `item`, `title`, `artist`) |
+| POST | `/search?q=` | Search all enabled sources; returns `results[]` (`source`, `item`, `title`, `artist`) |
 | POST | `/play` `/pause` `/toggle` `/next` `/previous` `/stop` | Transport controls |
 | POST | `/seek?ms=<int>` | Seek to a position in milliseconds |
 | POST | `/volume?level=<0..1>` | Set the volume |
@@ -85,14 +93,14 @@ BASE="http://127.0.0.1:<port>"   # shown in Settings → General → Agent contr
 curl "$BASE/status"
 
 # Search, then play the first result
-curl "$BASE/search?q=jazz"
-curl "$BASE/play-ref?source=audius&item=abc123"
+curl -X POST "$BASE/search?q=jazz"
+curl -X POST "$BASE/play-ref?source=audius&item=abc123"
 
 # Transport + volume + loop
-curl "$BASE/toggle"
-curl "$BASE/volume?level=0.6"
-curl "$BASE/mode?loop=shuffle"
+curl -X POST "$BASE/toggle"
+curl -X POST "$BASE/volume?level=0.6"
+curl -X POST "$BASE/mode?loop=shuffle"
 
 # Play a queue entry
-curl "$BASE/play-queue?i=2"
+curl -X POST "$BASE/play-queue?i=2"
 ```

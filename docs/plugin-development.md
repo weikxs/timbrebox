@@ -72,18 +72,24 @@ boundary.
 Plugins are treated as **untrusted code**. The design assumptions:
 
 - **Only HTTP is exposed.** No `fs`, no `process`, no raw sockets, no arbitrary
-  `require`, no timers-to-native, no access to other plugins or app state.
+  `require`, no timers-to-native, no access to other plugins or app state. The
+  engine's own `fetch` / `XMLHttpRequest` are removed — `axios` is the only way
+  out.
 - **Egress policy** (enforced in Dart, in one place, on *every* request and
   *every* redirect hop):
   - Only `http` / `https` schemes are allowed.
-  - **Internal targets are blocked**: `localhost`, `*.local`, loopback,
-    link-local, multicast, and private ranges — IPv4 `10/8`, `192.168/16`,
-    `169.254/16`, `172.16–31/16`, `0/8`, plus IPv6 unique-local `fc00::/7`.
-  - Numeric-looking hosts that don't cleanly parse (decimal/hex/octal IPv4
-    encodings of internal addresses) are also treated as untrusted and blocked.
-  - **Redirects are followed manually** (max 4 hops), so a public URL that
-    302-redirects to an internal address is caught (blocks redirect-to-internal
-    SSRF). Redirects are followed as `GET` and drop the request body.
+  - **Internal targets are blocked**: `localhost`, `*.localhost`, `*.local`,
+    `*.internal`, and every loopback, private, link-local, CGNAT, multicast or
+    reserved address (IPv4, IPv6, and IPv4 embedded in IPv6 such as
+    `::ffff:127.0.0.1`).
+  - **Host names are resolved first** and every address they resolve to must be
+    public; the connection then goes to that checked address, so DNS rebinding
+    cannot swap in a private one.
+  - IPv4 written in any form other than plain dotted decimal (`127.1`,
+    `0177.0.0.1`, `2130706433`, `0x7f000001`) is refused.
+  - **Redirects are followed manually** (max 4 hops; more is an error), and
+    every hop is checked again. Redirects are followed as `GET` and drop the
+    request body.
   - Responses are capped (**8 MB** for plugin requests; installs cap the script
     at **6 MB**) and each request has a **20-second** transport timeout.
 - **Isolation:** each plugin runs in its own runtime; a crash or exception in one
@@ -206,6 +212,9 @@ async function getMediaSource(musicItem, quality) {
   with no headers are played directly.
 - MIME type is inferred from the URL extension (`.m4a`/`.mp4`, `.mp3`, `.flac`,
   `.ogg`); include a recognizable extension when you can.
+- **The `url` must be a public `http(s)` URL.** It goes through the same egress
+  policy before anything plays, proxies or downloads it; `file://` and
+  local/LAN addresses are refused.
 
 ### `getTopLists() -> [ { title, data } ]`
 
@@ -411,7 +420,9 @@ Paste one of these into the URL field
 ("粘贴插件 .js 原始链接，或订阅 JSON 地址") and tap **安装 (Install)**:
 
 1. **A raw plugin `.js` URL** — a direct link to the script file, e.g.
-   `https://example.com/plugins/plugin.js`.
+   `https://example.com/plugins/plugin.js`. Plugin scripts, subscriptions and
+   update checks are fetched over **https only**, from public hosts, on every
+   redirect hop.
    > If your host serves a "preview" page URL for a file, TimbreBox tries to
    > resolve it to the corresponding raw-file URL, so both forms usually work.
 2. **A subscription JSON URL** — a document listing many plugins:
@@ -501,7 +512,7 @@ present, it will work; unsupported hooks are simply ignored.
 | **"插件请求了不允许的模块：X"** | You `require`'d something outside the whitelist (`axios`, `crypto-js`, `cheerio`, `he`, `dayjs`, `qs`, `big-integer`). Node builtins (`fs`, `crypto`, `http`, `buffer`) are not available. |
 | **`cheerio`-style / `require` errors at runtime** | Ensure you `require('cheerio')` (bundled) and feed it `res.data` **as text** — set `responseType: 'text'` so the body isn't JSON-parsed into an object. |
 | **"插件未返回可播放的地址"** | `getMediaSource` returned no object, or no non-empty `url`, at any of the four probed qualities. Verify the media API is reachable (see geo-blocking) and that you return `{ url }`. Return `null` at a quality to let TimbreBox try the next. |
-| **"出于安全，禁止插件访问内网地址：…" / "不允许的协议：…"** | The egress policy blocked the request: an internal/LAN/loopback host, a non-http(s) scheme, or a **redirect to an internal address**. Point the plugin at a public https endpoint. |
+| **"出于安全，禁止访问本机或内网地址：…" / "出于安全，不允许使用该协议：…"** (English UI: "Blocked for safety: …") | The egress policy blocked the request or the returned stream `url`: an internal/LAN/loopback host (also one a public name resolves to), a non-http(s) scheme, or a **redirect to an internal address**. Point the plugin at a public https endpoint. |
 | **"曲目信息已过期，请重新搜索"** | Playback was attempted for an item TimbreBox no longer has in memory (e.g. after a reload). Re-run the search so the full `MusicItem` is re-cached. |
 | **Request "timed out" / hangs** | Requests have a 20s transport cap and each function call a 25s cap; responses over 8 MB are rejected. Avoid downloading large bodies inside the plugin. |
 | **Search returns nothing but no error** | `search` returned a non-object, `data` wasn't an array, or every item was missing an `id`/`title`. Every item needs a non-empty `id` **and** `title`. |

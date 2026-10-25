@@ -112,11 +112,11 @@ Future<String> _runTool(
     case 'play_music':
       final query = args['query']?.toString().trim() ?? '';
       if (query.isEmpty) return 'Provide a non-empty query.';
-      final search = await _client.getJson(base, '/search?q=${enc(query)}');
+      final search = await _client.requestJson(base, '/search?q=${enc(query)}');
       final results = (search['results'] as List?) ?? const [];
       if (results.isEmpty) return 'No results for "$query".';
       final first = results.first as Map;
-      final played = await _client.getJson(
+      final played = await _client.requestJson(
         base,
         '/play-ref?source=${enc(first['source'])}&item=${enc(first['item'])}',
       );
@@ -125,26 +125,26 @@ Future<String> _runTool(
           ? 'Playing: ${track is Map ? track['title'] : first['title']}'
           : 'Could not play: ${played['error'] ?? 'unknown error'}';
     case 'pause':
-      await _client.getJson(base, '/pause');
+      await _client.requestJson(base, '/pause');
       return 'Paused.';
     case 'resume':
-      await _client.getJson(base, '/play');
+      await _client.requestJson(base, '/play');
       return 'Resumed.';
     case 'stop':
-      await _client.getJson(base, '/stop');
+      await _client.requestJson(base, '/stop');
       return 'Stopped.';
     case 'next':
-      await _client.getJson(base, '/next');
+      await _client.requestJson(base, '/next');
       return 'Skipped to next.';
     case 'previous':
-      await _client.getJson(base, '/previous');
+      await _client.requestJson(base, '/previous');
       return 'Skipped to previous.';
     case 'set_volume':
       final level = ((args['level'] as num?)?.toDouble() ?? 0.5).clamp(0, 1);
-      await _client.getJson(base, '/volume?level=$level');
+      await _client.requestJson(base, '/volume?level=$level');
       return 'Volume set to ${(level * 100).round()}%.';
     case 'get_status':
-      final status = await _client.getJson(base, '/status');
+      final status = await _client.requestJson(base, '/status');
       final track = status['track'];
       final title = track is Map ? track['title'] : null;
       return 'playing=${status['playing']}, volume=${status['volume']}, '

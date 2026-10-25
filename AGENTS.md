@@ -39,7 +39,7 @@ state a source adapter produces must stay in memory only.
 
 The repo ships its own project skill, `timbrebox-control` (`.claude/skills/`),
 plus the `tools/timbrebox-ctl` wrapper, to drive the **running** app through its
-local loopback control API (on by default, no token — loopback is the boundary):
+local loopback control API (on by default, no token; requests from web pages are refused and actions are POST-only):
 
 - **Claude Code** auto-invokes the `timbrebox-control` skill for natural-language
   requests ("播放周杰伦的歌", pause, next, volume, shuffle, queue …); the flow is

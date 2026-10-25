@@ -34,7 +34,7 @@ Future<void> main(List<String> argv) async {
       exitCode = 2;
       return;
     }
-    final result = await client.getJson(base, path);
+    final result = await client.requestJson(base, path);
     stdout.writeln(asJson ? jsonEncode(result) : _human(args.first, result));
   } catch (error) {
     stderr.writeln('Error: $error');

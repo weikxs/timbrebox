@@ -78,6 +78,7 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
 
   @override
   Future<List<DownloadedEntry>> load() async {
+    final directory = await _directoryProvider();
     final file = await _indexFile();
     if (!await file.exists()) return const [];
     try {
@@ -86,10 +87,14 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
       final entries = <DownloadedEntry>[];
       for (final raw in decoded) {
         final entry = DownloadedEntry.fromJson(raw);
+        // Only files directly inside the library are trusted: the index is a
+        // plain file a user or another program can edit, and "clear
+        // downloads" deletes whatever it lists.
+        final path = entry == null ? null : _inside(directory, entry.path);
         // Drop records whose file was deleted outside the app so the library
         // never lists something that cannot play.
-        if (entry != null && await File(entry.path).exists()) {
-          entries.add(entry);
+        if (path != null && await File(path).exists()) {
+          entries.add(DownloadedEntry(track: entry!.track, path: path));
         }
       }
       return entries;
@@ -104,9 +109,30 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
   Future<void> save(List<DownloadedEntry> entries) async {
     final file = await _indexFile();
     await file.parent.create(recursive: true);
-    final payload = jsonEncode([for (final entry in entries) entry.toJson()]);
+    final directory = await _directoryProvider();
+    final payload = jsonEncode([
+      for (final entry in entries)
+        if (_inside(directory, entry.path) case final path?)
+          DownloadedEntry(track: entry.track, path: _baseName(path)).toJson(),
+    ]);
     await file.writeAsString(payload, flush: true);
   }
+
+  /// The normalized path of [stored] if it names a file directly inside
+  /// [directory] (a bare file name, or an absolute path from older indexes),
+  /// otherwise null.
+  static String? _inside(Directory directory, String stored) {
+    final base = _normalized(directory.absolute.path);
+    final candidate = _normalized(
+      File(stored).isAbsolute ? stored : '$base${Platform.pathSeparator}$stored',
+    );
+    return File(candidate).parent.path == base ? candidate : null;
+  }
+
+  static String _normalized(String path) =>
+      Uri.file(path).normalizePath().toFilePath();
+
+  static String _baseName(String path) => File(path).uri.pathSegments.last;
 
   Future<File> _indexFile() async {
     final directory = await _directoryProvider();

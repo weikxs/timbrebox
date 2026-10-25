@@ -97,7 +97,7 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 
 ### Local downloads
 - Download with progress, best-available single-file audio; playback prefers the local file afterward.
-- Persisted through a `library-index.json` in the app-support directory storing **relative path + location ID only** — never source URLs, headers, or tokens.
+- Persisted through a `library-index.json` in the download folder that stores **only file names inside that folder** — never source URLs, headers, or tokens; entries pointing anywhere else are ignored.
 - Restart plays the downloaded file without touching the original source.
 
 ### Appearance: themes, custom skin, liquid glass
@@ -122,7 +122,7 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 - Third-party sources in the TimbreBox plugin format: paste a plugin URL and it becomes a new searchable, playable source. See [Plugin System](#plugin-system).
 
 ### Agent control (Claude Code / Codex CLI)
-- The app runs a **local loopback control API** (on by default; no token — loopback binding *is* the security boundary), so a local AI agent can search and play by natural language. Say "play some Jay Chou" / "播放周杰伦的歌" and the agent searches, picks the best match, and plays it — then pause / resume / skip / seek / set volume / change loop or shuffle mode / manage the queue / enable-disable a source.
+- The app runs a **local loopback control API** (on by default; no token; bound to `127.0.0.1`, and requests from web pages are refused), so a local AI agent can search and play by natural language. Say "play some Jay Chou" / "播放周杰伦的歌" and the agent searches, picks the best match, and plays it — then pause / resume / skip / seek / set volume / change loop or shuffle mode / manage the queue / enable-disable a source.
 - **Claude Code** auto-invokes the bundled `timbrebox-control` skill; **Codex CLI** and any local script drive the same API through `tools/timbrebox-ctl` or plain `curl` on `127.0.0.1`.
 - Runs in the **background** on every desktop — close the window and the app keeps serving the API (reopen by relaunching; `timbrebox-ctl quit` to exit). Nothing off the machine can reach it. See [Agent control API](./docs/agent-control-api.md).
 
@@ -232,7 +232,7 @@ TimbreBox supports third-party source plugins in the TimbreBox plugin format. A 
 **How it works**
 - Each plugin's JavaScript runs in a sandboxed JavaScript engine (a native JS runtime on each platform). The *only* capability injected into the sandbox is HTTP, through a pending-promise bridge — no filesystem, process, socket, or FFI access.
 - A whitelisted `require` exposes a small set of bundled, pure-JS modules — an HTTP client shim, `crypto-js`, `cheerio`, `he`, `dayjs`, `qs`, and `big-integer`; anything else throws.
-- Outbound requests are governed at the Dart layer (HTTPS-only, SSRF protection, size / redirect / timeout caps). Streams that need custom headers are routed through `StreamHeaderProxy` so the audio engine can play them.
+- Outbound requests are governed at the Dart layer (public hosts only, checked after DNS resolution and on every redirect hop; size / redirect / timeout caps; plugins are installed over HTTPS only). Streams that need custom headers are routed through `StreamHeaderProxy` so the audio engine can play them.
 
 **Installing a plugin**
 - In the app, paste a raw `.js` plugin URL (or a subscription JSON `{ desc, plugins: [...] }`). A repository `blob` URL is automatically rewritten to its raw form.

@@ -5,7 +5,9 @@ import 'dart:io';
 /// player on its fixed preferred port range and performs JSON requests.
 class ControlApiClient {
   ControlApiClient({List<int>? ports})
-    : ports = ports ?? const [8787, 8788, 8789, 8790, 8791, 8792, 8793, 8794, 8795, 8796];
+    : ports =
+          ports ??
+          const [8787, 8788, 8789, 8790, 8791, 8792, 8793, 8794, 8795, 8796];
 
   final List<int> ports;
   final HttpClient _http = HttpClient()
@@ -26,14 +28,29 @@ class ControlApiClient {
     return null;
   }
 
+  /// Endpoints that only read state; the player accepts every other
+  /// endpoint only as POST.
+  static const readPaths = {'/', '/status', '/queue', '/sources', '/lyric'};
+
   /// GETs [path] on [base] and decodes the JSON object response.
-  Future<Map<String, Object?>> getJson(String base, String path) async {
-    final decoded = jsonDecode(await _raw('$base$path'));
+  Future<Map<String, Object?>> getJson(String base, String path) =>
+      _json(_raw('$base$path'));
+
+  /// Calls [path] (with its query) on [base] using the method the player
+  /// expects for it — GET for reads, POST for actions — and decodes the JSON.
+  Future<Map<String, Object?>> requestJson(String base, String path) {
+    final uri = Uri.parse('$base$path');
+    final method = readPaths.contains(uri.path) ? 'GET' : 'POST';
+    return _json(_raw(uri.toString(), method: method));
+  }
+
+  Future<Map<String, Object?>> _json(Future<String> body) async {
+    final decoded = jsonDecode(await body);
     return decoded is Map<String, Object?> ? decoded : <String, Object?>{};
   }
 
-  Future<String> _raw(String url) async {
-    final request = await _http.getUrl(Uri.parse(url));
+  Future<String> _raw(String url, {String method = 'GET'}) async {
+    final request = await _http.openUrl(method, Uri.parse(url));
     final response = await request.close();
     return response.transform(utf8.decoder).join();
   }

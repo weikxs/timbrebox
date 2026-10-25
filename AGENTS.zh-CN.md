@@ -31,7 +31,7 @@ gstack 已为 Codex 安装。根据任务选择最小必要工作流：
 ### TimbreBox 控制 skill（驱动运行中的播放器）
 
 仓库自带一个项目 skill `timbrebox-control`（`.claude/skills/`）以及 `tools/timbrebox-ctl`
-封装脚本，用于通过本地回环控制 API 驱动**正在运行**的应用（默认开启、无令牌——回环即边界）：
+封装脚本，用于通过本地回环控制 API 驱动**正在运行**的应用（默认开启、无令牌；拒绝网页发来的请求，动作只接受 POST）：
 
 - **Claude Code** 对自然语言请求自动调用 `timbrebox-control` skill（"播放周杰伦的歌"、暂停、
   下一首、音量、随机、队列……）；流程是 search → `play-ref` → `status`。
