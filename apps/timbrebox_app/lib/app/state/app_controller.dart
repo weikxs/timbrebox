@@ -162,7 +162,8 @@ class AppController extends ChangeNotifier {
   List<String> _skippedPlugins = const [];
   var _pluginTopListsLoaded = false;
   late final PlayerControlServer _controlServer = PlayerControlServer(this);
-  // On by default (loopback + per-session token); a saved preference overrides.
+  // On by default (loopback + a per-run token, see ControlTokenFile); a saved
+  // preference overrides.
   var _agentControl = true;
   final Random _random;
   String? _skinImagePath;

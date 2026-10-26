@@ -303,7 +303,7 @@ Legend: ✅ done · 🚧 in progress · 📋 planned
 
 **Downloads & library**
 - ✅ Local download + persisted `library-index.json`; restart plays local file
-- 📋 Persist favorites + play queue (currently in-memory)
+- ✅ Favorites, playlists, the play queue and the playback position persist across restarts
 
 **Plugin system**
 - ✅ P0/P1 — sandboxed JS runtime, HTTP bridge, install from a `.js` URL, `PluginCatalogSource`, dynamic registration, persistence

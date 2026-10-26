@@ -43,10 +43,11 @@ the functions and metadata fields TimbreBox understands (see below).
 
 Each installed plugin is loaded into its own **sandboxed JavaScript engine**:
 
-| Platform                  | Runtime engine        |
-| ------------------------- | --------------------- |
-| Android / Windows / Linux | interpreted engine    |
-| iOS / macOS (Apple)       | system engine         |
+| Platform            | Runtime engine     |
+| ------------------- | ------------------ |
+| Windows / Linux     | interpreted engine |
+| macOS               | system engine      |
+| Android / iOS       | none — mobile builds never download or run plugin code |
 
 On load, TimbreBox evaluates, in order: a small **prelude** (`console`, an
 `axios`/`require` shim, and the host-HTTP bridge), the **bundled shim libraries**,
@@ -55,7 +56,15 @@ captured as `globalThis.__plugin`, and exported functions are invoked on demand.
 
 Function calls are **serialized** on the single runtime (search and resolve
 requests never interleave), each call is JSON-encoded in and out, and each call
-has a **25-second timeout**.
+has a **25-second timeout**. The engine runs on the app's UI thread, so a run of
+plugin code that does not yield — a `while (true) {}` — is **stopped after
+three seconds** (on Linux and macOS; the Windows engine build offers no such
+stop) and the engine is restarted on the next call. Await network requests
+instead of busy-waiting.
+
+The engine starts on the plugin's first call, not at launch, and is **shut
+down after five minutes without a call**; the next call starts a fresh one.
+Keep state that must survive that in the items you return, not in globals.
 
 ### The HTTP bridge
 
@@ -169,7 +178,13 @@ fields you attach are preserved).
 | `duration`  | number          | **Seconds** (a bare number is treated as seconds).                    |
 
 You may attach any additional fields your `getMediaSource` needs (track hashes,
-signed tokens, mid, etc.) — they ride along on the item.
+signed tokens, mid, etc.) — they ride along on the item. When the user saves a
+track (favorites, a playlist, the play queue), the item is saved with it so it
+can still play after a restart — **minus** any URL value or field named `url`,
+and minus fields whose names look like credentials (`token`, `cookie`, `auth`,
+`secret`, `session`, `sign`, `key`, `passw`). Give `getMediaSource` stable ids
+it can re-resolve from; anything credential-like is available only until the
+app quits.
 
 ### `search(query, page, type) -> { isEnd, data }`
 
@@ -205,11 +220,10 @@ async function getMediaSource(musicItem, quality) {
   with a non-empty `url`. So a plugin that only exposes `high`/`super` still
   works. (Note: TimbreBox does **not** pass a user's preferred quality — it only
   probes this fixed order. See [Limitations](#8-limitations--not-yet-supported).)
-- **Header-gated URLs are auto-proxied.** If you return `headers` and/or
-  `userAgent`, TimbreBox routes playback through a loopback proxy that injects
-  those headers per request hop (the media player cannot attach arbitrary headers
-  itself). `userAgent` is merged into the headers as `User-Agent`. Plain URLs
-  with no headers are played directly.
+- **Every URL is played through a loopback proxy.** It injects the `headers`
+  and/or `userAgent` you return on every request hop (the media player cannot
+  attach arbitrary headers itself) and checks every redirect hop against the
+  egress policy. `userAgent` is merged into the headers as `User-Agent`.
 - MIME type is inferred from the URL extension (`.m4a`/`.mp4`, `.mp3`, `.flac`,
   `.ogg`); include a recognizable extension when you can.
 - **The `url` must be a public `http(s)` URL.** It goes through the same egress
