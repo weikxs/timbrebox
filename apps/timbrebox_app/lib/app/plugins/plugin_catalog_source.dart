@@ -249,9 +249,13 @@ final class PluginCatalogSource implements CatalogSource {
     Object? raw;
     try {
       for (final quality in const ['standard', 'high', 'super', 'low']) {
+        // A newer track was chosen: stop trying further qualities.
+        request.cancellation.throwIfCancelled();
         raw = await _call('getMediaSource', [item, quality]);
         if (raw is Map && (raw['url']?.toString().isNotEmpty ?? false)) break;
       }
+    } on OperationCancelled {
+      rethrow;
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.resolveFailed').replaceFirst('{e}', '$error'),

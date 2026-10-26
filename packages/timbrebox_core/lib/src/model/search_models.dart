@@ -23,6 +23,10 @@ class SourceException implements Exception {
   final String message;
   final bool retryable;
   final String code;
+
+  /// The message alone: it is written for the user and shown as is.
+  @override
+  String toString() => message;
 }
 
 class SearchRequest {

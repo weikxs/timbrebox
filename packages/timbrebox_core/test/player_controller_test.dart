@@ -148,19 +148,54 @@ void main() {
     expect(engine.calls, ['load', 'play']);
     await controller.dispose();
   });
+
+  test('stopping during a load drops what that load ends with', () async {
+    final engine = _CancellableLoadEngine();
+    final controller = PlayerController(engine);
+
+    final playing = controller.play(candidate);
+    await Future<void>.delayed(Duration.zero);
+    await controller.stop();
+    engine.cancelLoad();
+    await playing;
+
+    expect(controller.value.status, PlaybackStatus.idle);
+    expect(controller.value.errorMessage, isNull);
+    expect(engine.calls, isNot(contains('play')));
+    await controller.dispose();
+  });
+
+  test('a source failure shows its own message', () async {
+    final controller = PlayerController(
+      _FakePlayerEngine(
+        loadError: const SourceException('Track expired', retryable: true),
+      ),
+    );
+
+    await controller.play(candidate);
+
+    expect(controller.value.errorMessage, 'Track expired');
+    await controller.dispose();
+  });
 }
 
 class _FakePlayerEngine implements PlayerEngine {
-  _FakePlayerEngine({this.failLoad = false, this.failPause = false});
+  _FakePlayerEngine({
+    this.failLoad = false,
+    this.failPause = false,
+    this.loadError,
+  });
 
   final bool failLoad;
   final bool failPause;
+  final Object? loadError;
   final List<String> calls = [];
 
   @override
   Future<void> load(StreamCandidate candidate) async {
     calls.add('load');
     if (failLoad) throw StateError('load failed');
+    if (loadError case final error?) throw error;
   }
 
   @override
@@ -228,4 +263,19 @@ class _StartingPlayerEngine extends _FakePlayerEngine
   @override
   Future<void> loadFrom(StreamCandidate candidate, Duration start) async =>
       calls.add('load from $start');
+}
+
+/// A load that ends only when cancelled, the way the network engine's does
+/// once a stop cancels it.
+class _CancellableLoadEngine extends _FakePlayerEngine {
+  final _cancelled = Completer<void>();
+
+  void cancelLoad() => _cancelled.complete();
+
+  @override
+  Future<void> load(StreamCandidate candidate) async {
+    calls.add('load');
+    await _cancelled.future;
+    throw const OperationCancelled();
+  }
 }

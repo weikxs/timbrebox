@@ -106,6 +106,9 @@ class PlayerController {
   }
 
   Future<void> stop() async {
+    // A load still running belongs to the play this stop ends: whatever it
+    // finishes with (usually OperationCancelled) must not show.
+    _generation++;
     try {
       await _engine.stop();
       _emit(
@@ -117,6 +120,7 @@ class PlayerController {
   }
 
   Future<void> release() async {
+    _generation++;
     try {
       await _engine.release();
       _emit(const PlaybackState.idle());

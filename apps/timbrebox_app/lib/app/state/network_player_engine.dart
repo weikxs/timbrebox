@@ -2,10 +2,17 @@ import 'dart:async';
 
 import 'package:timbrebox_core/timbrebox_core.dart';
 
+import '../design/app_strings.dart';
+import 'audio_source.dart';
 import 'player_backend.dart';
 import 'player_source_resolver.dart';
 
 /// Owns one native decoder and resolves a short-lived stream only on play.
+///
+/// Resolving runs outside the queue of decoder operations, so pause, seek or
+/// volume never wait behind a slow source; each load has its own
+/// cancellation, a newer load or a stop cancels it, and a load that is no
+/// longer the latest never touches the decoder.
 class NetworkPlayerEngine
     implements
         PlayerEngine,
@@ -18,7 +25,10 @@ class NetworkPlayerEngine
   NetworkPlayerEngine({
     required AudioBackend backend,
     PlayerSourceResolver? resolver,
+    Duration resolveTimeout = maxResolveTime,
   }) : _resolver = resolver ?? const DefaultPlayerSourceResolver(),
+       // ignore: prefer_initializing_formals
+       _resolveTimeout = resolveTimeout,
        // ignore: prefer_initializing_formals
        _backend = backend {
     _completionSubscription = _backend.completed.listen((_) {
@@ -26,8 +36,15 @@ class NetworkPlayerEngine
     });
   }
 
+  /// The longest a track may take to resolve (a plugin may try several
+  /// qualities in turn) before its load gives up.
+  static const maxResolveTime = Duration(seconds: 30);
+
   final AudioBackend _backend;
   final PlayerSourceResolver _resolver;
+  final Duration _resolveTimeout;
+  CancellationToken? _loadCancellation;
+  var _loadGeneration = 0;
   final StreamController<void> _completed = StreamController.broadcast();
   StreamSubscription<void>? _completionSubscription;
   Timer? _releaseTimer;
@@ -67,32 +84,65 @@ class NetworkPlayerEngine
   Future<void> loadFrom(StreamCandidate candidate, Duration start) =>
       _load(candidate, start);
 
-  Future<void> _load(StreamCandidate candidate, Duration? start) =>
-      _run(() async {
-        _ensureLive();
-        // Stop the previous track first: if resolving the new one fails,
-        // nothing must keep playing (or be resumable) under the new name.
-        await _releaseLoadedSource();
-        final source = await _resolver.resolve(candidate);
-        _ensureLive();
-        await _backend.setReleaseMode(AudioReleaseMode.stop);
-        final backend = _backend;
-        if (start != null && backend is StartPositionAudioBackend) {
-          await (backend as StartPositionAudioBackend).setSourceFrom(
-            source,
-            start,
-          );
-        } else {
-          await backend.setSource(source);
-        }
-        _loaded = true;
-      });
+  Future<void> _load(StreamCandidate candidate, Duration? start) async {
+    _ensureLive();
+    final cancellation = _beginLoad();
+    final generation = _loadGeneration;
+    // Stop the previous track first: if resolving the new one fails,
+    // nothing must keep playing (or be resumable) under the new name.
+    await _run(_releaseLoadedSource);
+    final source = await _resolveWithin(candidate, cancellation);
+    await _run(() async {
+      _ensureLive();
+      // A newer load or a stop took over while this one resolved.
+      if (generation != _loadGeneration) throw const OperationCancelled();
+      await _backend.setReleaseMode(AudioReleaseMode.stop);
+      final backend = _backend;
+      if (start != null && backend is StartPositionAudioBackend) {
+        await (backend as StartPositionAudioBackend).setSourceFrom(
+          source,
+          start,
+        );
+      } else {
+        await backend.setSource(source);
+      }
+      _loaded = true;
+    });
+  }
+
+  /// Cancels the load in flight (if any) and returns the next one's token.
+  CancellationToken _beginLoad() {
+    _loadCancellation?.cancel();
+    _loadGeneration++;
+    return _loadCancellation = CancellationToken();
+  }
+
+  Future<AudioSourceSpec> _resolveWithin(
+    StreamCandidate candidate,
+    CancellationToken cancellation,
+  ) async {
+    final AudioSourceSpec source;
+    try {
+      source = await _resolver
+          .resolve(candidate, cancellation: cancellation)
+          .timeout(_resolveTimeout);
+    } on TimeoutException {
+      cancellation.cancel();
+      throw SourceException(
+        AppStrings.t('stream.err.resolveTimeout'),
+        retryable: true,
+        code: 'resolve_timeout',
+      );
+    }
+    cancellation.throwIfCancelled();
+    return source;
+  }
 
   @override
   Future<void> play() => _run(() async {
     _ensureLive();
     _releaseTimer?.cancel();
-    if (!_loaded) throw StateError('播放前必须先解析音频流。');
+    if (!_loaded) throw StateError(AppStrings.t('stream.err.notLoaded'));
     await _backend.resume();
   });
 
@@ -109,17 +159,25 @@ class NetworkPlayerEngine
   });
 
   @override
-  Future<void> stop() => _run(_releaseLoadedSource);
+  Future<void> stop() {
+    _beginLoad().cancel();
+    return _run(_releaseLoadedSource);
+  }
 
   @override
-  Future<void> release() => _run(() async {
+  Future<void> release() {
+    _beginLoad().cancel();
+    return _run(_dispose);
+  }
+
+  Future<void> _dispose() async {
     if (_disposed) return;
     await _releaseLoadedSource();
     _disposed = true;
     await _completionSubscription?.cancel();
     await _completed.close();
     await _backend.dispose();
-  });
+  }
 
   @override
   Future<void> setReleaseAfterPause(bool enabled) async {
@@ -149,7 +207,7 @@ class NetworkPlayerEngine
   }
 
   void _ensureLive() {
-    if (_disposed) throw StateError('音频引擎已经释放。');
+    if (_disposed) throw StateError(AppStrings.t('stream.err.engineReleased'));
   }
 
   Future<T> _run<T>(Future<T> Function() operation) {

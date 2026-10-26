@@ -390,7 +390,10 @@ class AppController extends ChangeNotifier {
     // back" intent, so we never auto-resume against the user.
     _pausedByRoute = false;
     final track = _currentTrack;
-    if (isLoading) return;
+    if (isLoading) {
+      await _cancelLoad();
+      return;
+    }
     if (isPlaying) {
       await _player.pause();
       _playbackError = _player.value.errorMessage;
@@ -399,6 +402,17 @@ class AppController extends ChangeNotifier {
       await _resumeOrReload(track);
       return;
     }
+    notifyListeners();
+  }
+
+  /// Gives up on the track that is still loading: pressing play/pause while
+  /// a slow source resolves stops it, and pressing again reloads it.
+  Future<void> _cancelLoad() async {
+    _playGeneration++;
+    _pauseWhenStarted = false;
+    await _player.stop();
+    _playbackError = null;
+    _syncPlaybackState();
     notifyListeners();
   }
 
