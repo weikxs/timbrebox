@@ -10,6 +10,7 @@ import '../design/app_strings.dart';
 import '../design/timbre_colors.dart';
 import '../model/catalog_track.dart';
 import '../state/app_controller.dart';
+import 'lyrics_view.dart';
 import 'mini_player.dart';
 import 'player_progress_bar.dart';
 import 'playlists_panel.dart';
@@ -198,7 +199,7 @@ class _NowPlayingDesk extends StatelessWidget {
                       const Spacer(),
                       if (controller.currentTrackHasLyric)
                         IconButton(
-                          onPressed: () => _showLyrics(context, controller),
+                          onPressed: () => showLyricsSheet(context, controller),
                           tooltip: AppStrings.t('player.lyrics'),
                           icon: const Icon(Icons.lyrics_outlined),
                           color: TimbreColors.muted,
@@ -453,81 +454,6 @@ Widget _frost({required bool reduced, required Widget child}) => reduced
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
         child: child,
       );
-
-/// Opens a bottom sheet with the current track's lyric text (plugin-provided).
-void _showLyrics(BuildContext context, AppController controller) {
-  final title = controller.currentTrack?.title ?? AppStrings.t('player.lyrics');
-  // Resolve once — the sheet's builder runs every drag frame, so calling
-  // currentLyric() inside it would re-fetch continuously.
-  final lyricFuture = controller.currentLyric();
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: TimbreColors.canvasRaised,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: .6,
-      maxChildSize: .9,
-      builder: (context, scrollController) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: FutureBuilder<String?>(
-          future: lyricFuture,
-          builder: (context, snapshot) {
-            final Widget body;
-            if (snapshot.connectionState != ConnectionState.done) {
-              body = const Center(child: CircularProgressIndicator());
-            } else if ((snapshot.data ?? '').trim().isEmpty) {
-              body = Center(
-                child: Text(
-                  AppStrings.t('player.noLyrics'),
-                  style: TextStyle(color: TimbreColors.muted),
-                ),
-              );
-            } else {
-              body = ListView(
-                controller: scrollController,
-                children: [
-                  Text(
-                    _stripLrcTimestamps(snapshot.data!),
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.7,
-                      color: TimbreColors.ink,
-                    ),
-                  ),
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 20,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Expanded(child: body),
-              ],
-            );
-          },
-        ),
-      ),
-    ),
-  );
-}
-
-/// Drops leading `[mm:ss.xx]` timestamps from LRC lyric lines for reading.
-String _stripLrcTimestamps(String raw) => raw
-    .split('\n')
-    .map((line) => line.replaceAll(RegExp(r'^(\[\d+:\d+(\.\d+)?\])+'), '').trim())
-    .where((line) => line.isNotEmpty)
-    .join('\n');
 
 /// The turntable halo behind the now-playing text. It spins while audio is
 /// playing and freezes in place when paused, like a real record deck. It also

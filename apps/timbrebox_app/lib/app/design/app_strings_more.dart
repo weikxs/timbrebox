@@ -5,6 +5,7 @@ library;
 const moreZhStrings = <String, String>{
   // player
   'player.searchAgain': '重新搜索',
+  'player.lyricsUnsynced': '这份歌词没有时间轴，无法跟随播放。',
   // agent control
   'agent.startFailed': '控制接口未能启动（无法安全写入令牌文件或没有可用端口）。',
   // plugins
@@ -29,6 +30,7 @@ const moreZhStrings = <String, String>{
 const moreEnStrings = <String, String>{
   // player
   'player.searchAgain': 'Search again',
+  'player.lyricsUnsynced': 'These lyrics have no timings, so they cannot follow playback.',
   // agent control
   'agent.startFailed':
       'The control interface did not start (the token file could not be '
