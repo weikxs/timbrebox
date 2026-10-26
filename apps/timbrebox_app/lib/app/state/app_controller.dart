@@ -80,6 +80,7 @@ class AppController extends ChangeNotifier {
        _random = random ?? Random() {
     _enabledSources.addAll(_catalog.sources.map((source) => source.id));
     unawaited(_restoreLibrary());
+    unawaited(_downloadService?.removeStaleParts());
     unawaited(_restoreFavorites());
     unawaited(_restoreSearchHistory());
     unawaited(_restorePlaylists());
@@ -133,6 +134,10 @@ class AppController extends ChangeNotifier {
   final Map<String, String> _downloadPaths = {};
   final Set<String> _downloading = {};
   final Map<String, String> _downloadErrors = {};
+  final Map<String, CancellationToken> _downloadCancels = {};
+  final ValueNotifier<Map<String, double>> _downloadProgress = ValueNotifier(
+    const {},
+  );
   final Set<String> _enabledSources = {};
   final PlayerEngine _playerEngine;
   final PlayerController _player;
@@ -1067,8 +1072,11 @@ class AppController extends ChangeNotifier {
   /// which may not call the protected member themselves.
   void _notify() => notifyListeners();
 
+  var _isDisposed = false;
+
   @override
   void dispose() {
+    _isDisposed = true;
     _persistSession(); // Keep the position when the app closes.
     _searchCancellation?.cancel();
     _loadMoreCancellation?.cancel();
@@ -1091,13 +1099,12 @@ class AppController extends ChangeNotifier {
     unawaited(_player.dispose());
     _positionNotifier.dispose();
     _sleepRemainingNotifier.dispose();
+    for (final cancellation in _downloadCancels.values) {
+      cancellation.cancel();
+    }
+    _downloadProgress.dispose();
     _appearance.dispose();
     super.dispose();
-  }
-
-  String _friendlyDownloadError(Object error) {
-    final text = error.toString();
-    return text.startsWith('Bad state: ') ? text.substring(11) : text;
   }
 
   String _formatDuration(Duration value) {

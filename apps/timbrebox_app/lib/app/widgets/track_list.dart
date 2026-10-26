@@ -197,12 +197,11 @@ class _TrackRow extends StatelessWidget {
                   iconSize: 18,
                   icon: const Icon(Icons.queue_music_rounded),
                 ),
+              // While downloading, the same button cancels.
               IconButton(
-                onPressed: controller.isDownloading(track)
-                    ? null
-                    : () => controller.toggleDownload(track),
+                onPressed: () => controller.toggleDownload(track),
                 tooltip: AppStrings.t(controller.isDownloading(track)
-                    ? 'download.downloading'
+                    ? 'download.cancel'
                     : controller.isDownloaded(track)
                     ? 'download.remove'
                     : 'download.toLocal'),
