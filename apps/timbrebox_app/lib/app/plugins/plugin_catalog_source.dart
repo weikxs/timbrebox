@@ -4,6 +4,7 @@ import '../design/app_strings.dart';
 import '../data/catalog_source.dart';
 import '../data/stream_header_proxy.dart';
 import '../model/catalog_track.dart';
+import '../net/egress_policy.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
 import 'plugin_stream_url.dart';
@@ -26,11 +27,13 @@ final class PluginCatalogSource implements CatalogSource {
     required PluginManifest manifest,
     required PluginRuntime runtime,
     StreamHeaderProxy? proxy,
+    EgressPolicy policy = const EgressPolicy(),
   }) : this._(
          manifest: manifest,
          functions: exportedFunctions(runtime),
          loadRuntime: () async => runtime,
          proxy: proxy,
+         policy: policy,
        );
 
   /// Starts the plugin's runtime with [loadRuntime] on first use.
@@ -39,11 +42,13 @@ final class PluginCatalogSource implements CatalogSource {
     required Set<String> functions,
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
+    EgressPolicy policy = const EgressPolicy(),
   }) : this._(
          manifest: manifest,
          functions: functions,
          loadRuntime: loadRuntime,
          proxy: proxy,
+         policy: policy,
        );
 
   PluginCatalogSource._({
@@ -51,10 +56,14 @@ final class PluginCatalogSource implements CatalogSource {
     required Set<String> functions,
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
+    required EgressPolicy policy,
   }) : _functions = Set.unmodifiable(functions),
        // ignore: prefer_initializing_formals
        _loadRuntime = loadRuntime,
-       _proxy = proxy ?? StreamHeaderProxy();
+       _proxy = proxy ?? StreamHeaderProxy(policy: policy),
+       _ownsProxy = proxy == null,
+       // ignore: prefer_initializing_formals
+       _policy = policy;
 
   /// The plugin functions TimbreBox calls; see [PluginManifest.functions].
   static const knownFunctions = [
@@ -77,6 +86,13 @@ final class PluginCatalogSource implements CatalogSource {
   Future<PluginRuntime>? _runtime;
   var _disposed = false;
   final StreamHeaderProxy _proxy;
+
+  /// False when the proxy is shared (see [PluginRepository.streamProxy]):
+  /// a track still playing from it must outlive this source.
+  final bool _ownsProxy;
+
+  /// Checks the stream URL a plugin hands back before anything opens it.
+  final EgressPolicy _policy;
   final Map<String, Map<String, Object?>> _items = {};
   final Map<String, Map<String, Object?>> _topListItems = {};
   final Map<String, String> _artwork = {};
@@ -201,7 +217,7 @@ final class PluginCatalogSource implements CatalogSource {
       );
     }
     final url = raw['url']?.toString();
-    final parsed = await checkedPluginStreamUri(url);
+    final parsed = await checkedPluginStreamUri(url, policy: _policy);
     final headers = <String, String>{};
     final rawHeaders = raw['headers'];
     if (rawHeaders is Map) {
@@ -213,13 +229,12 @@ final class PluginCatalogSource implements CatalogSource {
     if (userAgent != null && userAgent.isNotEmpty) {
       headers['User-Agent'] = userAgent;
     }
-    // Header-gated streams can't be opened by media_kit directly — relay them
-    // through the loopback proxy which injects the headers per hop.
-    if (headers.isNotEmpty) {
-      final local = await _proxy.publish(parsed, headers);
-      return ResolvedStream(uri: local, mimeType: _mimeType(url!));
-    }
-    return ResolvedStream(uri: parsed, mimeType: _mimeType(url!));
+    // Every plugin stream is relayed through the loopback proxy, headers or
+    // not: it injects the headers per hop, and its client vets each redirect
+    // hop against the egress policy, which libmpv opening the URL itself
+    // would not.
+    final local = await _proxy.publish(parsed, headers);
+    return ResolvedStream(uri: local, mimeType: _mimeType(url!));
   }
 
   /// Flattens the plugin's `getTopLists` groups into a single list of charts.
@@ -317,7 +332,7 @@ final class PluginCatalogSource implements CatalogSource {
   void dispose() {
     _disposed = true;
     _runtime?.then((runtime) => runtime.dispose(), onError: (_) {});
-    _proxy.dispose();
+    if (_ownsProxy) _proxy.dispose();
   }
 }
 
