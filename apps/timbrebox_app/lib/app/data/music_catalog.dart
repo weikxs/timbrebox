@@ -7,6 +7,7 @@ import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../model/catalog_search.dart';
 import '../model/catalog_track.dart';
+import '../net/pooled_http.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
 import 'video_source_adapters.dart';
@@ -710,6 +711,9 @@ class InternetArchiveCatalogSource implements CatalogSource {
   }
 }
 
+/// Reads JSON from the built-in catalog APIs over one long-lived client, so
+/// repeated searches reuse keep-alive connections instead of a new TLS
+/// handshake per request.
 class JsonHttpClient {
   JsonHttpClient({
     HttpClient Function()? clientFactory,
@@ -719,34 +723,59 @@ class JsonHttpClient {
 
   final HttpClient Function() _clientFactory;
   final SourceHttpPolicy _policy;
+  late final HttpClient _client = _clientFactory()
+    ..idleTimeout = pooledIdleTimeout;
 
   Future<String> read(Uri uri, CancellationToken cancellation) async {
-    final client = _clientFactory();
     try {
-      final request = await client.getUrl(uri).timeout(_policy.timeout);
+      return await _read(uri, cancellation);
+    } on TimeoutException {
+      throw SourceException(
+        AppStrings.t('source.errRespTimeout'),
+        retryable: true,
+      );
+    } on SocketException {
+      throw SourceException(
+        AppStrings.t('source.errNetworkRetry'),
+        retryable: true,
+      );
+    } on FormatException {
+      throw SourceException(
+        AppStrings.t('source.errBadSearch'),
+        retryable: true,
+      );
+    }
+  }
+
+  Future<String> _read(Uri uri, CancellationToken cancellation) async {
+    HttpClientRequest? request;
+    try {
+      request = await openWithin(_client.getUrl(uri), _policy.timeout);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.userAgentHeader, _policy.userAgent);
-      final response = await request.close().timeout(_policy.timeout);
+      final response = await responseWithin(request, _policy.timeout);
       if (response.statusCode != HttpStatus.ok) {
-        throw SourceException(AppStrings.t('source.errUnavailableRetry'), retryable: true);
+        throw SourceException(
+          AppStrings.t('source.errUnavailableRetry'),
+          retryable: true,
+        );
       }
       final bytes = BytesBuilder(copy: false);
       await for (final chunk in response) {
         cancellation.throwIfCancelled();
         bytes.add(chunk);
         if (bytes.length > _policy.maxResponseBytes) {
-          throw SourceException(AppStrings.t('source.errRespTooLarge'), retryable: true);
+          throw SourceException(
+            AppStrings.t('source.errRespTooLarge'),
+            retryable: true,
+          );
         }
       }
       return utf8.decode(bytes.takeBytes());
-    } on TimeoutException {
-      throw SourceException(AppStrings.t('source.errRespTimeout'), retryable: true);
-    } on SocketException {
-      throw SourceException(AppStrings.t('source.errNetworkRetry'), retryable: true);
-    } on FormatException {
-      throw SourceException(AppStrings.t('source.errBadSearch'), retryable: true);
-    } finally {
-      client.close(force: true);
+    } catch (_) {
+      // A failed exchange must not leave its pooled connection half-read.
+      request?.abort();
+      rethrow;
     }
   }
 }

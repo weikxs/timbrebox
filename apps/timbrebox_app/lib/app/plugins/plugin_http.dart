@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import '../design/app_strings.dart';
 import '../net/egress_policy.dart';
+import '../net/pooled_http.dart';
 
 /// The single privileged capability handed to plugins: HTTP. Every plugin
 /// network call flows through here, so egress policy (scheme, private-IP
@@ -16,6 +17,27 @@ final class PluginHttpClient {
 
   final int maxBytes;
   final EgressPolicy policy;
+
+  /// One client per plugin, so its requests reuse keep-alive connections. The
+  /// policy is attached to it, so every new connection (each redirect hop
+  /// included) is still vetted.
+  HttpClient? _client;
+
+  HttpClient get _pooled => _client ??= _newClient();
+
+  HttpClient _newClient() {
+    final client = HttpClient()
+      ..connectionTimeout = _timeout
+      ..idleTimeout = pooledIdleTimeout;
+    policy.attach(client);
+    return client;
+  }
+
+  /// Drops the pooled connections; a later [send] opens a new client.
+  void close() {
+    _client?.close(force: true);
+    _client = null;
+  }
 
   static const _timeout = Duration(seconds: 20);
   static const _maxRedirects = 4;
@@ -39,12 +61,12 @@ final class PluginHttpClient {
         : start.replace(queryParameters: {...start.queryParameters, ...params});
     Object? body = request['data'];
 
-    final client = HttpClient()..connectionTimeout = _timeout;
-    policy.attach(client);
+    final client = _pooled;
+    HttpClientRequest? httpRequest;
     try {
       for (var redirect = 0; ; redirect++) {
         await _enforcePolicy(uri);
-        final httpRequest = await client.openUrl(method, uri);
+        httpRequest = await client.openUrl(method, uri);
         httpRequest.followRedirects = false;
         headers.forEach(httpRequest.headers.set);
         if (body != null && method != 'GET' && method != 'HEAD') {
@@ -52,7 +74,7 @@ final class PluginHttpClient {
             utf8.encode(body is String ? body : jsonEncode(body)),
           );
         }
-        final response = await httpRequest.close().timeout(_timeout);
+        final response = await responseWithin(httpRequest, _timeout);
         if (response.isRedirect && redirect >= _maxRedirects) {
           await response.drain<void>();
           throw PluginHttpException(
@@ -79,8 +101,10 @@ final class PluginHttpClient {
           'data': utf8.decode(bytes, allowMalformed: true),
         };
       }
-    } finally {
-      client.close(force: true);
+    } catch (_) {
+      // A failed exchange must not leave its pooled connection half-read.
+      httpRequest?.abort();
+      rethrow;
     }
   }
 

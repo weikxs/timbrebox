@@ -9,6 +9,7 @@ import '../model/catalog_track.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
 import '../design/app_strings.dart';
+import '../net/pooled_http.dart';
 
 part 'bilibili_catalog_source.dart';
 part 'page_video_catalog_source.dart';
@@ -55,7 +56,8 @@ typedef SourceReader =
       CancellationToken cancellation,
     );
 
-/// Small HTTP boundary shared by the compiled-in adapters.
+/// Small HTTP boundary shared by the compiled-in adapters. One long-lived
+/// client per adapter keeps connections alive across requests.
 final class SourceHttpClient {
   SourceHttpClient({
     HttpClient Function()? clientFactory,
@@ -72,6 +74,8 @@ final class SourceHttpClient {
   final HttpClient Function() _clientFactory;
   final SourceHttpPolicy _policy;
   final SourceReader? _reader;
+  late final HttpClient _client = _clientFactory()
+    ..idleTimeout = pooledIdleTimeout;
 
   Future<String> get(
     Uri uri,
@@ -114,11 +118,35 @@ final class SourceHttpClient {
     if (_reader != null) {
       return _reader(uri, body, headers, cancellation);
     }
-    final client = _clientFactory();
     try {
-      final request = body == null
-          ? await client.getUrl(uri)
-          : await client.postUrl(uri);
+      return await _exchange(
+        uri,
+        cancellation,
+        body: body,
+        headers: headers,
+        cookies: cookies,
+        maxResponseBytes: maxResponseBytes,
+      );
+    } on TimeoutException {
+      throw SourceException(AppStrings.t('source.errTimeout'), retryable: true);
+    } on SocketException {
+      throw SourceException(AppStrings.t('source.errNetwork'), retryable: true);
+    }
+  }
+
+  Future<String> _exchange(
+    Uri uri,
+    CancellationToken cancellation, {
+    String? body,
+    required Map<String, String> headers,
+    MemoryCookieJar? cookies,
+    int? maxResponseBytes,
+  }) async {
+    HttpClientRequest? request;
+    try {
+      request = body == null
+          ? await _client.getUrl(uri)
+          : await _client.postUrl(uri);
       request.headers.set(
         HttpHeaders.acceptHeader,
         'application/json, text/html',
@@ -132,11 +160,13 @@ final class SourceHttpClient {
         request.headers.contentType = ContentType.json;
         request.write(body);
       }
-      final response = await request.close().timeout(_policy.timeout);
+      final response = await responseWithin(request, _policy.timeout);
       cookies?.capture(response.headers);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SourceException(
-          AppStrings.t('source.errUnavailable').replaceFirst('{code}', '${response.statusCode}'),
+          AppStrings.t(
+            'source.errUnavailable',
+          ).replaceFirst('{code}', '${response.statusCode}'),
           retryable: response.statusCode >= 500,
           code: response.statusCode == 412
               ? 'source_access_restricted'
@@ -148,16 +178,17 @@ final class SourceHttpClient {
         cancellation.throwIfCancelled();
         bytes.add(chunk);
         if (bytes.length > (maxResponseBytes ?? _policy.maxResponseBytes)) {
-          throw SourceException(AppStrings.t('source.errTooLarge'), retryable: true);
+          throw SourceException(
+            AppStrings.t('source.errTooLarge'),
+            retryable: true,
+          );
         }
       }
       return utf8.decode(bytes.takeBytes());
-    } on TimeoutException {
-      throw SourceException(AppStrings.t('source.errTimeout'), retryable: true);
-    } on SocketException {
-      throw SourceException(AppStrings.t('source.errNetwork'), retryable: true);
-    } finally {
-      client.close(force: true);
+    } catch (_) {
+      // A failed exchange must not leave its pooled connection half-read.
+      request?.abort();
+      rethrow;
     }
   }
 }

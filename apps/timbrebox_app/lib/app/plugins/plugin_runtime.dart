@@ -135,6 +135,7 @@ final class PluginRuntime {
     if (_disposed) return;
     _disposed = true;
     _rt.dispose();
+    _http.close();
   }
 
   static const _prelude = r'''

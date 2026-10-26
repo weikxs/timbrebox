@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import '../net/egress_policy.dart';
+import '../net/pooled_http.dart';
 
 /// Loopback proxy that makes header-gated / range-limited remote audio playable
 /// by media_kit.
@@ -24,6 +25,11 @@ final class StreamHeaderProxy {
   final EgressPolicy policy;
 
   HttpServer? _server;
+
+  /// One upstream client for the proxy's lifetime, so window after window
+  /// (and seek after seek) reuses keep-alive connections. The policy is
+  /// attached to it, so every new connection and redirect hop is vetted.
+  HttpClient? _client;
   final _entries = <String, _ProxyTarget>{};
   var _token = 0;
 
@@ -67,8 +73,7 @@ final class StreamHeaderProxy {
       await req.response.close();
       return;
     }
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
-    policy.attach(client);
+    final client = _upstreamClient();
     try {
       if (target.chunked) {
         final total = _totalBytes(target.upstream);
@@ -86,11 +91,20 @@ final class StreamHeaderProxy {
         req.response.statusCode = HttpStatus.badGateway;
       } catch (_) {}
     } finally {
-      client.close(force: true);
       try {
         await req.response.close();
       } catch (_) {}
     }
+  }
+
+  HttpClient _upstreamClient() {
+    final existing = _client;
+    if (existing != null) return existing;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..idleTimeout = pooledIdleTimeout;
+    policy.attach(client);
+    return _client = client;
   }
 
   /// Simple mode: forward one request to upstream with headers injected and the
@@ -215,6 +229,8 @@ final class StreamHeaderProxy {
   Future<void> dispose() async {
     await _server?.close(force: true);
     _server = null;
+    _client?.close(force: true);
+    _client = null;
     _entries.clear();
   }
 }
