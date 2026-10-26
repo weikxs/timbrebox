@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../data/stream_header_proxy.dart';
 import '../design/app_strings.dart';
 import '../net/egress_policy.dart';
 import 'plugin_catalog_source.dart';
@@ -24,11 +25,21 @@ final class PluginRepository {
     PluginRuntime Function()? createRuntime,
   }) : _createRuntime = createRuntime ?? PluginRuntime.new,
        // ignore: prefer_initializing_formals
-       _pluginsDirectory = pluginsDirectory;
+       _pluginsDirectory = pluginsDirectory,
+       streamProxy = StreamHeaderProxy(policy: policy);
 
   /// Plugin code is fetched over https from public hosts only, on every
   /// redirect hop too: a plain-http or LAN source could hand us any script.
+  /// Plugin stream URLs are held to the same public-hosts rule.
   final EgressPolicy policy;
+
+  /// The loopback proxy every plugin source relays its streams through. It
+  /// belongs to the repository, not to a source, so updating or removing a
+  /// plugin does not cut off the track that is playing from it.
+  final StreamHeaderProxy streamProxy;
+
+  /// Closes the shared stream proxy (the app is shutting down).
+  Future<void> dispose() => streamProxy.dispose();
 
   /// Where plugins are stored; defaults to `<appSupport>/plugins`.
   final Future<Directory> Function()? _pluginsDirectory;
@@ -108,7 +119,12 @@ final class PluginRepository {
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
     await _store(manifest, source);
-    return PluginCatalogSource(manifest: manifest, runtime: runtime);
+    return PluginCatalogSource(
+      manifest: manifest,
+      runtime: runtime,
+      proxy: streamProxy,
+      policy: policy,
+    );
   }
 
   /// Returns the plugin URLs in a subscription JSON, or null if [content] is not
@@ -170,6 +186,8 @@ final class PluginRepository {
         manifest: manifest,
         functions: functions.toSet(),
         loadRuntime: () async => _startRuntime(await scriptFile.readAsString()),
+        proxy: streamProxy,
+        policy: policy,
       );
     } catch (_) {
       return null; // A broken stored plugin is skipped.
@@ -187,7 +205,12 @@ final class PluginRepository {
     await File(
       '${scriptFile.parent.path}/manifest.json',
     ).writeAsString(jsonEncode(recorded.toJson()), flush: true);
-    return PluginCatalogSource(manifest: recorded, runtime: runtime);
+    return PluginCatalogSource(
+      manifest: recorded,
+      runtime: runtime,
+      proxy: streamProxy,
+      policy: policy,
+    );
   }
 
   Future<PluginRuntime> _startRuntime(String script) async {

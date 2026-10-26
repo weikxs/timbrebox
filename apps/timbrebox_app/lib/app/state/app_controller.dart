@@ -575,7 +575,8 @@ class AppController extends ChangeNotifier {
   }
 
   /// Registers [source] (replacing any prior one with the same id, disposing it)
-  /// and tracks its manifest + enabled state.
+  /// and tracks its manifest + enabled state. A track playing from the old
+  /// source keeps playing: its stream lives in the repository's shared proxy.
   void _adoptSource(
     MutableMusicCatalog mutable,
     PluginCatalogSource source, {
@@ -1563,6 +1564,7 @@ class AppController extends ChangeNotifier {
       source.dispose();
     }
     _pluginSources.clear();
+    unawaited(_pluginRepository?.dispose());
     unawaited(_controlServer.stop());
     unawaited(_mediaControls.dispose());
     unawaited(_player.dispose());

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +7,7 @@ import 'package:timbrebox_app/app/data/stream_header_proxy.dart';
 import 'package:timbrebox_app/app/net/egress_policy.dart';
 import 'package:timbrebox_app/app/plugins/plugin_catalog_source.dart';
 import 'package:timbrebox_app/app/plugins/plugin_manifest.dart';
+import 'package:timbrebox_app/app/plugins/plugin_repository.dart';
 import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';
 
 /// Every plugin stream goes through the loopback proxy, so each redirect hop
@@ -80,5 +82,53 @@ module.exports = {
     expect(stream.uri.host, '127.0.0.1');
     expect(stream.uri.path, startsWith('/s/'));
     expect(stream.mimeType, 'audio/mpeg');
+  });
+
+  test('updating a plugin keeps its playing stream alive', () async {
+    final root = await Directory.systemTemp.createTemp('plugins');
+    addTearDown(() => root.delete(recursive: true));
+    final dir = await Directory('${root.path}/plugin_p').create();
+    await File('${dir.path}/plugin.js').writeAsString('''
+module.exports = {
+  platform: 'P',
+  search: async function () {
+    return { isEnd: true, data: [{ id: 'x', title: 'Song' }] };
+  },
+  getMediaSource: async function () {
+    return { url: 'http://cdn.test:${upstream.port}/track.mp3' };
+  },
+};
+''');
+    const manifest = PluginManifest(
+      id: 'plugin_p',
+      platform: 'P',
+      version: '1',
+      functions: ['search', 'getMediaSource'],
+    );
+    await File(
+      '${dir.path}/manifest.json',
+    ).writeAsString(jsonEncode(manifest.toJson()));
+    final repository = PluginRepository(
+      policy: permissive,
+      pluginsDirectory: () async => root,
+    );
+    addTearDown(repository.dispose);
+    final old = (await repository.loadInstalled()).single;
+    await old.search(
+      SearchRequest(query: 'q', cancellation: CancellationToken()),
+    );
+    final playing = await resolve(old);
+
+    // An update disposes the old source while its track keeps playing.
+    old.dispose();
+
+    final client = HttpClient();
+    addTearDown(() => client.close(force: true));
+    final response = await (await client.getUrl(playing.uri)).close();
+    final body = await response
+        .transform(const SystemEncoding().decoder)
+        .join();
+    expect(body, 'audio-bytes');
+    expect(upstreamPaths, ['/track.mp3']);
   });
 }
