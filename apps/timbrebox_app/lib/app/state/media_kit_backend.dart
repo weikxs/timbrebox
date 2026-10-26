@@ -58,22 +58,27 @@ final class MediaKitBackend
     return player;
   }
 
-  /// Audio-only libmpv: an 8 MB demuxer cache instead of media_kit's 32 MB
-  /// (sized for video), and no video output. Video decoding stays off too:
-  /// media_kit opens with `vid=no` until a video view attaches, and none
-  /// does, so Douyin / TikTok MP4s play their audio track only.
+  /// Audio-only libmpv: a 2 MB demuxer cache instead of media_kit's 32 MB
+  /// (sized for video) - about 100 s of a 160 kbps stream, 10 s of lossless.
+  /// While playing, an 8 MB cache sat full in memory. No video output, and
+  /// video decoding stays off too: media_kit opens with `vid=no` until a
+  /// video view attaches, and none does, so Douyin / TikTok MP4s play their
+  /// audio track only.
   static const configuration = PlayerConfiguration(
-    bufferSize: 8 * 1024 * 1024,
+    bufferSize: 2 * 1024 * 1024,
     vo: 'null',
   );
 
   /// Set right after the player is created. media_kit keeps as much behind
-  /// the playhead as ahead of it; a music player seeks back rarely, so 2 MB
-  /// is plenty. `vid=no` is stated here as well rather than left to
-  /// media_kit's default.
+  /// the playhead as ahead of it; a music player seeks back rarely, so
+  /// 512 KB is plenty (a seek further back reads from the network again).
+  /// `vid=no` is stated here as well rather than left to media_kit's
+  /// default. `ytdl=no`: the app resolves every stream itself, so mpv never
+  /// hands a URL to youtube-dl / yt-dlp (a new process) when one fails.
   static const mpvProperties = {
-    'demuxer-max-back-bytes': '${2 * 1024 * 1024}',
+    'demuxer-max-back-bytes': '${512 * 1024}',
     'vid': 'no',
+    'ytdl': 'no',
   };
 
   var _disposed = false;
