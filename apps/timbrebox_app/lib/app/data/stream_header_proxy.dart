@@ -127,9 +127,17 @@ final class StreamHeaderProxy {
     _Range range,
     int total,
   ) async {
+    // libmpv drops the connection on every seek; once it is gone, stop
+    // pulling windows instead of fetching the rest of the track for nobody.
+    var playerGone = false;
+    unawaited(
+      response.done.then<void>((_) {}, onError: (_) {}).whenComplete(() {
+        playerGone = true;
+      }),
+    );
     var cursor = range.start;
     var wroteHeaders = false;
-    while (cursor <= range.end) {
+    while (cursor <= range.end && !playerGone) {
       final windowEnd = (cursor + _window - 1) > range.end
           ? range.end
           : cursor + _window - 1;
@@ -148,8 +156,12 @@ final class StreamHeaderProxy {
         wroteHeaders = true;
       }
       await for (final chunk in upstreamResponse) {
+        if (playerGone) return; // Cancelling drops the upstream connection.
         response.add(chunk);
       }
+      // Backpressure: the next window is fetched only once this one has been
+      // handed to the player's socket (this throws if the player hung up).
+      await response.flush();
       cursor = windowEnd + 1;
     }
   }
