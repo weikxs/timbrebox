@@ -33,6 +33,12 @@ class TrackArtwork extends StatelessWidget {
                 artworkUrl,
                 width: size,
                 height: size,
+                // Decode at the tile's pixel size, not the source's (often
+                // 480-1280 px). Only the height is set so the aspect ratio
+                // stays: covers are square and video thumbnails landscape,
+                // where the height is the side that fills the tile.
+                cacheHeight: (size * MediaQuery.devicePixelRatioOf(context))
+                    .round(),
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
                 // Decorative: the track title/artist text always sits alongside.
