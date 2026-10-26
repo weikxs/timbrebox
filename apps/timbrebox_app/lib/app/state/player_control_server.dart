@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:io' as io show exit;
 
 import '../model/catalog_track.dart';
 import 'app_controller.dart';
@@ -16,9 +18,16 @@ import 'control_request_guard.dart';
 ///   POST /seek?ms= /volume?level= /mode?loop= /play-ref?source=&item=
 ///   POST /play-queue?i= /source?id=&enabled=
 final class PlayerControlServer {
-  PlayerControlServer(this._controller);
+  PlayerControlServer(this._controller, {void Function(int code)? exit})
+    : _exit = exit ?? io.exit;
 
   final AppController _controller;
+
+  /// Ends the process; replaced in tests.
+  final void Function(int code) _exit;
+
+  /// The longest a quit waits for the session save and pending writes.
+  static const _quitSaveLimit = Duration(seconds: 5);
   HttpServer? _server;
 
   /// Preferred deterministic loopback ports so a local agent/CLI can find the
@@ -50,8 +59,10 @@ final class PlayerControlServer {
   }
 
   Future<void> stop() async {
-    await _server?.close(force: true);
+    final server = _server;
+    if (server == null) return; // Never started: no file of ours to remove.
     _server = null;
+    await server.close(force: true);
     await _removeEndpointFile();
   }
 
@@ -177,8 +188,11 @@ final class PlayerControlServer {
         case '/quit':
           // Deliberate shutdown of the whole app — useful when the window is
           // hidden in the background and there is no Cmd+Q (Windows/Linux).
-          // Respond first, then exit so the process and this server stop.
-          Future.delayed(const Duration(milliseconds: 150), () => exit(0));
+          // Respond first, then save and exit so the process and this
+          // server stop.
+          unawaited(
+            Future<void>.delayed(const Duration(milliseconds: 150), quit),
+          );
           return _json(request, HttpStatus.ok, {'ok': true, 'quitting': true});
         case '/seek':
           final ms = int.tryParse(query['ms'] ?? '');
@@ -224,6 +238,18 @@ final class PlayerControlServer {
     } catch (error) {
       return _json(request, HttpStatus.internalServerError, {'error': '$error'});
     }
+  }
+
+  /// Saves the session and lets pending file writes finish (for at most
+  /// [_quitSaveLimit]), then ends the process.
+  Future<void> quit() async {
+    try {
+      await _controller.prepareToQuit().timeout(_quitSaveLimit);
+    } catch (_) {
+      // Quitting must not hang on a stuck disk; whatever was saved stays.
+    }
+    await stop();
+    _exit(0);
   }
 
   Map<String, Object?> _discovery() => {

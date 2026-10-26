@@ -17,6 +17,7 @@ import '../plugins/plugin_catalog_source.dart';
 import '../plugins/plugin_manifest.dart';
 import '../plugins/plugin_repository.dart';
 import 'appearance_store.dart';
+import 'atomic_file.dart';
 import 'audio_route_monitor.dart';
 import 'catalog_download_service.dart';
 import 'diagnostic_log.dart';
@@ -926,7 +927,17 @@ class AppController extends ChangeNotifier {
   /// save from one that must rewrite the queue.
   String? _savedQueueKey;
 
-  void _persistSession() {
+  void _persistSession() => unawaited(_saveSession());
+
+  /// Saves what must survive a quit — the session (queue and position) —
+  /// and waits for every file write still in flight.
+  Future<void> prepareToQuit() async {
+    _savedQueueKey = null; // Write the whole session, not just the position.
+    await _saveSession();
+    await pendingAtomicWrites();
+  }
+
+  Future<void> _saveSession() async {
     final store = _sessionStore;
     if (store == null) return;
     _savedPosition = _position;
@@ -938,12 +949,9 @@ class AppController extends ChangeNotifier {
     final index = found < 0 ? 0 : found;
     final key = '$index\n${summaries.map((track) => track.ref).join('\n')}';
     final positionMs = _position.inMilliseconds;
-    if (key == _savedQueueKey) {
-      unawaited(store.savePosition(positionMs));
-      return;
-    }
+    if (key == _savedQueueKey) return store.savePosition(positionMs);
     _savedQueueKey = key;
-    unawaited(store.save(queue, index, positionMs: positionMs));
+    return store.save(queue, index, positionMs: positionMs);
   }
 
   // ---- Agent control (local HTTP API to drive the player) ----
