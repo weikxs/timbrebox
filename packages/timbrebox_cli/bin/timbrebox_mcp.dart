@@ -1,7 +1,9 @@
 // TimbreBox MCP server (stdio, JSON-RPC 2.0, newline-delimited).
 //
 // Bridges MCP tool calls to the running TimbreBox player's local loopback
-// control API. Point an MCP client (e.g. Claude Desktop) at:
+// control API, sending the per-run token from the app's user-only
+// control-token file (or TIMBREBOX_TOKEN_FILE / TIMBREBOX_TOKEN). Point an
+// MCP client (e.g. Claude Desktop) at:
 //   dart run timbrebox_cli:timbrebox_mcp
 import 'dart:convert';
 import 'dart:io';
@@ -92,13 +94,14 @@ Future<void> _handleToolCall(Object? id, Object? params) async {
   final name = (params is Map ? params['name'] : null)?.toString();
   final rawArgs = params is Map ? params['arguments'] : null;
   final args = rawArgs is Map ? rawArgs : const {};
-  final base = await _client.discover();
-  if (base == null) {
-    _toolResult(id, 'TimbreBox is not running or Agent control is off.',
-        isError: true);
-    return;
-  }
   try {
+    // Discovery sends the run's token too, and says so when it is refused.
+    final base = await _client.discover();
+    if (base == null) {
+      _toolResult(id, 'TimbreBox is not running or Agent control is off.',
+          isError: true);
+      return;
+    }
     _toolResult(id, await _runTool(base, name, args));
   } catch (error) {
     _toolResult(id, 'Error: $error', isError: true);

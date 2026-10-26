@@ -31,11 +31,11 @@ gstack 已为 Codex 安装。根据任务选择最小必要工作流：
 ### TimbreBox 控制 skill（驱动运行中的播放器）
 
 仓库自带一个项目 skill `timbrebox-control`（`.claude/skills/`）以及 `tools/timbrebox-ctl`
-封装脚本，用于通过本地回环控制 API 驱动**正在运行**的应用（默认开启、无令牌；拒绝网页发来的请求，动作只接受 POST）：
+封装脚本，用于通过本地回环控制 API 驱动**正在运行**的应用（默认开启；拒绝网页发来的请求，动作只接受 POST，每个请求都带上本次运行的令牌——取自应用仅本人可读的 `control-token` 文件，`tools/timbrebox-ctl` 会自动读取）：
 
 - **Claude Code** 对自然语言请求自动调用 `timbrebox-control` skill（"播放周杰伦的歌"、暂停、
   下一首、音量、随机、队列……）；流程是 search → `play-ref` → `status`。
-- **Codex CLI** 及任意本地脚本通过 `tools/timbrebox-ctl <cmd>` 或直接 `curl` 访问 `127.0.0.1`
+- **Codex CLI** 及任意本地脚本通过 `tools/timbrebox-ctl <cmd>` 或直接 `curl`（带上 `X-TimbreBox-Token` 头）访问 `127.0.0.1`
   上的同一 API。
 - 这些是 `timbrebox-ctl` 子命令 / HTTP 路径，**不是** slash 命令——唯一的 slash 命令是
   `/timbrebox-control`，绝不敲裸 `/status`。

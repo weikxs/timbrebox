@@ -332,8 +332,12 @@ class _AgentControlInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = controller.agentControlAddress ?? AppStrings.t('agent.starting');
-    final example = '$address/status';
+    final error = controller.agentControlError;
+    final address =
+        error ?? controller.agentControlAddress ?? AppStrings.t('agent.starting');
+    final tokenPath = controller.agentControlTokenPath ?? '…';
+    final example =
+        'curl -H "X-TimbreBox-Token: \$(cat \'$tokenPath\')" "$address/status"';
     return Container(
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -346,9 +350,11 @@ class _AgentControlInfo extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _kv(AppStrings.t('agent.address'), address),
+          const SizedBox(height: 6),
+          _kv(AppStrings.t('agent.token'), tokenPath),
           const SizedBox(height: 8),
           Text(
-            '${AppStrings.t('agent.exampleLabel')}curl "$example"\n'
+            '${AppStrings.t('agent.exampleLabel')}$example\n'
             '${AppStrings.t('agent.endpointsLabel')}GET /status /queue /sources /lyric · '
             'POST /search?q= /play-ref?source=&item= /play /pause /toggle /next '
             '/previous /stop /seek?ms= /volume?level= /mode?loop= /quit',

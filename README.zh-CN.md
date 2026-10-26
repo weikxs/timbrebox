@@ -122,8 +122,8 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 - 采用 TimbreBox 插件格式的第三方音源：粘贴一个插件链接，插件即成为可搜索、可播放的新音源。参见[插件系统](#插件系统)。
 
 ### Agent 控制（Claude Code / Codex CLI）
-- 应用运行一个**本地回环控制 API**（默认开启；无令牌；只绑定 `127.0.0.1`，并拒绝网页发来的请求），本地 AI agent 可用自然语言搜索并播放。说一句"播放周杰伦的歌" / "play some Jay Chou"，agent 就会搜索、挑最佳匹配并播放——随后可暂停 / 继续 / 切歌 / 定位 / 调音量 / 切换循环或随机 / 管理队列 / 启停音源。
-- **Claude Code** 自动调用内置的 `timbrebox-control` skill；**Codex CLI** 及任意本地脚本通过 `tools/timbrebox-ctl` 或直接 `curl` 访问 `127.0.0.1` 上的同一 API。
+- 应用运行一个**本地回环控制 API**（默认开启；只绑定 `127.0.0.1`，拒绝网页发来的请求，每个请求都要带上本次运行的令牌，令牌存放在只有你的账户能读取的文件里），本地 AI agent 可用自然语言搜索并播放。说一句"播放周杰伦的歌" / "play some Jay Chou"，agent 就会搜索、挑最佳匹配并播放——随后可暂停 / 继续 / 切歌 / 定位 / 调音量 / 切换循环或随机 / 管理队列 / 启停音源。
+- **Claude Code** 自动调用内置的 `timbrebox-control` skill；**Codex CLI** 及任意本地脚本通过 `tools/timbrebox-ctl` 或直接 `curl`（带上 `X-TimbreBox-Token` 头）访问 `127.0.0.1` 上的同一 API。
 - 各桌面端均支持**后台运行** —— 关闭窗口后 app 仍持续提供 API（重新启动即可恢复窗口；`timbrebox-ctl quit` 退出）。机器之外无法访问。详见 [Agent 控制 API](./docs/agent-control-api.zh-CN.md)。
 
 ## 架构
@@ -317,7 +317,7 @@ dart test                # 核心领域测试
 - 🚧 Windows（SMTC）与 Linux（MPRIS）媒体会话后端 —— 代码已完成，待真机验证
 
 **Agent 控制与国际化**
-- ✅ 本地回环控制 API（search / play / 传输控制 / 队列 / 音源 / 歌词），默认开启、无令牌
+- ✅ 本地回环控制 API（search / play / 传输控制 / 队列 / 音源 / 歌词），默认开启，令牌每次运行更换、存于仅本人可读的文件
 - ✅ `tools/timbrebox-ctl` CLI + `timbrebox-control` skill —— 让 Claude Code / Codex CLI 用自然语言播放
 - ✅ `timbrebox` 一次性 Dart CLI 包（全量命令、`--json`），走控制 API
 - ✅ MCP stdio 服务器（`dart run timbrebox_cli:timbrebox_mcp`），把工具（play_music / pause / resume / next / previous / stop / set_volume / get_status）桥接到控制 API

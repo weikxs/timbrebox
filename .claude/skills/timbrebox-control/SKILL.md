@@ -7,8 +7,20 @@ description: Control the TimbreBox desktop music player (this repo's Flutter app
 
 TimbreBox (the Flutter desktop music player in this repo) exposes a **local HTTP
 control API** bound to loopback. It is **on by default** (Settings → General →
-Agent control). Loopback binding *is* the security boundary — nothing off the
-machine can reach it — so there is **no token**.
+Agent control). Nothing off the machine can reach it, requests from web pages
+are refused, and **every request must carry the run's token** in the header
+`X-TimbreBox-Token`. The app writes a new random token at each start to a
+user-only file named `control-token` in its support directory:
+
+| Platform | Token file |
+|---|---|
+| macOS | `~/Library/Containers/io.timbrebox.timbreboxApp/Data/Library/Application Support/io.timbrebox.timbreboxApp/control-token` |
+| Linux | `${XDG_DATA_HOME:-~/.local/share}/io.timbrebox.timbrebox_app/control-token` |
+| Windows | `%APPDATA%\io.timbrebox\TimbreBox\control-token` |
+
+`tools/timbrebox-ctl` (and the Dart CLI / MCP server) find and send it for you;
+`TIMBREBOX_TOKEN_FILE=<path>` or `TIMBREBOX_TOKEN=<token>` override the lookup.
+Settings → General → Agent control shows the file's path.
 
 This skill drives the **one running app instance**. It does not launch, build, or
 edit the player; if the app isn't running, ask the user to start it.
@@ -40,16 +52,23 @@ request: run the search→play flow, don't just show results.
 ## Step 1 — Find the running player
 
 The server binds the first free port in the fixed range **8787–8796**. Discover
-it by probing until one answers with the discovery document:
+it by probing until one answers with the discovery document. Pass the token on
+curl's stdin (`-H @-`), not on its command line, so it never shows up in the
+process list:
 
 ```bash
+TOKEN_FILE="$HOME/Library/Containers/io.timbrebox.timbreboxApp/Data/Library/Application Support/io.timbrebox.timbreboxApp/control-token"  # macOS; see the table above
+tb() { printf 'X-TimbreBox-Token: %s\n' "$(cat "$TOKEN_FILE")" | curl -H @- "$@"; }
 for p in 8787 8788 8789 8790 8791 8792 8793 8794 8795 8796; do
-  if curl -s "http://127.0.0.1:$p/" | grep -q 'TimbreBox control API'; then
+  if tb -s "http://127.0.0.1:$p/" | grep -q 'TimbreBox control API'; then
     BASE="http://127.0.0.1:$p"; break
   fi
 done
 [ -n "$BASE" ] || echo "TimbreBox not running / Agent control disabled"
 ```
+
+An answer of HTTP 401 mentioning `X-TimbreBox-Token` means the app is running
+but the token is missing or from an earlier run (it changes at every start).
 
 From inside this repo, prefer the wrapper `tools/timbrebox-ctl`, which does the
 discovery for you: `tools/timbrebox-ctl <command> [args]` (run `timbrebox-ctl
@@ -58,25 +77,27 @@ turned off — tell the user to launch TimbreBox (it's on by default).
 
 ## Step 2 — Commands
 
-Every response is JSON. Prefer the wrapper; the raw curl equivalent is shown too. Actions are POST (the player refuses them as GET); reads are GET.
+Every response is JSON. Prefer the wrapper; the raw request is shown with the
+`tb` helper from Step 1 (curl plus the token header). Actions are POST (the
+player refuses them as GET); reads are GET.
 
 | Intent | Wrapper | Raw request |
 |---|---|---|
-| Current state | `timbrebox-ctl status` | `curl -s "$BASE/status"` |
-| Search all enabled sources | `timbrebox-ctl search "周杰伦"` | `curl -sG -X POST "$BASE/search" --data-urlencode "q=周杰伦"` |
-| Play a search/queue result | `timbrebox-ctl play-ref <source> <item>` | `curl -sG -X POST "$BASE/play-ref" --data-urlencode source=<s> --data-urlencode item=<i>` |
-| Resume / Pause / Toggle | `timbrebox-ctl play` \| `pause` \| `toggle` | `curl -s -X POST "$BASE/play"` \| `/pause` \| `/toggle` |
-| Next / Previous | `timbrebox-ctl next` \| `prev` | `curl -s -X POST "$BASE/next"` \| `/previous` |
-| Stop (clears playback) | `timbrebox-ctl stop` | `curl -s -X POST "$BASE/stop"` |
-| Seek to position (ms) | `timbrebox-ctl seek 30000` | `curl -sG -X POST "$BASE/seek" --data-urlencode ms=30000` |
-| Volume (0..1) | `timbrebox-ctl volume 0.6` | `curl -sG -X POST "$BASE/volume" --data-urlencode level=0.6` |
-| Loop mode | `timbrebox-ctl mode shuffle` | `curl -sG -X POST "$BASE/mode" --data-urlencode loop=shuffle` |
-| Show queue | `timbrebox-ctl queue` | `curl -s "$BASE/queue"` |
-| Play queue index | `timbrebox-ctl play-queue 2` | `curl -sG -X POST "$BASE/play-queue" --data-urlencode i=2` |
-| List sources | `timbrebox-ctl sources` | `curl -s "$BASE/sources"` |
-| Enable/disable a source | `timbrebox-ctl source youtube false` | `curl -sG -X POST "$BASE/source" --data-urlencode id=youtube --data-urlencode enabled=false` |
-| Current lyric | `timbrebox-ctl lyric` | `curl -s "$BASE/lyric"` |
-| Quit the app | `timbrebox-ctl quit` | `curl -s -X POST "$BASE/quit"` |
+| Current state | `timbrebox-ctl status` | `tb -s "$BASE/status"` |
+| Search all enabled sources | `timbrebox-ctl search "周杰伦"` | `tb -sG -X POST "$BASE/search" --data-urlencode "q=周杰伦"` |
+| Play a search/queue result | `timbrebox-ctl play-ref <source> <item>` | `tb -sG -X POST "$BASE/play-ref" --data-urlencode source=<s> --data-urlencode item=<i>` |
+| Resume / Pause / Toggle | `timbrebox-ctl play` \| `pause` \| `toggle` | `tb -s -X POST "$BASE/play"` \| `/pause` \| `/toggle` |
+| Next / Previous | `timbrebox-ctl next` \| `prev` | `tb -s -X POST "$BASE/next"` \| `/previous` |
+| Stop (clears playback) | `timbrebox-ctl stop` | `tb -s -X POST "$BASE/stop"` |
+| Seek to position (ms) | `timbrebox-ctl seek 30000` | `tb -sG -X POST "$BASE/seek" --data-urlencode ms=30000` |
+| Volume (0..1) | `timbrebox-ctl volume 0.6` | `tb -sG -X POST "$BASE/volume" --data-urlencode level=0.6` |
+| Loop mode | `timbrebox-ctl mode shuffle` | `tb -sG -X POST "$BASE/mode" --data-urlencode loop=shuffle` |
+| Show queue | `timbrebox-ctl queue` | `tb -s "$BASE/queue"` |
+| Play queue index | `timbrebox-ctl play-queue 2` | `tb -sG -X POST "$BASE/play-queue" --data-urlencode i=2` |
+| List sources | `timbrebox-ctl sources` | `tb -s "$BASE/sources"` |
+| Enable/disable a source | `timbrebox-ctl source youtube false` | `tb -sG -X POST "$BASE/source" --data-urlencode id=youtube --data-urlencode enabled=false` |
+| Current lyric | `timbrebox-ctl lyric` | `tb -s "$BASE/lyric"` |
+| Quit the app | `timbrebox-ctl quit` | `tb -s -X POST "$BASE/quit"` |
 
 `loop` / `mode` accept exactly `queue`, `track`, `off`, `shuffle`. `volume` and
 `level` are `0.0`–`1.0`. `seek`/`ms` is an absolute position in milliseconds.
@@ -125,7 +146,7 @@ Field names are exact — parse these, don't guess.
 **`/`** → discovery doc: `{ name, version, auth, endpoints, status }`.
 
 **Errors** come back as `{ "error": "…" }` with HTTP 400 (bad/missing param),
-404 (not found), or 500 (internal). Always check the status code / `ok` field
+401 (missing or wrong token), 404 (not found), or 500 (internal). Always check the status code / `ok` field
 before reporting success.
 
 ## Typical flow: "play a song"

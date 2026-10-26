@@ -10,6 +10,7 @@ void main() {
     String? host = '127.0.0.1:8787',
     String? origin,
     String? fetchSite,
+    String? token = _token,
   }) => controlRequestRejection(
     method: method,
     path: path,
@@ -17,6 +18,8 @@ void main() {
     origin: origin,
     fetchSite: fetchSite,
     port: port,
+    token: token,
+    expectedToken: _token,
   );
 
   test('serves a local read with GET', () {
@@ -62,4 +65,13 @@ void main() {
   test('accepts a request the user typed in the address bar', () {
     expect(check(fetchSite: 'none'), isNull);
   });
+
+  test('refuses a request without this run\'s token', () {
+    expect(check(token: null)?.status, 401);
+    expect(check(token: '')?.status, 401);
+    expect(check(method: 'POST', path: '/quit', token: 'guess')?.status, 401);
+    expect(check(token: '${_token}0')?.status, 401);
+  });
 }
+
+const _token = '0123456789abcdef0123456789abcdef';

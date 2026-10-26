@@ -311,7 +311,7 @@ abstract final class AppStrings {
 
     // agent control
     'agent.localInterface': '本机控制接口',
-    'agent.interfaceSubtitle': '默认开启：在本机（仅回环，无需令牌）开放 HTTP 接口，供本地 agent/脚本控制播放器。',
+    'agent.interfaceSubtitle': '默认开启：在本机（仅回环）开放 HTTP 接口，供本地 agent/脚本控制播放器。每个请求都要带上本次运行的令牌（只有你的账户能读取的令牌文件）。',
     'agent.starting': '正在启动…',
     'agent.address': '地址',
     'agent.token': '令牌',
@@ -643,7 +643,7 @@ abstract final class AppStrings {
     // agent control
     'agent.localInterface': 'Local control interface',
     'agent.interfaceSubtitle':
-        'On by default: exposes a local HTTP interface (loopback only, no token) for local agents/scripts to control the player.',
+        'On by default: exposes a local HTTP interface (loopback only) for local agents/scripts to control the player. Every request must carry this run\'s token, from a file only your account can read.',
     'agent.starting': 'Starting…',
     'agent.address': 'Address',
     'agent.token': 'Token',

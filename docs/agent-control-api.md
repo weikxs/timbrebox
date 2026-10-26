@@ -21,7 +21,8 @@ control server) running in the background on every desktop:
 
 To start it without stealing focus, launch it backgrounded — on macOS:
 `open -g -a TimbreBox`. `POST /quit` shuts the whole app down cleanly on any
-platform (handy when the window is hidden and there is no Cmd+Q).
+platform (handy when the window is hidden and there is no Cmd+Q): it saves the
+session and finishes pending file writes before the process exits.
 
 ## Security
 
@@ -35,19 +36,38 @@ platform (handy when the window is hidden and there is no Cmd+Q).
     than `none`, which browsers add to requests made by pages;
   - runs actions only for `POST`, so a plain link or `<img>` cannot trigger
     them (`405` otherwise; reads are `GET`).
-- **No token / authentication** for local programs: anything already running
-  as you on this machine could drive the app's UI anyway.
+- **A per-run token.** Each time the API starts, the app writes a new random
+  256-bit token to a file named `control-token` in its support directory,
+  readable only by your account (mode `0600` on macOS and Linux; the per-user
+  AppData folder on Windows). Every request must send it in the
+  `X-TimbreBox-Token` header, or gets `401`. Other users on the machine, and
+  anything that cannot read your files, cannot drive the player. The file is
+  deleted when the API stops:
+
+  | Platform | Token file |
+  |---|---|
+  | macOS | `~/Library/Containers/io.timbrebox.timbreboxApp/Data/Library/Application Support/io.timbrebox.timbreboxApp/control-token` |
+  | Linux | `${XDG_DATA_HOME:-~/.local/share}/io.timbrebox.timbrebox_app/control-token` |
+  | Windows | `%APPDATA%\io.timbrebox\TimbreBox\control-token` |
+
+  Settings → General → Agent control shows the path. `tools/timbrebox-ctl`,
+  the Dart CLI and the MCP server read it themselves; `TIMBREBOX_TOKEN_FILE`
+  (a path) or `TIMBREBOX_TOKEN` (the token) override the lookup.
 - macOS requires the `com.apple.security.network.server` entitlement (already
   shipped).
 
 ## Discovery & CLI
 
 The server binds a fixed preferred port in **8787–8796** (first free one), so a
-local agent can find it without knowing the ephemeral port:
+local agent can find it without knowing the ephemeral port. Hand the token to
+curl on stdin (`-H @-`) rather than on its command line, where other users
+could see it in the process list:
 
 ```bash
+TOKEN_FILE=...   # the token file for your platform, see above
+tb() { printf 'X-TimbreBox-Token: %s\n' "$(cat "$TOKEN_FILE")" | curl -H @- "$@"; }
 for p in 8787 8788 8789 8790 8791 8792 8793 8794 8795 8796; do
-  curl -s "http://127.0.0.1:$p/" | grep -q 'TimbreBox control API' && BASE="http://127.0.0.1:$p" && break
+  tb -s "http://127.0.0.1:$p/" | grep -q 'TimbreBox control API' && BASE="http://127.0.0.1:$p" && break
 done
 ```
 
@@ -56,9 +76,10 @@ wraps every endpoint (e.g. `tools/timbrebox-ctl search "jazz"`,
 `tools/timbrebox-ctl play-ref <source> <item>`). For AI agents there is a skill
 at `.claude/skills/timbrebox-control/`.
 
-(The app also writes `~/.timbrebox/control.json` with the address, but on
-sandboxed macOS builds the app's HOME is inside its container, so the port scan
-above is the reliable cross-platform discovery.)
+(The app also writes `~/.timbrebox/control.json` with the address and the
+token file's path — never the token — but on sandboxed macOS builds the app's
+HOME is inside its container, so the port scan above is the reliable
+cross-platform discovery.)
 
 ## Endpoints
 
@@ -82,25 +103,27 @@ server answers `405` to the other method.
 | POST | `/source?id=<id>&enabled=<true\|false>` | Enable/disable a source |
 | POST | `/quit` | Quit the whole app (a background instance) |
 
-Errors return an appropriate HTTP status and `{ "error": "..." }`.
+Errors return an appropriate HTTP status and `{ "error": "..." }`; a missing or
+stale token gets `401`.
 
 ## Examples
 
 ```bash
 BASE="http://127.0.0.1:<port>"   # shown in Settings → General → Agent control
+# tb = curl plus the token header, as defined under Discovery & CLI
 
 # Current state
-curl "$BASE/status"
+tb "$BASE/status"
 
 # Search, then play the first result
-curl -X POST "$BASE/search?q=jazz"
-curl -X POST "$BASE/play-ref?source=audius&item=abc123"
+tb -X POST "$BASE/search?q=jazz"
+tb -X POST "$BASE/play-ref?source=audius&item=abc123"
 
 # Transport + volume + loop
-curl -X POST "$BASE/toggle"
-curl -X POST "$BASE/volume?level=0.6"
-curl -X POST "$BASE/mode?loop=shuffle"
+tb -X POST "$BASE/toggle"
+tb -X POST "$BASE/volume?level=0.6"
+tb -X POST "$BASE/mode?loop=shuffle"
 
 # Play a queue entry
-curl -X POST "$BASE/play-queue?i=2"
+tb -X POST "$BASE/play-queue?i=2"
 ```

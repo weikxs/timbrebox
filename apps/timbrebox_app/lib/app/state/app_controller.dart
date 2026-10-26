@@ -867,7 +867,7 @@ class AppController extends ChangeNotifier {
       ..addAll(shortcutsFromJson(data['shortcuts']));
     AppEffects.reduced = _reducedEffects;
     DiagnosticLog.enabled = _diagnosticLogging;
-    if (_agentControl) unawaited(_controlServer.start());
+    if (_agentControl) unawaited(_startControlServer());
     await _player.setVolume(_volume);
     await _player.setRate(_rate);
     await _player.setReleaseAfterPause(_releaseAfterPause);
@@ -959,15 +959,35 @@ class AppController extends ChangeNotifier {
   bool get agentControlEnabled => _agentControl;
   String? get agentControlAddress => _controlServer.address;
 
+  /// The user-only file holding the API's token while it runs.
+  String? get agentControlTokenPath => _controlServer.tokenPath;
+
+  /// Why the API could not start (its token could not be written
+  /// privately, or no port was free), or null.
+  String? get agentControlError => _agentControlError;
+  String? _agentControlError;
+
   Future<void> setAgentControlEnabled(bool value) async {
     _agentControl = value;
     if (value) {
-      await _controlServer.start();
+      await _startControlServer();
     } else {
+      _agentControlError = null;
       await _controlServer.stop();
     }
     _persistSettings();
     notifyListeners();
+  }
+
+  Future<void> _startControlServer() async {
+    try {
+      await _controlServer.start();
+      _agentControlError = null;
+    } catch (error) {
+      DiagnosticLog.record('control API did not start: $error');
+      _agentControlError = AppStrings.t('agent.startFailed');
+    }
+    if (!_isDisposed) notifyListeners();
   }
 
   /// Plays a track already seen this session, identified by source + item id.

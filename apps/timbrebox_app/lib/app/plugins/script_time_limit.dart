@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
@@ -7,6 +6,8 @@ import 'package:flutter_js/flutter_js.dart';
 import 'package:flutter_js/javascriptcore/binding/jsc_ffi.dart';
 import 'package:flutter_js/javascriptcore/jscore_runtime.dart';
 import 'package:flutter_js/quickjs/ffi.dart' show runtimeOpaques;
+
+import '../native/libc.dart';
 
 /// The longest one synchronous run of plugin code may take.
 ///
@@ -43,36 +44,7 @@ void _usePollingTrapsOnce() {
   if (_pollingTrapsSet) return;
   _pollingTrapsSet = true;
   try {
-    final libc = DynamicLibrary.process();
-    final malloc = libc
-        .lookupFunction<
-          Pointer<Uint8> Function(IntPtr),
-          Pointer<Uint8> Function(int)
-        >('malloc');
-    final free = libc
-        .lookupFunction<
-          Void Function(Pointer<Uint8>),
-          void Function(Pointer<Uint8>)
-        >('free');
-    final setenv = libc
-        .lookupFunction<
-          Int32 Function(Pointer<Uint8>, Pointer<Uint8>, Int32),
-          int Function(Pointer<Uint8>, Pointer<Uint8>, int)
-        >('setenv');
-    Pointer<Uint8> cString(String value) {
-      final bytes = utf8.encode(value);
-      final pointer = malloc(bytes.length + 1);
-      pointer.asTypedList(bytes.length + 1)
-        ..setAll(0, bytes)
-        ..[bytes.length] = 0;
-      return pointer;
-    }
-
-    final name = cString('JSC_usePollingTraps');
-    final value = cString('true');
-    setenv(name, value, 1); // setenv copies both strings.
-    free(name);
-    free(value);
+    Libc.setenv('JSC_usePollingTraps', 'true');
   } catch (error) {
     debugPrint('plugin time limit unavailable: $error');
   }

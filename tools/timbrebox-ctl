@@ -3,8 +3,13 @@
 #
 # TimbreBox exposes a loopback HTTP control API (Settings → General → Agent
 # control, on by default). This script auto-discovers the endpoint from
-# ~/.timbrebox/control.json (written by the app while the API is enabled) so an
-# agent or shell never needs to know the ephemeral port.
+# ~/.timbrebox/control.json (written by the app while the API is enabled) or
+# the fixed port range, so an agent or shell never needs to know the port.
+#
+# Every request carries the app's per-run token (header X-TimbreBox-Token),
+# read from TIMBREBOX_TOKEN, the file named by TIMBREBOX_TOKEN_FILE, or the
+# app's user-only control-token file in its support directory. The token is
+# handed to curl on stdin, never on its command line.
 #
 # Usage:
 #   timbrebox-ctl status
@@ -21,8 +26,52 @@ EP_FILE="${TIMBREBOX_CONTROL:-${HOME}/.timbrebox/control.json}"
 
 die() { echo "timbrebox-ctl: $*" >&2; exit 1; }
 
+# Where the running app keeps its token, most likely first.
+token_paths() {
+  if [ -f "${EP_FILE}" ]; then
+    python3 -c "import json;print(json.load(open('${EP_FILE}')).get('tokenFile',''))" 2>/dev/null || true
+  fi
+  case "$(uname -s)" in
+    Darwin)
+      local id="io.timbrebox.timbreboxApp"
+      printf '%s\n' \
+        "${HOME}/Library/Containers/${id}/Data/Library/Application Support/${id}/control-token" \
+        "${HOME}/Library/Application Support/${id}/control-token" ;;
+    Linux)
+      local data="${XDG_DATA_HOME:-${HOME}/.local/share}"
+      printf '%s\n' \
+        "${data}/io.timbrebox.timbrebox_app/control-token" \
+        "${data}/timbrebox_app/control-token" ;;
+    MINGW*|MSYS*|CYGWIN*)
+      printf '%s\n' "${APPDATA:-}/io.timbrebox/TimbreBox/control-token" ;;
+  esac
+}
+
+read_token() {
+  if [ -n "${TIMBREBOX_TOKEN:-}" ]; then printf '%s' "${TIMBREBOX_TOKEN}"; return; fi
+  local f
+  if [ -n "${TIMBREBOX_TOKEN_FILE:-}" ]; then
+    [ -r "${TIMBREBOX_TOKEN_FILE}" ] && tr -d '[:space:]' < "${TIMBREBOX_TOKEN_FILE}"
+    return
+  fi
+  while IFS= read -r f; do
+    if [ -n "${f}" ] && [ -r "${f}" ]; then tr -d '[:space:]' < "${f}"; return; fi
+  done < <(token_paths)
+}
+
+TOKEN="$(read_token || true)"
+
+# curl with the token header fed on stdin (not visible in the process list).
+tcurl() { printf 'X-TimbreBox-Token: %s\n' "${TOKEN}" | curl -H @- "$@"; }
+
 # Verify a base URL is actually the TimbreBox control API (not some other app).
-is_timbrebox() { curl -s "${1}/" 2>/dev/null | grep -q 'TimbreBox control API'; }
+is_timbrebox() { tcurl -s "${1}/" 2>/dev/null | grep -q 'TimbreBox control API'; }
+
+# The app answers but refuses the token (missing, or from an earlier run).
+token_refused() { tcurl -s "${1}/" 2>/dev/null | grep -q 'X-TimbreBox-Token'; }
+refused() {
+  die "TimbreBox 拒绝了令牌（每次启动都会更换；找不到时用 TIMBREBOX_TOKEN_FILE 指向 control-token 文件）"
+}
 
 base_url() {
   # 1) discovery file (works for non-sandboxed installs).
@@ -31,6 +80,7 @@ base_url() {
     a="$(python3 -c "import json;print(json.load(open('${EP_FILE}'))['address'])" 2>/dev/null \
         || grep -oE 'http://127\.0\.0\.1:[0-9]+' "${EP_FILE}" | head -1 || true)"
     if [ -n "${a}" ] && is_timbrebox "${a}"; then printf '%s' "${a}"; return; fi
+    if [ -n "${a}" ] && token_refused "${a}"; then refused; fi
   fi
   # 2) scan the preferred loopback port range (the macOS sandbox hides the file
   #    from an external CLI, but the fixed ports are always reachable).
@@ -39,14 +89,15 @@ base_url() {
     if is_timbrebox "http://127.0.0.1:${p}"; then
       printf 'http://127.0.0.1:%s' "${p}"; return
     fi
+    if token_refused "http://127.0.0.1:${p}"; then refused; fi
   done
   die "找不到运行中的 TimbreBox 控制接口（确认应用已启动且已开启 Agent 控制）"
 }
 
-req() { curl -sS "${@}"; echo; }
+req() { tcurl -sS "${@}"; echo; }
 # Actions must be POST: the player refuses them as GET so a web page cannot
 # trigger them through the browser.
-act() { curl -sS -X POST "${@}"; echo; }
+act() { tcurl -sS -X POST "${@}"; echo; }
 
 main() {
   local cmd="${1:-help}"; shift || true

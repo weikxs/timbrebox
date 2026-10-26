@@ -6,11 +6,13 @@ import 'dart:io' as io show exit;
 import '../model/catalog_track.dart';
 import 'app_controller.dart';
 import 'control_request_guard.dart';
+import 'control_token.dart';
 
 /// A loopback HTTP control API so a local agent / CLI / script can drive the
 /// player. Bound to 127.0.0.1, so nothing off the machine can reach it; the
 /// checks in [controlRequestRejection] keep web pages in the user's browser
-/// out as well. There is no token. On by default.
+/// out as well, and every request must carry this run's token from the
+/// user-only token file (header [controlTokenHeader]). On by default.
 ///
 /// Endpoints (all return JSON):
 ///   GET  / /status /queue /sources /lyric
@@ -18,10 +20,28 @@ import 'control_request_guard.dart';
 ///   POST /seek?ms= /volume?level= /mode?loop= /play-ref?source=&item=
 ///   POST /play-queue?i= /source?id=&enabled=
 final class PlayerControlServer {
-  PlayerControlServer(this._controller, {void Function(int code)? exit})
-    : _exit = exit ?? io.exit;
+  PlayerControlServer(
+    this._controller, {
+    void Function(int code)? exit,
+    List<int> ports = preferredPorts,
+    ControlTokenFile? tokenFile,
+    File? endpointFile,
+  }) : _exit = exit ?? io.exit,
+       // ignore: prefer_initializing_formals
+       _ports = ports,
+       _tokenFile = tokenFile ?? ControlTokenFile(),
+       _endpointOverride = endpointFile;
 
   final AppController _controller;
+  final List<int> _ports;
+  final ControlTokenFile _tokenFile;
+  final File? _endpointOverride;
+
+  /// This run's token; requests without it are refused.
+  String? _token;
+
+  /// The file holding the token while the API runs (shown in Settings).
+  String? tokenPath;
 
   /// Ends the process; replaced in tests.
   final void Function(int code) _exit;
@@ -43,18 +63,23 @@ final class PlayerControlServer {
   String? get address =>
       _server == null ? null : 'http://127.0.0.1:${_server!.port}';
 
+  /// Starts the API with a fresh token. Throws (and stays stopped) when the
+  /// token file cannot be written privately: no token, no API.
   Future<void> start() async {
     if (_server != null) return;
-    for (final candidate in preferredPorts) {
+    _token = await _tokenFile.issue();
+    tokenPath = (await _tokenFile.file()).path;
+    HttpServer? server;
+    for (final candidate in _ports) {
       try {
-        _server = await HttpServer.bind(InternetAddress.loopbackIPv4, candidate);
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, candidate);
         break;
       } catch (_) {
         // Port busy — try the next.
       }
     }
-    _server ??= await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    _server!.listen(_handle);
+    server ??= await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    _server = server..listen(_handle);
     await _writeEndpointFile();
   }
 
@@ -62,13 +87,17 @@ final class PlayerControlServer {
     final server = _server;
     if (server == null) return; // Never started: no file of ours to remove.
     _server = null;
+    _token = null;
+    tokenPath = null;
     await server.close(force: true);
+    await _tokenFile.revoke();
     await _removeEndpointFile();
   }
 
   /// The well-known file any local agent/CLI reads to discover the running
   /// control endpoint (the port is ephemeral). Cross-platform home dir.
   File? _endpointFile() {
+    if (_endpointOverride case final file?) return file;
     final home =
         Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
     if (home == null || home.isEmpty) return null;
@@ -81,8 +110,10 @@ final class PlayerControlServer {
     if (file == null || addr == null) return;
     try {
       await file.parent.create(recursive: true);
+      // Where the token is, never the token itself: this file is not private.
+      final tokenFile = (await _tokenFile.file()).path;
       await file.writeAsString(
-        jsonEncode({'address': addr, 'pid': pid}),
+        jsonEncode({'address': addr, 'pid': pid, 'tokenFile': tokenFile}),
         flush: true,
       );
     } catch (_) {
@@ -106,6 +137,8 @@ final class PlayerControlServer {
       origin: request.headers.value('origin'),
       fetchSite: request.headers.value('sec-fetch-site'),
       port: request.connectionInfo?.localPort ?? port ?? 0,
+      token: request.headers.value(controlTokenHeader),
+      expectedToken: _token ?? '',
     );
     if (rejection != null) {
       return _json(request, rejection.status, {'error': rejection.error});
@@ -255,7 +288,9 @@ final class PlayerControlServer {
   Map<String, Object?> _discovery() => {
     'name': 'TimbreBox control API',
     'version': 1,
-    'auth': 'none (loopback only; requests from web pages are refused)',
+    'auth':
+        'header $controlTokenHeader: the token from the user-only file '
+        'control-token in the app support directory (new each run)',
     'endpoints': const {
       'GET /': 'this discovery document',
       'GET /status': 'current playback state',

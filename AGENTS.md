@@ -39,13 +39,13 @@ state a source adapter produces must stay in memory only.
 
 The repo ships its own project skill, `timbrebox-control` (`.claude/skills/`),
 plus the `tools/timbrebox-ctl` wrapper, to drive the **running** app through its
-local loopback control API (on by default, no token; requests from web pages are refused and actions are POST-only):
+local loopback control API (on by default; requests from web pages are refused, actions are POST-only, and every request carries the per-run token from the app's user-only `control-token` file, which `tools/timbrebox-ctl` reads for you):
 
 - **Claude Code** auto-invokes the `timbrebox-control` skill for natural-language
   requests ("播放周杰伦的歌", pause, next, volume, shuffle, queue …); the flow is
   search → `play-ref` → `status`.
 - **Codex CLI** and any local script drive the same API via
-  `tools/timbrebox-ctl <cmd>` or plain `curl` on `127.0.0.1`.
+  `tools/timbrebox-ctl <cmd>` or plain `curl` (with the `X-TimbreBox-Token` header) on `127.0.0.1`.
 - These are `timbrebox-ctl` subcommands / HTTP paths, **not** slash commands — the
   only slash command is `/timbrebox-control`; never invoke a bare `/status`.
 - Project skills are enumerated at **session start** — after adding or editing a

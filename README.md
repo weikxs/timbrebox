@@ -122,8 +122,8 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 - Third-party sources in the TimbreBox plugin format: paste a plugin URL and it becomes a new searchable, playable source. See [Plugin System](#plugin-system).
 
 ### Agent control (Claude Code / Codex CLI)
-- The app runs a **local loopback control API** (on by default; no token; bound to `127.0.0.1`, and requests from web pages are refused), so a local AI agent can search and play by natural language. Say "play some Jay Chou" / "播放周杰伦的歌" and the agent searches, picks the best match, and plays it — then pause / resume / skip / seek / set volume / change loop or shuffle mode / manage the queue / enable-disable a source.
-- **Claude Code** auto-invokes the bundled `timbrebox-control` skill; **Codex CLI** and any local script drive the same API through `tools/timbrebox-ctl` or plain `curl` on `127.0.0.1`.
+- The app runs a **local loopback control API** (on by default; bound to `127.0.0.1`, requests from web pages are refused, and every request carries a per-run token from a file only your account can read), so a local AI agent can search and play by natural language. Say "play some Jay Chou" / "播放周杰伦的歌" and the agent searches, picks the best match, and plays it — then pause / resume / skip / seek / set volume / change loop or shuffle mode / manage the queue / enable-disable a source.
+- **Claude Code** auto-invokes the bundled `timbrebox-control` skill; **Codex CLI** and any local script drive the same API through `tools/timbrebox-ctl` or plain `curl` (with the `X-TimbreBox-Token` header) on `127.0.0.1`.
 - Runs in the **background** on every desktop — close the window and the app keeps serving the API (reopen by relaunching; `timbrebox-ctl quit` to exit). Nothing off the machine can reach it. See [Agent control API](./docs/agent-control-api.md).
 
 ## Architecture
@@ -317,7 +317,7 @@ Legend: ✅ done · 🚧 in progress · 📋 planned
 - 🚧 Windows (SMTC) and Linux (MPRIS) media-session backends — code complete, pending on-device verification
 
 **Agent control & i18n**
-- ✅ Local loopback control API (search / play / transport / queue / sources / lyric), on by default, no token
+- ✅ Local loopback control API (search / play / transport / queue / sources / lyric), on by default, per-run token in a user-only file
 - ✅ `tools/timbrebox-ctl` CLI + `timbrebox-control` skill — natural-language play for Claude Code / Codex CLI
 - ✅ `timbrebox` one-shot Dart CLI package (full command set, `--json`) over the control API
 - ✅ MCP stdio server (`dart run timbrebox_cli:timbrebox_mcp`) bridging tools (play_music / pause / resume / next / previous / stop / set_volume / get_status) to the control API

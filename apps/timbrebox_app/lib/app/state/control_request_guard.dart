@@ -7,9 +7,13 @@
 ///     DNS rebinding (a page reaching us through its own domain name);
 ///   * a request carrying `Origin`, or a `Sec-Fetch-Site` other than `none`,
 ///     comes from a web page and is refused;
+///   * every request must carry this run's token (see `ControlTokenFile`),
+///     which only processes that can read the user's files have;
 ///   * endpoints that change anything accept only POST, so a plain `<img>` or
 ///     link cannot trigger them.
 library;
+
+import 'control_token.dart';
 
 /// Endpoints that only read state. Every other endpoint needs POST.
 const controlReadPaths = {'/', '/status', '/queue', '/sources', '/lyric'};
@@ -24,12 +28,17 @@ ControlRejection? controlRequestRejection({
   required String? origin,
   required String? fetchSite,
   required int port,
+  required String? token,
+  required String expectedToken,
 }) {
   if (!isLoopbackHost(host, port)) {
     return (status: 403, error: 'Forbidden host');
   }
   if (origin != null || (fetchSite != null && fetchSite != 'none')) {
     return (status: 403, error: 'Requests from web pages are not allowed');
+  }
+  if (!controlTokenMatches(token, expectedToken)) {
+    return (status: 401, error: 'Missing or wrong $controlTokenHeader');
   }
   final isRead = controlReadPaths.contains(path);
   final verb = method.toUpperCase();
