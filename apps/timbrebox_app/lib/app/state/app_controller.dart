@@ -154,6 +154,7 @@ class AppController extends ChangeNotifier {
   final List<PluginManifest> _plugins = [];
   final Map<String, PluginCatalogSource> _pluginSources = {};
   final List<PluginTopListItem> _pluginTopLists = [];
+  List<String> _skippedPlugins = const [];
   var _pluginTopListsLoaded = false;
   late final PlayerControlServer _controlServer = PlayerControlServer(this);
   // On by default (loopback + per-session token); a saved preference overrides.

@@ -1,3 +1,5 @@
+import 'app_strings_more.dart';
+
 /// Lightweight app-wide localization. `AppStrings.lang` is a global (like the
 /// active palette) set from the language preference; widgets read `AppStrings.t`
 /// at build time so switching language re-renders. Keys are dotted namespaces;
@@ -13,8 +15,11 @@ abstract final class AppStrings {
       : AppLang.zh;
 
   static String t(String key) {
-    final table = lang == AppLang.en ? _en : _zh;
-    return table[key] ?? _zh[key] ?? key;
+    final english = lang == AppLang.en;
+    return (english ? _en[key] ?? moreEnStrings[key] : null) ??
+        _zh[key] ??
+        moreZhStrings[key] ??
+        key;
   }
 
   static const _zh = <String, String>{

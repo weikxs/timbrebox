@@ -95,6 +95,15 @@ class _PluginSettingsState extends State<PluginSettings> {
                 ],
               ],
             ),
+            if (controller.skippedPlugins.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                AppStrings.t(
+                  'plugin.skippedFmt',
+                ).replaceFirst('{ids}', controller.skippedPlugins.join(', ')),
+                style: TextStyle(color: TimbreColors.gold, fontSize: 12),
+              ),
+            ],
             GroupLabel(AppStrings.t('plugin.installed')),
             if (plugins.isEmpty)
               Text(

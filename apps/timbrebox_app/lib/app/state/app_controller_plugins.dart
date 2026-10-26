@@ -4,6 +4,10 @@ part of 'app_controller.dart';
 /// lyrics.
 extension AppControllerPlugins on AppController {
   List<PluginManifest> get plugins => List.unmodifiable(_plugins);
+
+  /// Stored plugins that could not be loaded at launch (see
+  /// [PluginRepository.skippedAtLoad]); the plugin settings list them.
+  List<String> get skippedPlugins => _skippedPlugins;
   bool get supportsPlugins =>
       _pluginRepository != null && _catalog is MutableMusicCatalog;
 
@@ -64,10 +68,9 @@ extension AppControllerPlugins on AppController {
     for (final source in sources) {
       _adoptSource(mutable, source, enabledDefault: source.manifest.enabled);
     }
-    if (sources.isNotEmpty) {
-      _pluginsChanged();
-      _notify();
-    }
+    _skippedPlugins = repository.skippedAtLoad;
+    if (sources.isNotEmpty) _pluginsChanged();
+    if (sources.isNotEmpty || _skippedPlugins.isNotEmpty) _notify();
   }
 
   /// Registers [source] (replacing any prior one with the same id, disposing it)
@@ -104,6 +107,12 @@ extension AppControllerPlugins on AppController {
     for (final source in sources) {
       _adoptSource(mutable, source);
     }
+    // Reinstalling a plugin that was skipped at launch repairs it.
+    final installed = {for (final source in sources) source.manifest.id};
+    _skippedPlugins = [
+      for (final id in _skippedPlugins)
+        if (!installed.contains(id)) id,
+    ];
     _pluginsChanged();
     _notify();
     return sources.length;

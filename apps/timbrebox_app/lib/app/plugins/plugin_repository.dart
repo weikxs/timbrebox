@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import '../data/stream_header_proxy.dart';
 import '../design/app_strings.dart';
 import '../net/egress_policy.dart';
+import '../state/atomic_file.dart';
 import 'plugin_catalog_source.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
@@ -143,16 +144,29 @@ final class PluginRepository {
     ];
   }
 
-  /// Rebuilds live sources for every stored plugin (skips ones that fail).
+  final List<String> _skipped = [];
+
+  /// The stored plugins (directory names) the last [loadInstalled] could not
+  /// read, so the user can be told instead of the plugin silently vanishing.
+  List<String> get skippedAtLoad => List.unmodifiable(_skipped);
+
+  /// Rebuilds live sources for every stored plugin. One that fails to load is
+  /// skipped and listed in [skippedAtLoad].
   Future<List<PluginCatalogSource>> loadInstalled() async {
+    _skipped.clear();
     final directory = await _pluginsDir();
     if (!await directory.exists()) return const [];
     final sources = <PluginCatalogSource>[];
     for (final entry in await directory.list().toList()) {
       if (entry is! Directory) continue;
       final source = await _loadOne(entry);
-      if (source != null) sources.add(source);
+      if (source != null) {
+        sources.add(source);
+      } else {
+        _skipped.add(entry.uri.pathSegments.where((s) => s.isNotEmpty).last);
+      }
     }
+    _skipped.sort();
     return sources;
   }
 
@@ -166,7 +180,7 @@ final class PluginRepository {
     if (!await file.exists()) return;
     final json = jsonDecode(await file.readAsString()) as Map<String, Object?>;
     final manifest = PluginManifest.fromJson(json).copyWith(enabled: enabled);
-    await file.writeAsString(jsonEncode(manifest.toJson()), flush: true);
+    await writeFileAtomically(file, jsonEncode(manifest.toJson()));
   }
 
   /// Reads one stored plugin. Its engine starts on first use; a plugin
@@ -202,9 +216,10 @@ final class PluginRepository {
     final recorded = manifest.copyWith(
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
-    await File(
-      '${scriptFile.parent.path}/manifest.json',
-    ).writeAsString(jsonEncode(recorded.toJson()), flush: true);
+    await writeFileAtomically(
+      File('${scriptFile.parent.path}/manifest.json'),
+      jsonEncode(recorded.toJson()),
+    );
     return PluginCatalogSource(
       manifest: recorded,
       runtime: runtime,
@@ -227,10 +242,13 @@ final class PluginRepository {
   Future<void> _store(PluginManifest manifest, String source) async {
     final dir = Directory('${(await _pluginsDir()).path}/${manifest.id}');
     await dir.create(recursive: true);
-    await File('${dir.path}/plugin.js').writeAsString(source, flush: true);
-    await File(
-      '${dir.path}/manifest.json',
-    ).writeAsString(jsonEncode(manifest.toJson()), flush: true);
+    // Each file is replaced in one step, so a crash mid-install leaves the
+    // previous version readable instead of a truncated script or manifest.
+    await writeFileAtomically(File('${dir.path}/plugin.js'), source);
+    await writeFileAtomically(
+      File('${dir.path}/manifest.json'),
+      jsonEncode(manifest.toJson()),
+    );
   }
 
   Future<Directory> _pluginsDir() async {
