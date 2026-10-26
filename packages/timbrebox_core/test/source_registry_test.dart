@@ -89,6 +89,51 @@ void main() {
     expect(batch.groupFor('bilibili')?.failure?.retryable, isTrue);
   });
 
+  test('reports each source as it finishes, in registration order', () async {
+    final slow = Completer<void>();
+    final registry = SourceRegistry([
+      _FakeSource('youtube', () => slow.future),
+      _FakeSource('bilibili', () async {}),
+    ]);
+
+    final snapshots = <List<String>>[];
+    final done = registry
+        .searchBatches(
+          SearchRequest(query: 'ambient', cancellation: CancellationToken()),
+        )
+        .forEach(
+          (batch) =>
+              snapshots.add([for (final group in batch.groups) group.sourceId]),
+        );
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+
+    // The fast source is reported while the slow one is still running.
+    expect(snapshots, [
+      ['bilibili'],
+    ]);
+    slow.complete();
+    await done;
+    expect(snapshots.last, ['youtube', 'bilibili']);
+  });
+
+  test('a whole batch lists sources in registration order', () async {
+    final slow = Completer<void>();
+    final registry = SourceRegistry([
+      _FakeSource('youtube', () => slow.future),
+      _FakeSource('bilibili', () async {}),
+    ]);
+    Timer(const Duration(milliseconds: 5), slow.complete);
+
+    final batch = await registry.searchBatch(
+      SearchRequest(query: 'ambient', cancellation: CancellationToken()),
+    );
+
+    expect(batch.groups.map((group) => group.sourceId), [
+      'youtube',
+      'bilibili',
+    ]);
+  });
+
   test('exposes capability-filtered descriptors without starting sources', () {
     final registry = SourceRegistry([
       _FakeSource('youtube', () async {}),

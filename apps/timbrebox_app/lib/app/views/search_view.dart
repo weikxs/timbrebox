@@ -57,7 +57,9 @@ class _SearchViewState extends State<SearchView> {
               child: _ResultHeader(
                 query: query,
                 source: selectedSource,
-                isSearching: widget.controller.isSearching,
+                isSearching:
+                    selectedSource != null &&
+                    widget.controller.isSearchingSource(selectedSource.id),
               ),
             ),
           ),
@@ -341,8 +343,14 @@ Widget _resultSliver(AppController controller, SourceDescriptor? source) {
       failure.message,
     );
   }
+  final tracks = controller.searchResultsFor(source.id);
+  if (tracks.isEmpty && controller.isSearchingSource(source.id)) {
+    // Other sources may already show results; the header shows this one is
+    // still searching, so no "no match" yet.
+    return const SliverToBoxAdapter(child: SizedBox.shrink());
+  }
   return SliverTrackList(
-    tracks: controller.searchResultsFor(source.id),
+    tracks: tracks,
     controller: controller,
     emptyTitle: AppStrings.t(
       'search.noMatchFmt',

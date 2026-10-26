@@ -42,7 +42,9 @@ abstract interface class MutableMusicCatalog {
 /// compatibility with small platform/test catalogs while the built-in catalog
 /// exposes source-level status and results.
 abstract interface class GroupedMusicCatalog {
-  Future<CatalogSearchBatch> searchGrouped(
+  /// Emits the results so far each time a source finishes (sources in a
+  /// stable order), so the UI never waits for the slowest source.
+  Stream<CatalogSearchBatch> searchGrouped(
     String query, {
     required CancellationToken cancellation,
   });
@@ -148,7 +150,10 @@ class BuiltInMusicCatalog
     String query, {
     required CancellationToken cancellation,
   }) async {
-    final batch = await searchGrouped(query, cancellation: cancellation);
+    var batch = CatalogSearchBatch(query: query, groups: const []);
+    await for (final next in searchGrouped(query, cancellation: cancellation)) {
+      batch = next;
+    }
     if (!batch.hasResults && batch.hasFailures) {
       throw MusicCatalogException(
         batch.groups
@@ -161,42 +166,47 @@ class BuiltInMusicCatalog
   }
 
   @override
-  Future<CatalogSearchBatch> searchGrouped(
+  Stream<CatalogSearchBatch> searchGrouped(
     String query, {
     required CancellationToken cancellation,
-  }) async {
+  }) async* {
     final request = SearchRequest(query: query, cancellation: cancellation);
-    final coreBatch = await _registry.searchBatch(request);
-    final groups = <CatalogSearchGroup>[];
-    for (final group in coreBatch.groups) {
-      final source = _sources[group.sourceId];
-      if (source == null) continue;
-      final tracks = <CatalogTrack>[];
-      try {
-        tracks.addAll(group.items.map(source.toCatalogTrack));
-      } on StateError catch (error) {
-        groups.add(
-          CatalogSearchGroup(
-            sourceId: group.sourceId,
-            sourceName: source.descriptor.name,
-            status: SourceSearchStatus.failure,
-            tracks: const [],
-            failure: SourceFailure(error.message, retryable: true),
-          ),
-        );
-        continue;
-      }
-      groups.add(
-        CatalogSearchGroup(
-          sourceId: group.sourceId,
-          sourceName: source.descriptor.name,
-          status: group.status,
-          tracks: List.unmodifiable(tracks),
-          failure: group.failure,
-        ),
+    // Each source's tracks are built once, not again on every later emission.
+    final built = <String, CatalogSearchGroup>{};
+    await for (final coreBatch in _registry.searchBatches(request)) {
+      yield CatalogSearchBatch(
+        query: coreBatch.query,
+        groups: [
+          for (final group in coreBatch.groups)
+            if (_sources[group.sourceId] case final source?)
+              built[group.sourceId] ??= _catalogGroup(source, group),
+        ],
       );
     }
-    return CatalogSearchBatch(query: coreBatch.query, groups: groups);
+    cancellation.throwIfCancelled();
+  }
+
+  CatalogSearchGroup _catalogGroup(
+    CatalogSource source,
+    SourceSearchGroup group,
+  ) {
+    try {
+      return CatalogSearchGroup(
+        sourceId: group.sourceId,
+        sourceName: source.descriptor.name,
+        status: group.status,
+        tracks: List.unmodifiable(group.items.map(source.toCatalogTrack)),
+        failure: group.failure,
+      );
+    } on StateError catch (error) {
+      return CatalogSearchGroup(
+        sourceId: group.sourceId,
+        sourceName: source.descriptor.name,
+        status: SourceSearchStatus.failure,
+        tracks: const [],
+        failure: SourceFailure(error.message, retryable: true),
+      );
+    }
   }
 
   @override

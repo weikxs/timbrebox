@@ -69,13 +69,32 @@ class SourceRegistry {
     }
   }
 
+  /// Emits the batch so far each time a source finishes, so callers can show
+  /// fast sources without waiting for the slowest. Groups keep the sources'
+  /// registration order whatever order they finish in.
+  Stream<SearchBatch> searchBatches(SearchRequest request) async* {
+    final order = _sources.keys.toList(growable: false);
+    var results = const <SourceSearchResult>[];
+    await for (final result in searchAll(request)) {
+      results = [...results, result]
+        ..sort(
+          (a, b) =>
+              order.indexOf(a.sourceId).compareTo(order.indexOf(b.sourceId)),
+        );
+      yield SearchBatch(
+        query: request.query,
+        groups: [for (final result in results) result.group],
+      );
+    }
+  }
+
   Future<SearchBatch> searchBatch(SearchRequest request) async {
-    final results = await searchAll(request).toList();
+    var batch = SearchBatch(query: request.query, groups: const []);
+    await for (final next in searchBatches(request)) {
+      batch = next;
+    }
     request.cancellation.throwIfCancelled();
-    return SearchBatch(
-      query: request.query,
-      groups: [for (final result in results) result.group],
-    );
+    return batch;
   }
 
   Future<SourceSearchResult> _search(

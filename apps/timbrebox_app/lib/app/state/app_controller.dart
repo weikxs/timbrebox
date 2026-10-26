@@ -275,6 +275,10 @@ class AppController extends ChangeNotifier {
   String? get playbackError => _playbackError;
   String? get searchError => _searchError;
   bool get isSearching => _isSearching;
+
+  /// Whether [sourceId] has yet to report for the search that is running.
+  bool isSearchingSource(String sourceId) =>
+      _isSearching && searchGroupFor(sourceId) == null;
   bool get isPlaying => _player.value.isPlaying;
   bool get isLoading => _player.value.status == PlaybackStatus.loading;
   Duration get position => _position;
@@ -1116,18 +1120,25 @@ class AppController extends ChangeNotifier {
           ? _catalog as GroupedMusicCatalog
           : null;
       if (groupedCatalog != null) {
-        final batch = await groupedCatalog.searchGrouped(
+        // Results show per source as each one finishes; the previous query's
+        // results are gone from the start so the two never mix.
+        _searchBatch = CatalogSearchBatch(query: _query, groups: const []);
+        _results = [];
+        await for (final batch in groupedCatalog.searchGrouped(
           _query,
           cancellation: cancellation,
-        );
-        if (generation != _searchGeneration) return;
-        _searchBatch = batch;
-        _results = batch.tracks;
-        _initPagingFromBatch(batch);
-        _searchError = _globalSearchError(batch);
-        for (final track in _results) {
-          _knownTracks[track.ref.toString()] = track;
+        )) {
+          if (generation != _searchGeneration) return;
+          _searchBatch = batch;
+          _results = batch.tracks;
+          _initPagingFromBatch(batch);
+          for (final track in _results) {
+            _knownTracks[track.ref.toString()] = track;
+          }
+          notifyListeners();
         }
+        if (generation != _searchGeneration) return;
+        _searchError = _globalSearchError(_searchBatch!);
       } else {
         final results = await _catalog.search(
           _query,
@@ -1228,11 +1239,12 @@ class AppController extends ChangeNotifier {
     _loadingMore.clear();
   }
 
+  /// Starts paging for each source that just reported; one already paging
+  /// (it may have loaded more pages meanwhile) is left alone. [search] resets
+  /// paging before the first batch.
   void _initPagingFromBatch(CatalogSearchBatch batch) {
-    _pagedResults.clear();
-    _sourcePage.clear();
-    _sourceExhausted.clear();
     for (final group in batch.groups) {
+      if (_pagedResults.containsKey(group.sourceId)) continue;
       _pagedResults[group.sourceId] = List.of(group.tracks);
       _sourcePage[group.sourceId] = 1;
     }

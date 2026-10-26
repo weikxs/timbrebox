@@ -88,7 +88,10 @@ void main() {
 
   test('a failed page is not requested again right away', () async {
     final catalog = _FailingMoreCatalog([_page('p1', _full)], retryable: true);
-    final controller = AppController(engine: TestPlayerEngine(), catalog: catalog);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      catalog: catalog,
+    );
     addTearDown(controller.dispose);
     await controller.search('x');
 
@@ -102,7 +105,10 @@ void main() {
 
   test('a page that cannot be retried ends the list', () async {
     final catalog = _FailingMoreCatalog([_page('p1', _full)], retryable: false);
-    final controller = AppController(engine: TestPlayerEngine(), catalog: catalog);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      catalog: catalog,
+    );
     addTearDown(controller.dispose);
     await controller.search('x');
 
@@ -140,10 +146,7 @@ class _PagedCatalog
     SourceDescriptor(
       id: 'audius',
       name: 'Audius',
-      capabilities: const [
-        SourceCapability.search,
-        SourceCapability.streaming,
-      ],
+      capabilities: const [SourceCapability.search, SourceCapability.streaming],
     ),
   ];
 
@@ -160,20 +163,22 @@ class _PagedCatalog
   }) async => pages.isEmpty ? const [] : pages.first;
 
   @override
-  Future<CatalogSearchBatch> searchGrouped(
+  Stream<CatalogSearchBatch> searchGrouped(
     String query, {
     required CancellationToken cancellation,
-  }) async => CatalogSearchBatch(
-    query: query,
-    groups: [
-      CatalogSearchGroup(
-        sourceId: 'audius',
-        sourceName: 'Audius',
-        status: SourceSearchStatus.success,
-        tracks: pages.isEmpty ? const [] : pages.first,
-      ),
-    ],
-  );
+  }) async* {
+    yield CatalogSearchBatch(
+      query: query,
+      groups: [
+        CatalogSearchGroup(
+          sourceId: 'audius',
+          sourceName: 'Audius',
+          status: SourceSearchStatus.success,
+          tracks: pages.isEmpty ? const [] : pages.first,
+        ),
+      ],
+    );
+  }
 
   @override
   Future<CatalogSearchGroup> searchMore(
