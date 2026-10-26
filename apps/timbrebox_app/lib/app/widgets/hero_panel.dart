@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -214,7 +215,11 @@ class _NowPlayingDesk extends StatelessWidget {
                           onPressed: () {
                             if (track != null) controller.toggleFavorite(track);
                           },
-                          tooltip: AppStrings.t(favorite ? 'common.unfavorite' : 'player.favoriteThis'),
+                          tooltip: AppStrings.t(
+                            favorite
+                                ? 'common.unfavorite'
+                                : 'player.favoriteThis',
+                          ),
                           icon: Icon(
                             favorite
                                 ? Icons.favorite_rounded
@@ -270,7 +275,9 @@ class _QueueDesk extends StatelessWidget {
                     if (name == null || name.isEmpty) return;
                     controller.saveQueueAsPlaylist(name);
                     messenger.showSnackBar(
-                      SnackBar(content: Text(AppStrings.t('player.queueSaved'))),
+                      SnackBar(
+                        content: Text(AppStrings.t('player.queueSaved')),
+                      ),
                     );
                   },
                 ),
@@ -284,7 +291,9 @@ class _QueueDesk extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            AppStrings.t('player.inQueueFmt').replaceFirst('{n}', '${tracks.length}'),
+            AppStrings.t(
+              'player.inQueueFmt',
+            ).replaceFirst('{n}', '${tracks.length}'),
             style: TextStyle(color: TimbreColors.muted, fontSize: 11),
           ),
           const SizedBox(height: 12),
@@ -390,10 +399,7 @@ class _QueueRow extends StatelessWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: TimbreColors.muted,
-                      fontSize: 10,
-                    ),
+                    style: TextStyle(color: TimbreColors.muted, fontSize: 10),
                   ),
                 ],
               ),
@@ -467,12 +473,21 @@ class _VinylHalo extends StatefulWidget {
   State<_VinylHalo> createState() => _VinylHaloState();
 }
 
-class _VinylHaloState extends State<_VinylHalo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 14),
-  );
+class _VinylHaloState extends State<_VinylHalo> {
+  /// One full turn of the record.
+  static const _period = Duration(seconds: 14);
+
+  /// About 12 frames a second: smooth enough for a slow-turning record, and
+  /// a fifth of the frames a vsync-driven animation would make. Every frame
+  /// recomposites the whole window, frosted glass included.
+  static const _frameInterval = Duration(milliseconds: 83);
+
+  static final double _turnsPerFrame =
+      _frameInterval.inMicroseconds / _period.inMicroseconds;
+
+  /// The record's angle in turns; the painter repaints when it changes.
+  final ValueNotifier<double> _turns = ValueNotifier(0);
+  Timer? _ticker;
   late final AppLifecycleListener _lifecycle;
 
   bool get _foreground {
@@ -496,21 +511,25 @@ class _VinylHaloState extends State<_VinylHalo>
   }
 
   void _syncSpin() {
-    if (_shouldSpin && !_spin.isAnimating) {
-      _spin.repeat();
-    } else if (!_shouldSpin && _spin.isAnimating) {
-      _spin.stop();
+    if (_shouldSpin && _ticker == null) {
+      _ticker = Timer.periodic(_frameInterval, (_) => _advance());
+    } else if (!_shouldSpin && _ticker != null) {
+      _ticker?.cancel();
+      _ticker = null;
     }
   }
 
+  void _advance() => _turns.value = (_turns.value + _turnsPerFrame) % 1;
+
   @override
   void dispose() {
+    _ticker?.cancel();
     _lifecycle.dispose();
-    _spin.dispose();
+    _turns.dispose();
     super.dispose();
   }
 
-  // The painter repaints itself from [_spin] (no rebuild, no relayout of the
+  // The painter repaints itself from [_turns] (no rebuild, no relayout of the
   // panel), and the boundary keeps each frame from repainting the frosted
   // panel around it.
   @override
@@ -520,7 +539,7 @@ class _VinylHaloState extends State<_VinylHalo>
       child: RepaintBoundary(
         child: CustomPaint(
           size: const Size.square(218),
-          painter: _VinylPainter(_spin),
+          painter: _VinylPainter(_turns),
         ),
       ),
     ),
@@ -533,7 +552,7 @@ class _VinylHaloState extends State<_VinylHalo>
 class _VinylPainter extends CustomPainter {
   _VinylPainter(this.turns) : super(repaint: turns);
 
-  final Animation<double> turns;
+  final ValueListenable<double> turns;
 
   static const _gold = Color(0xffe1b27b);
 

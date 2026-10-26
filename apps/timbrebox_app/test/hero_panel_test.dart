@@ -41,49 +41,90 @@ void main() {
     matching: find.byType(RepaintBoundary),
   );
 
+  /// Pumps one second of 60 Hz vsyncs and returns how many times the
+  /// record's layer was painted.
+  Future<int> recordPaintsOverOneSecond(WidgetTester tester) async {
+    final layer = tester.renderObject<RenderRepaintBoundary>(record().first);
+    final before = _paints(layer);
+    for (var frame = 0; frame < _vsyncsPerSecond; frame++) {
+      await tester.pump(_vsync);
+    }
+    return _paints(layer) - before;
+  }
+
   testWidgets('the spinning record repaints only its own layer', (
     tester,
   ) async {
     await pumpPlaying(tester);
-    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pump(_vsync);
     final page = _boundaryAbove(tester.renderObject(find.byType(HeroPanel)));
     final pagePaints = _paints(page);
 
-    for (var frame = 0; frame < _frames; frame++) {
-      await tester.pump(const Duration(milliseconds: 16));
-    }
+    final recordPaints = await recordPaintsOverOneSecond(tester);
 
     // The page holding the frosted panel is not repainted while the record
     // turns; only the record's own layer is.
     final pageRepaints = _paints(page) - pagePaints;
-    final recordPaints = _paints(
-      tester.renderObject<RenderRepaintBoundary>(record().first),
-    );
-    debugPrint(
-      'repaints over $_frames frames: page=$pageRepaints record=$recordPaints',
-    );
+    debugPrint('repaints over 1 s: page=$pageRepaints record=$recordPaints');
     expect(pageRepaints, 0);
-    expect(recordPaints, greaterThanOrEqualTo(_frames));
+    expect(recordPaints, greaterThan(0));
+  });
+
+  testWidgets('the record turns at about 12 frames a second, not 60', (
+    tester,
+  ) async {
+    await pumpPlaying(tester);
+    await tester.pump(_vsync);
+
+    final recordPaints = await recordPaintsOverOneSecond(tester);
+
+    expect(recordPaints, inInclusiveRange(11, 13));
+  });
+
+  testWidgets('no frames are requested between two turns of the record', (
+    tester,
+  ) async {
+    await pumpPlaying(tester);
+    await tester.pump(_vsync);
+    // Let a turn land, then draw it.
+    await tester.pump(const Duration(milliseconds: 90));
+    await tester.pump(_vsync);
+
+    // Until the next turn is due, nothing asks the engine for a frame.
+    expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
   testWidgets('the record stops spinning while the app is in the background', (
     tester,
   ) async {
     await pumpPlaying(tester);
-    await tester.pump(const Duration(milliseconds: 16));
-    expect(tester.binding.hasScheduledFrame, isTrue);
+    await tester.pump(_vsync);
+    expect(await recordPaintsOverOneSecond(tester), greaterThan(0));
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
-    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pump(_vsync);
+    expect(await recordPaintsOverOneSecond(tester), 0);
     expect(tester.binding.hasScheduledFrame, isFalse);
 
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    await tester.pump(const Duration(milliseconds: 16));
-    expect(tester.binding.hasScheduledFrame, isTrue);
+    await tester.pump(_vsync);
+    expect(await recordPaintsOverOneSecond(tester), greaterThan(0));
+  });
+
+  testWidgets('the record stops spinning when playback pauses', (tester) async {
+    final controller = await pumpPlaying(tester);
+    await tester.pump(_vsync);
+
+    await controller.togglePlayback();
+    await tester.pump(_vsync);
+    expect(controller.isPlaying, isFalse);
+
+    expect(await recordPaintsOverOneSecond(tester), 0);
   });
 }
 
-const _frames = 30;
+const _vsync = Duration(milliseconds: 16);
+const _vsyncsPerSecond = 63; // 63 x 16 ms ~ 1 s
 
 RenderObject _boundaryAbove(RenderObject object) {
   var current = object.parent;
