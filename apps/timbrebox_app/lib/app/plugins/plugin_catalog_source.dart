@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
+import '../data/bounded_cache.dart';
 import '../data/catalog_source.dart';
 import '../data/stream_header_proxy.dart';
 import '../model/catalog_track.dart';
@@ -114,9 +115,9 @@ final class PluginCatalogSource
 
   /// Checks the stream URL a plugin hands back before anything opens it.
   final EgressPolicy _policy;
-  final Map<String, Map<String, Object?>> _items = {};
-  final Map<String, Map<String, Object?>> _topListItems = {};
-  final Map<String, String> _artwork = {};
+  final _items = BoundedCache<String, Map<String, Object?>>();
+  final _topListItems = BoundedCache<String, Map<String, Object?>>();
+  final _artwork = BoundedCache<String, String>();
 
   bool get hasTopLists => _functions.contains('getTopLists');
   bool get hasLyric => _functions.contains('getLyric');

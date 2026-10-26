@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../model/catalog_track.dart';
+import 'bounded_cache.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
 import '../design/app_strings.dart';

@@ -58,10 +58,10 @@ abstract base class _PageVideoCatalogSource
   final String name;
   final SourceEndpoint endpoint;
   final String referer;
-  final Map<String, _PageVideoRecord> _records = <String, _PageVideoRecord>{};
+  final _records = BoundedCache<String, _PageVideoRecord>();
 
   /// Video pages of saved tracks, from their resolve hints.
-  final Map<String, Uri> _pages = <String, Uri>{};
+  final _pages = BoundedCache<String, Uri>();
   late final SourceHttpClient _client = http ?? SourceHttpClient();
 
   @override

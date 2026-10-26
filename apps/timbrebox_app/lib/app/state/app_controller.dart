@@ -22,6 +22,7 @@ import 'catalog_download_service.dart';
 import 'diagnostic_log.dart';
 import 'download_index_store.dart';
 import 'favorites_store.dart';
+import 'known_tracks.dart';
 import 'network_player_engine.dart';
 import 'player_control_server.dart';
 import 'playlist_store.dart';
@@ -126,7 +127,7 @@ class AppController extends ChangeNotifier {
 
   final PlaybackQueue _queue = PlaybackQueue();
   final MusicCatalog _catalog;
-  final Map<String, CatalogTrack> _knownTracks = {};
+  late final KnownTracks _knownTracks = KnownTracks(pinned: _pinnedTrackKeys);
   final Set<String> _favorites = {};
   final Set<String> _downloads = {};
   final Map<String, String> _downloadPaths = {};
@@ -1119,6 +1120,32 @@ class AppController extends ChangeNotifier {
     }
     return null;
   }
+
+  /// The tracks [_knownTracks] must keep: everything the queue, favorites,
+  /// downloads, the current track and the results on screen refer to.
+  Iterable<String> _pinnedTrackKeys() sync* {
+    for (final summary in _queue.tracks) {
+      yield summary.ref.toString();
+    }
+    yield* _favorites;
+    yield* _downloads;
+    yield* _downloadPaths.keys;
+    yield* _downloading;
+    yield* _downloadErrors.keys;
+    if (_currentTrack case final track?) yield track.ref.toString();
+    final shown = [
+      ..._results,
+      for (final tracks in _pagedResults.values) ...tracks,
+      for (final tracks in _categoryTracks.values) ...tracks,
+    ];
+    for (final track in shown) {
+      yield track.ref.toString();
+    }
+  }
+
+  /// How many tracks are held for lookups (see [KnownTracks]).
+  @visibleForTesting
+  int get knownTrackCount => _knownTracks.length;
 
   CatalogTrack _trackFor(TrackSummary summary) {
     final track = _knownTracks[summary.ref.toString()];

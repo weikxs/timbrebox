@@ -8,6 +8,7 @@ import 'package:timbrebox_core/timbrebox_core.dart';
 import '../model/catalog_search.dart';
 import '../model/catalog_track.dart';
 import '../net/pooled_http.dart';
+import 'bounded_cache.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
 import 'video_source_adapters.dart';
@@ -331,7 +332,7 @@ class AudiusCatalogSource implements CatalogSource {
            readJson ?? JsonHttpClient(clientFactory: clientFactory).read;
 
   final JsonReader _readJson;
-  final Map<String, String> _artwork = {};
+  final _artwork = BoundedCache<String, String>();
 
   @override
   SourceDescriptor get descriptor => SourceDescriptor(
@@ -455,7 +456,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
            readJson ?? JsonHttpClient(clientFactory: clientFactory).read;
 
   final JsonReader _readJson;
-  final Map<String, String> _streams = {};
+  final _streams = BoundedCache<String, String>();
 
   @override
   SourceDescriptor get descriptor => SourceDescriptor(
@@ -594,7 +595,7 @@ class InternetArchiveCatalogSource implements CatalogSource {
   };
 
   final JsonReader _readJson;
-  final Map<String, String> _fileNames = {};
+  final _fileNames = BoundedCache<String, String>();
 
   @override
   SourceDescriptor get descriptor => SourceDescriptor(
