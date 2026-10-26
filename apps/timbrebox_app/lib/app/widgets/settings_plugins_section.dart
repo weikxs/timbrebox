@@ -186,31 +186,37 @@ class _PluginSettingsState extends State<PluginSettings> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _updating = true);
     try {
-      final count = await widget.controller.updatePlugins();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            count > 0
-                ? AppStrings.t(
-                    'plugin.updatedCountFmt',
-                  ).replaceFirst('{n}', '$count')
-                : AppStrings.t('plugin.upToDate'),
-          ),
-        ),
-      );
+      final report = await widget.controller.updatePlugins();
+      messenger.showSnackBar(SnackBar(content: Text(_updateMessage(report))));
     } catch (error) {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            AppStrings.t(
-              'plugin.updateFailedFmt',
-            ).replaceFirst('{e}', '$error'),
+            AppStrings.t('plugin.updateFailedFmt').replaceFirst('{e}', '$error'),
           ),
         ),
       );
     } finally {
       if (mounted) setState(() => _updating = false);
     }
+  }
+
+  /// "Up to date" only when every plugin was actually checked.
+  static String _updateMessage(PluginUpdateReport report) {
+    final failed = report.failed.join(', ');
+    if (report.failed.isEmpty) {
+      return report.updated > 0
+          ? AppStrings.t(
+              'plugin.updatedCountFmt',
+            ).replaceFirst('{n}', '${report.updated}')
+          : AppStrings.t('plugin.upToDate');
+    }
+    if (report.updated > 0) {
+      return AppStrings.t('plugin.updatedSomeFailedFmt')
+          .replaceFirst('{n}', '${report.updated}')
+          .replaceFirst('{names}', failed);
+    }
+    return AppStrings.t('plugin.updateFailedFmt').replaceFirst('{e}', failed);
   }
 
   Future<bool> _confirmInstall(String url) async {

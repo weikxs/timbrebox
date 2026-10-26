@@ -17,7 +17,7 @@ void main() {
   PluginRepository repository() =>
       PluginRepository(pluginsDirectory: () async => root);
 
-  Future<void> store(String id, {String? manifest}) async {
+  Future<void> store(String id, {String? manifest, String? srcUrl}) async {
     final dir = await Directory('${root.path}/$id').create();
     await File(
       '${dir.path}/plugin.js',
@@ -29,6 +29,7 @@ void main() {
               id: id,
               platform: id,
               version: '1',
+              srcUrl: srcUrl,
               functions: const ['search'],
             ).toJson(),
           ),
@@ -80,5 +81,22 @@ void main() {
           as Map<String, Object?>,
     );
     expect(saved.enabled, isFalse);
+  });
+
+  test('checking for updates reports the plugins that failed', () async {
+    // The local machine is not a public host, so this update cannot fetch.
+    await store('plugin_a', srcUrl: 'https://127.0.0.1:9/a.js');
+    await store('plugin_b');
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      pluginRepository: repository(),
+    );
+    addTearDown(controller.dispose);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    final report = await controller.updatePlugins();
+
+    expect(report.updated, 0);
+    expect(report.failed, ['plugin_a']);
   });
 }

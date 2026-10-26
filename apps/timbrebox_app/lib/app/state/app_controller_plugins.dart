@@ -118,13 +118,17 @@ extension AppControllerPlugins on AppController {
     return sources.length;
   }
 
-  /// Re-fetches every plugin from its srcUrl; returns how many were updated.
-  Future<int> updatePlugins() async {
+  /// Re-fetches every plugin from its srcUrl and reports how many were
+  /// updated and which could not be checked.
+  Future<PluginUpdateReport> updatePlugins() async {
     final repository = _pluginRepository;
     final catalog = _catalog;
-    if (repository == null || catalog is! MutableMusicCatalog) return 0;
+    if (repository == null || catalog is! MutableMusicCatalog) {
+      return const PluginUpdateReport(updated: 0, failed: []);
+    }
     final mutable = catalog as MutableMusicCatalog;
     var updated = 0;
+    final failed = <String>[];
     for (final manifest in List.of(_plugins)) {
       try {
         final fresh = await repository.update(manifest);
@@ -135,15 +139,17 @@ extension AppControllerPlugins on AppController {
           enabledDefault: _enabledSources.contains(manifest.id),
         );
         updated++;
-      } catch (_) {
+      } catch (error) {
         // A single failed update must not abort the rest.
+        failed.add(manifest.platform);
+        DiagnosticLog.record('plugin ${manifest.id} update failed: $error');
       }
     }
     if (updated > 0) {
       _pluginsChanged();
       _notify();
     }
-    return updated;
+    return PluginUpdateReport(updated: updated, failed: failed);
   }
 
   Future<void> removePlugin(String id) async {
@@ -158,4 +164,15 @@ extension AppControllerPlugins on AppController {
     _pluginsChanged();
     _notify();
   }
+}
+
+/// The outcome of [AppControllerPlugins.updatePlugins].
+class PluginUpdateReport {
+  const PluginUpdateReport({required this.updated, required this.failed});
+
+  /// How many plugins were replaced by a newer version.
+  final int updated;
+
+  /// The names of plugins whose update could not be fetched or installed.
+  final List<String> failed;
 }
