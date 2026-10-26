@@ -27,6 +27,9 @@ class _FakeSessionStore implements SessionStore {
   }
 
   @override
+  Future<void> savePosition(int positionMs) async {}
+
+  @override
   Future<void> clear() async => _restored = null;
 }
 

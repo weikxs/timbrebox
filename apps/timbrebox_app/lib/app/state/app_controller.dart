@@ -906,20 +906,28 @@ class AppController extends ChangeNotifier {
   static const _sessionSaveInterval = Duration(seconds: 10);
   var _savedPosition = Duration.zero;
 
+  /// The queue (and current track) as last written, to tell a position-only
+  /// save from one that must rewrite the queue.
+  String? _savedQueueKey;
+
   void _persistSession() {
     final store = _sessionStore;
     if (store == null) return;
     _savedPosition = _position;
-    final tracks = queue;
     final currentRef = _currentTrack?.ref;
-    final index = currentRef == null
+    final summaries = _queue.tracks;
+    final found = currentRef == null
         ? 0
-        : tracks.indexWhere((track) => track.ref == currentRef);
-    unawaited(store.save(
-      tracks,
-      index < 0 ? 0 : index,
-      positionMs: _position.inMilliseconds,
-    ));
+        : summaries.indexWhere((track) => track.ref == currentRef);
+    final index = found < 0 ? 0 : found;
+    final key = '$index\n${summaries.map((track) => track.ref).join('\n')}';
+    final positionMs = _position.inMilliseconds;
+    if (key == _savedQueueKey) {
+      unawaited(store.savePosition(positionMs));
+      return;
+    }
+    _savedQueueKey = key;
+    unawaited(store.save(queue, index, positionMs: positionMs));
   }
 
   // ---- Agent control (local HTTP API to drive the player) ----
@@ -971,7 +979,10 @@ class AppController extends ChangeNotifier {
   void setAutoPlay(bool value) {
     _autoPlay = value;
     _persistSettings();
-    if (!value) unawaited(_sessionStore?.clear());
+    if (!value) {
+      _savedQueueKey = null; // The next save writes the whole session again.
+      unawaited(_sessionStore?.clear());
+    }
     notifyListeners();
   }
 

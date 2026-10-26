@@ -236,6 +236,10 @@ final class _RecordingSessionStore implements SessionStore {
   }) async => lastPositionMs = positionMs;
 
   @override
+  Future<void> savePosition(int positionMs) async =>
+      lastPositionMs = positionMs;
+
+  @override
   Future<RestoredSession?> load() async => null;
 
   @override
