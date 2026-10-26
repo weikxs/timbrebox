@@ -119,10 +119,17 @@ final class PluginRuntime {
 
   void _settle(Object? id, bool ok, Object? payload) {
     if (_disposed) return;
-    final payloadLiteral = jsonEncode(jsonEncode(payload));
-    _rt.evaluate('__resolveHost($id, $ok, $payloadLiteral);');
+    _rt.evaluate('__resolveHost($id, $ok, ${_jsLiteral(payload)});');
     _rt.executePendingJob();
   }
+
+  /// [value] as a JS data literal. JSON is plain data in JS syntax (no code),
+  /// so the body is escaped once and the sandbox skips a `JSON.parse` of a
+  /// second, doubly escaped copy. U+2028/U+2029 are escaped too: engines
+  /// before ES2019 read them as line breaks inside a string literal.
+  static String _jsLiteral(Object? value) => jsonEncode(
+    value,
+  ).replaceAll('\u2028', r'\u2028').replaceAll('\u2029', r'\u2029');
 
   void dispose() {
     if (_disposed) return;
@@ -158,11 +165,10 @@ final class PluginRuntime {
         }));
       });
     }
-    globalThis.__resolveHost = function(id, ok, payloadJson) {
+    globalThis.__resolveHost = function(id, ok, payload) {
       var p = __pending[id];
       if (!p) return;
       delete __pending[id];
-      var payload = JSON.parse(payloadJson);
       if (ok) p.resolve(payload); else p.reject(new Error(payload && payload.message || 'request failed'));
     };
 

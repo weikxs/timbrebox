@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import '../design/app_strings.dart';
 import '../net/egress_policy.dart';
@@ -93,15 +94,15 @@ final class PluginHttpClient {
     }
   }
 
-  Future<List<int>> _readCapped(HttpClientResponse response) async {
-    final bytes = <int>[];
+  Future<Uint8List> _readCapped(HttpClientResponse response) async {
+    final bytes = BytesBuilder(copy: false);
     await for (final chunk in response.timeout(_timeout)) {
-      bytes.addAll(chunk);
+      bytes.add(chunk);
       if (bytes.length > maxBytes) {
         throw PluginHttpException(AppStrings.t('plugin.http.tooLarge'));
       }
     }
-    return bytes;
+    return bytes.takeBytes();
   }
 
   Map<String, String> _responseHeaders(HttpClientResponse response) {
