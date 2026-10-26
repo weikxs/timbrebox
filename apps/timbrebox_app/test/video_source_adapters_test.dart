@@ -72,6 +72,32 @@ void main() {
       );
     },
   );
+
+  test('a large page with escaped braces in strings still parses', () async {
+    // ~1 MB of page state, mostly a string full of quotes, escapes and braces
+    // that must not end the object early.
+    final noise = List.filled(85000, r'a \" } { \\ ').join();
+    final page =
+        '<script>{"itemStruct":{"id":"tt-1","desc":"Public clip",'
+        '"note":"$noise","author":{"nickname":"Creator"},'
+        '"video":{"playAddr":"https://media.example/tt.mp4"}}}</script>';
+    final source = TikTokCatalogSource(
+      http: SourceHttpClient.withReader(
+        (uri, body, headers, cancellation) async => page,
+      ),
+    );
+
+    final watch = Stopwatch()..start();
+    final track = (await source.search(_request('clip'))).items.single;
+    watch.stop();
+    // ignore: avoid_print
+    print(
+      'parsed a ${page.length ~/ 1024} KB page in '
+      '${watch.elapsedMilliseconds} ms',
+    );
+    expect(track.title, 'Public clip');
+    expect(track.artist, 'Creator');
+  });
 }
 
 SearchRequest _request(String query) =>

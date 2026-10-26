@@ -71,7 +71,7 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
       request.cancellation,
       headers: {'Referer': referer},
     );
-    final records = _pageRecords(text, sourceId: id);
+    final records = await _parsePage(text, sourceId: id);
     if (records.isEmpty) {
       throw const SourceException(
         '该音源当前没有返回可播放的公开搜索结果。',
@@ -143,6 +143,22 @@ final class _PageVideoRecord {
   final String artist;
   final String? streamUrl;
   final Duration? duration;
+}
+
+/// Pages above this size are parsed on a background isolate: decoding up to
+/// a megabyte of embedded JSON would otherwise block the UI for tens of ms.
+const _backgroundParseChars = 64 * 1024;
+
+/// Parses [text] once into a list (the lazy [_pageRecords] would re-run the
+/// whole scan for every pass over it).
+Future<List<_PageVideoRecord>> _parsePage(
+  String text, {
+  required String sourceId,
+}) async {
+  if (text.length < _backgroundParseChars) {
+    return _pageRecords(text, sourceId: sourceId).toList();
+  }
+  return Isolate.run(() => _pageRecords(text, sourceId: sourceId).toList());
 }
 
 Iterable<_PageVideoRecord> _pageRecords(

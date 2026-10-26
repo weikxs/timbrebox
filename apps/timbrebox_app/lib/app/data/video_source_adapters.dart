@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:timbrebox_core/timbrebox_core.dart';
@@ -236,27 +237,37 @@ Iterable<Map<String, dynamic>> _jsonObjects(String text, String marker) sync* {
 Object? _mapValue(Object? value, String key) =>
     value is Map ? value[key] : null;
 
+const _quote = 0x22; // "
+const _backslash = 0x5c; // \
+const _openBrace = 0x7b; // {
+const _closeBrace = 0x7d; // }
+
+/// The index of the `}` closing the object that opens at [start], or -1.
+/// Compares code units: indexing a String allocates a one-char String per
+/// character, which adds up over a page of up to a megabyte.
 int _balancedEnd(String text, int start) {
   var depth = 0;
   var quoted = false;
   var escaped = false;
   for (var index = start; index < text.length; index++) {
-    final char = text[index];
+    final unit = text.codeUnitAt(index);
     if (quoted) {
       if (escaped) {
         escaped = false;
-      } else if (char == '\\') {
+      } else if (unit == _backslash) {
         escaped = true;
-      } else if (char == '"') {
+      } else if (unit == _quote) {
         quoted = false;
       }
       continue;
     }
-    if (char == '"') {
+    if (unit == _quote) {
       quoted = true;
+    } else if (unit == _openBrace) {
+      depth++;
+    } else if (unit == _closeBrace && --depth == 0) {
+      return index;
     }
-    if (char == '{') depth++;
-    if (char == '}' && --depth == 0) return index;
   }
   return -1;
 }
