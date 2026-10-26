@@ -205,10 +205,29 @@ class _CategoryGrid extends StatelessWidget {
         _GroupLabel(AppStrings.t('hot.chineseGroup'), color: _cyan),
         const SizedBox(height: 12),
         _Tiles(categories: _bilibiliCategories, onOpen: onOpen),
-        if (pluginCats.isNotEmpty) ...[
+        if (pluginCats.isNotEmpty ||
+            controller.pluginTopListFailures.isNotEmpty) ...[
           const SizedBox(height: 26),
           _GroupLabel(AppStrings.t('hot.pluginCharts'), color: _indigo),
           const SizedBox(height: 12),
+          if (controller.pluginTopListFailures.isNotEmpty)
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    AppStrings.t('hot.pluginChartsFailedFmt').replaceFirst(
+                      '{names}',
+                      controller.pluginTopListFailures.join(', '),
+                    ),
+                    style: TextStyle(color: TimbreColors.gold, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: controller.retryPluginTopLists,
+                  child: Text(AppStrings.t('common.retry')),
+                ),
+              ],
+            ),
           _Tiles(categories: pluginCats, onOpen: onOpen),
         ],
       ],

@@ -38,6 +38,8 @@ const moreZhStrings = <String, String>{
   'plugin.js.moduleNotAllowed': '插件请求了不允许的模块：',
   // storage
   'storage.writeFailed': '有设置或曲库数据没能保存（磁盘已满或没有写入权限？）。',
+  // hot library
+  'hot.pluginChartsFailedFmt': '这些插件的榜单没能加载：{names}',
   // player
   'player.searchAgain': '重新搜索',
   'player.lyricsUnsynced': '这份歌词没有时间轴，无法跟随播放。',
@@ -107,6 +109,8 @@ const moreEnStrings = <String, String>{
   'plugin.js.moduleNotLoaded': 'Plugin module not loaded: ',
   'plugin.js.moduleNotAllowed':
       'The plugin asked for a module that is not allowed: ',
+  // hot library
+  'hot.pluginChartsFailedFmt': 'Charts from these plugins did not load: {names}',
   // storage
   'storage.writeFailed':
       'Some settings or library data could not be saved (is the disk full, '

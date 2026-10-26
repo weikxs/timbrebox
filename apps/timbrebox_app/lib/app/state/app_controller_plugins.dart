@@ -19,6 +19,7 @@ extension AppControllerPlugins on AppController {
     if (_pluginTopListsLoaded && !force) return;
     _pluginTopListsLoaded = true;
     final all = <PluginTopListItem>[];
+    final failed = <String>[];
     // Snapshot before awaiting so install/remove mid-load can't throw a
     // ConcurrentModificationError.
     for (final entry in _pluginSources.entries.toList()) {
@@ -26,14 +27,24 @@ extension AppControllerPlugins on AppController {
       try {
         all.addAll(await entry.value.topLists());
       } catch (error) {
+        failed.add(entry.value.manifest.platform);
         DiagnosticLog.record('plugin ${entry.key} top lists failed: $error');
       }
     }
     _pluginTopLists
       ..clear()
       ..addAll(all);
+    _pluginTopListFailures = failed;
     _notify();
   }
+
+  /// The plugins whose charts failed to load last time (their names); the
+  /// hot library offers to try again.
+  List<String> get pluginTopListFailures =>
+      List.unmodifiable(_pluginTopListFailures);
+
+  /// Loads every plugin's charts again (after a failure).
+  Future<void> retryPluginTopLists() => loadPluginTopLists(force: true);
 
   /// Plugins were restored, installed, updated, removed or switched on/off:
   /// charts already shown must reflect that (ones not shown yet load when
