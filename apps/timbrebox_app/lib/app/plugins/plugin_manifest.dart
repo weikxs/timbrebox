@@ -8,6 +8,7 @@ class PluginManifest {
     this.srcUrl,
     this.sha256,
     this.enabled = true,
+    this.functions,
   });
 
   /// Stable source id (valid `SourceDescriptor` id: lowercase, `plugin_…`).
@@ -23,6 +24,11 @@ class PluginManifest {
   final String? sha256;
   final bool enabled;
 
+  /// The plugin functions TimbreBox uses that the script exports, recorded
+  /// at install so the source's capabilities are known without starting its
+  /// JS engine. Null for plugins installed before this was recorded.
+  final List<String>? functions;
+
   /// Derives a valid, stable `SourceDescriptor` id from the plugin platform.
   /// Source ids must match `^[a-z][a-z0-9_]{1,31}$`.
   static String idFor(String platform) {
@@ -31,15 +37,17 @@ class PluginManifest {
     return id.length > 32 ? id.substring(0, 32) : id;
   }
 
-  PluginManifest copyWith({bool? enabled}) => PluginManifest(
-    id: id,
-    platform: platform,
-    version: version,
-    author: author,
-    srcUrl: srcUrl,
-    sha256: sha256,
-    enabled: enabled ?? this.enabled,
-  );
+  PluginManifest copyWith({bool? enabled, List<String>? functions}) =>
+      PluginManifest(
+        id: id,
+        platform: platform,
+        version: version,
+        author: author,
+        srcUrl: srcUrl,
+        sha256: sha256,
+        enabled: enabled ?? this.enabled,
+        functions: functions ?? this.functions,
+      );
 
   Map<String, Object?> toJson() => {
     'id': id,
@@ -49,6 +57,7 @@ class PluginManifest {
     'srcUrl': srcUrl,
     'sha256': sha256,
     'enabled': enabled,
+    'functions': functions,
   };
 
   factory PluginManifest.fromJson(Map<String, Object?> json) => PluginManifest(
@@ -59,5 +68,6 @@ class PluginManifest {
     srcUrl: json['srcUrl'] as String?,
     sha256: json['sha256'] as String?,
     enabled: json['enabled'] as bool? ?? true,
+    functions: (json['functions'] as List?)?.whereType<String>().toList(),
   );
 }

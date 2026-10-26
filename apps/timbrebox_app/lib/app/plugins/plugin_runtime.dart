@@ -26,7 +26,7 @@ final class PluginRuntime {
 
   /// Loads a plugin module and exposes its `module.exports` as `__plugin`.
   Future<void> load(String pluginSource) async {
-    final shims = await PluginShims.bundle();
+    final shims = await PluginShims.forSource(pluginSource);
     _rt.onMessage('__hostHttp', (dynamic args) {
       _dispatchHttp(args);
       return '';
@@ -36,7 +36,7 @@ final class PluginRuntime {
       return '';
     });
     _rt.evaluate(_prelude);
-    _rt.evaluate(shims);
+    if (shims.isNotEmpty) _rt.evaluate(shims);
     _rt.evaluate('var module={exports:{}};var exports=module.exports;');
     _rt.evaluate(pluginSource);
     _rt.evaluate('globalThis.__plugin = module.exports;');
@@ -125,6 +125,7 @@ final class PluginRuntime {
   }
 
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     _rt.dispose();
   }
@@ -182,15 +183,20 @@ final class PluginRuntime {
     axios.post = function(url, data, config) { config = config || {}; config.url = url; config.data = data; config.method = 'POST'; return axios(config); };
     axios.default = axios;
 
+    // Only the libraries a plugin names are evaluated (see PluginShims).
+    function __shim(name, lib) {
+      if (lib === undefined) throw new Error('插件模块未加载：' + name);
+      return lib;
+    }
     function require(name) {
       switch (name) {
         case 'axios': return axios;
-        case 'crypto-js': return globalThis.__lib_cryptojs;
-        case 'he': return globalThis.__lib_he;
-        case 'dayjs': return globalThis.__lib_dayjs;
-        case 'qs': return globalThis.__lib_qs;
-        case 'cheerio': return globalThis.__lib_cheerio;
-        case 'big-integer': return globalThis.__lib_bigint;
+        case 'crypto-js': return __shim(name, globalThis.__lib_cryptojs);
+        case 'he': return __shim(name, globalThis.__lib_he);
+        case 'dayjs': return __shim(name, globalThis.__lib_dayjs);
+        case 'qs': return __shim(name, globalThis.__lib_qs);
+        case 'cheerio': return __shim(name, globalThis.__lib_cheerio);
+        case 'big-integer': return __shim(name, globalThis.__lib_bigint);
         default: throw new Error('插件请求了不允许的模块：' + name);
       }
     }

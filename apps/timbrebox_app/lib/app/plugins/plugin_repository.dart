@@ -15,14 +15,24 @@ import 'plugin_runtime.dart';
 ///
 /// Each plugin lives under `<appSupport>/plugins/<id>/` as `plugin.js` +
 /// `manifest.json`. Installing fetches the raw `.js` from a GitHub URL, runs it
-/// once to read its metadata, then stores it. Loading rebuilds a live
-/// [PluginCatalogSource] per stored plugin.
+/// once to read its metadata, then stores it. Loading rebuilds a
+/// [PluginCatalogSource] per stored plugin whose JS engine starts on first use.
 final class PluginRepository {
-  PluginRepository({this.policy = const EgressPolicy()});
+  PluginRepository({
+    this.policy = const EgressPolicy(),
+    Future<Directory> Function()? pluginsDirectory,
+    PluginRuntime Function()? createRuntime,
+  }) : _createRuntime = createRuntime ?? PluginRuntime.new,
+       // ignore: prefer_initializing_formals
+       _pluginsDirectory = pluginsDirectory;
 
   /// Plugin code is fetched over https from public hosts only, on every
   /// redirect hop too: a plain-http or LAN source could hand us any script.
   final EgressPolicy policy;
+
+  /// Where plugins are stored; defaults to `<appSupport>/plugins`.
+  final Future<Directory> Function()? _pluginsDirectory;
+  final PluginRuntime Function() _createRuntime;
 
   static const _maxBytes = 6 * 1024 * 1024;
 
@@ -70,7 +80,7 @@ final class PluginRepository {
 
   /// Validates a plugin [source], stores it, and returns a live source.
   Future<PluginCatalogSource> _installSource(String source, Uri origin) async {
-    final runtime = PluginRuntime();
+    final runtime = _createRuntime();
     try {
       await runtime.load(source);
     } catch (error) {
@@ -95,6 +105,7 @@ final class PluginRepository {
       author: runtime.meta('author'),
       srcUrl: runtime.meta('srcUrl') ?? origin.toString(),
       sha256: sha256.convert(utf8.encode(source)).toString(),
+      functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
     await _store(manifest, source);
     return PluginCatalogSource(manifest: manifest, runtime: runtime);
@@ -142,21 +153,51 @@ final class PluginRepository {
     await file.writeAsString(jsonEncode(manifest.toJson()), flush: true);
   }
 
+  /// Reads one stored plugin. Its engine starts on first use; a plugin
+  /// installed before its functions were recorded is started once here to
+  /// record them.
   Future<PluginCatalogSource?> _loadOne(Directory dir) async {
     final manifestFile = File('${dir.path}/manifest.json');
     final scriptFile = File('${dir.path}/plugin.js');
     if (!await manifestFile.exists() || !await scriptFile.exists()) return null;
-    PluginRuntime? runtime;
     try {
       final manifest = PluginManifest.fromJson(
         jsonDecode(await manifestFile.readAsString()) as Map<String, Object?>,
       );
-      runtime = PluginRuntime();
-      await runtime.load(await scriptFile.readAsString());
-      return PluginCatalogSource(manifest: manifest, runtime: runtime);
+      final functions = manifest.functions;
+      if (functions == null) return await _loadLegacy(manifest, scriptFile);
+      return PluginCatalogSource.lazy(
+        manifest: manifest,
+        functions: functions.toSet(),
+        loadRuntime: () async => _startRuntime(await scriptFile.readAsString()),
+      );
     } catch (_) {
-      runtime?.dispose(); // Don't leak the JS engine on a broken stored plugin.
-      return null;
+      return null; // A broken stored plugin is skipped.
+    }
+  }
+
+  Future<PluginCatalogSource> _loadLegacy(
+    PluginManifest manifest,
+    File scriptFile,
+  ) async {
+    final runtime = await _startRuntime(await scriptFile.readAsString());
+    final recorded = manifest.copyWith(
+      functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
+    );
+    await File(
+      '${scriptFile.parent.path}/manifest.json',
+    ).writeAsString(jsonEncode(recorded.toJson()), flush: true);
+    return PluginCatalogSource(manifest: recorded, runtime: runtime);
+  }
+
+  Future<PluginRuntime> _startRuntime(String script) async {
+    final runtime = _createRuntime();
+    try {
+      await runtime.load(script);
+      return runtime;
+    } catch (_) {
+      runtime.dispose(); // Don't leak the JS engine on a broken plugin.
+      rethrow;
     }
   }
 
@@ -170,6 +211,8 @@ final class PluginRepository {
   }
 
   Future<Directory> _pluginsDir() async {
+    final override = _pluginsDirectory;
+    if (override != null) return override();
     final base = await getApplicationSupportDirectory();
     return Directory('${base.path}/plugins');
   }

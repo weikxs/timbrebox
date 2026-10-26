@@ -8,48 +8,128 @@ import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
 import 'plugin_stream_url.dart';
 
-/// Exposes a loaded plugin as a first-class catalog source.
+/// Exposes a plugin as a first-class catalog source.
 ///
 /// It adapts the plugin's JS `search` / `getMediaSource` to TimbreBox's models.
 /// The original JS music item is retained per id because `getMediaSource` needs
 /// the full item (with plugin-private fields), not just the id. Streams that
 /// require request headers are routed through the loopback proxy so media_kit
 /// can play them.
+///
+/// The JS engine starts on the first call that needs it
+/// ([PluginCatalogSource.lazy]), so installed plugins cost nothing at launch
+/// and disabled ones never start; capabilities come from the functions
+/// recorded in the manifest, never from evaluating JS on a read.
 final class PluginCatalogSource implements CatalogSource {
+  /// Wraps an already loaded [runtime] (a fresh install).
   PluginCatalogSource({
-    required this.manifest,
+    required PluginManifest manifest,
     required PluginRuntime runtime,
     StreamHeaderProxy? proxy,
-  }) : _proxy = proxy ?? StreamHeaderProxy(),
+  }) : this._(
+         manifest: manifest,
+         functions: exportedFunctions(runtime),
+         loadRuntime: () async => runtime,
+         proxy: proxy,
+       );
+
+  /// Starts the plugin's runtime with [loadRuntime] on first use.
+  PluginCatalogSource.lazy({
+    required PluginManifest manifest,
+    required Set<String> functions,
+    required Future<PluginRuntime> Function() loadRuntime,
+    StreamHeaderProxy? proxy,
+  }) : this._(
+         manifest: manifest,
+         functions: functions,
+         loadRuntime: loadRuntime,
+         proxy: proxy,
+       );
+
+  PluginCatalogSource._({
+    required this.manifest,
+    required Set<String> functions,
+    required Future<PluginRuntime> Function() loadRuntime,
+    StreamHeaderProxy? proxy,
+  }) : _functions = Set.unmodifiable(functions),
        // ignore: prefer_initializing_formals
-       _runtime = runtime;
+       _loadRuntime = loadRuntime,
+       _proxy = proxy ?? StreamHeaderProxy();
+
+  /// The plugin functions TimbreBox calls; see [PluginManifest.functions].
+  static const knownFunctions = [
+    'search',
+    'getMediaSource',
+    'getLyric',
+    'getTopLists',
+    'getTopListDetail',
+  ];
+
+  /// Which of [knownFunctions] the plugin loaded in [runtime] exports.
+  static Set<String> exportedFunctions(PluginRuntime runtime) => {
+    for (final name in knownFunctions)
+      if (runtime.hasFunction(name)) name,
+  };
 
   final PluginManifest manifest;
-  final PluginRuntime _runtime;
+  final Set<String> _functions;
+  final Future<PluginRuntime> Function() _loadRuntime;
+  Future<PluginRuntime>? _runtime;
+  var _disposed = false;
   final StreamHeaderProxy _proxy;
   final Map<String, Map<String, Object?>> _items = {};
   final Map<String, Map<String, Object?>> _topListItems = {};
   final Map<String, String> _artwork = {};
 
-  bool get hasTopLists => _runtime.hasFunction('getTopLists');
-  bool get hasLyric => _runtime.hasFunction('getLyric');
+  bool get hasTopLists => _functions.contains('getTopLists');
+  bool get hasLyric => _functions.contains('getLyric');
+
+  /// Whether the plugin's JS engine has been started.
+  bool get isStarted => _runtime != null;
 
   @override
-  SourceDescriptor get descriptor => SourceDescriptor(
+  late final SourceDescriptor descriptor = SourceDescriptor(
     id: manifest.id,
     name: manifest.platform,
     capabilities: [
-      if (_runtime.hasFunction('search')) SourceCapability.search,
-      if (_runtime.hasFunction('getMediaSource')) SourceCapability.streaming,
-      if (_runtime.hasFunction('getLyric')) SourceCapability.lyrics,
+      if (_functions.contains('search')) SourceCapability.search,
+      if (_functions.contains('getMediaSource')) SourceCapability.streaming,
+      if (_functions.contains('getLyric')) SourceCapability.lyrics,
     ],
   );
+
+  /// Calls a plugin function, starting the runtime first if needed.
+  Future<Object?> _call(String function, List<Object?> args) async {
+    final runtime = await _started();
+    return runtime.call(function, args);
+  }
+
+  Future<PluginRuntime> _started() {
+    if (_disposed) throw StateError(AppStrings.t('plugin.src.disposed'));
+    return _runtime ??= _start();
+  }
+
+  Future<PluginRuntime> _start() async {
+    final PluginRuntime runtime;
+    try {
+      runtime = await _loadRuntime();
+    } catch (_) {
+      _runtime = null; // A failed start is retried on the next call.
+      rethrow;
+    }
+    // Disposed while the engine was starting: release it right away.
+    if (_disposed) {
+      runtime.dispose();
+      throw StateError(AppStrings.t('plugin.src.disposed'));
+    }
+    return runtime;
+  }
 
   @override
   Future<SearchPage> search(SearchRequest request) async {
     final Object? raw;
     try {
-      raw = await _runtime.call('search', [request.query, request.page, 'music']);
+      raw = await _call('search', [request.query, request.page, 'music']);
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.searchFailed').replaceFirst('{e}', '$error'),
@@ -103,7 +183,7 @@ final class PluginCatalogSource implements CatalogSource {
     Object? raw;
     try {
       for (final quality in const ['standard', 'high', 'super', 'low']) {
-        raw = await _runtime.call('getMediaSource', [item, quality]);
+        raw = await _call('getMediaSource', [item, quality]);
         if (raw is Map && (raw['url']?.toString().isNotEmpty ?? false)) break;
       }
     } catch (error) {
@@ -145,7 +225,7 @@ final class PluginCatalogSource implements CatalogSource {
   /// Flattens the plugin's `getTopLists` groups into a single list of charts.
   Future<List<PluginTopListItem>> topLists() async {
     if (!hasTopLists) return const [];
-    final raw = await _runtime.call('getTopLists', const []);
+    final raw = await _call('getTopLists', const []);
     if (raw is! List) return const [];
     final items = <PluginTopListItem>[];
     for (final group in raw) {
@@ -175,10 +255,10 @@ final class PluginCatalogSource implements CatalogSource {
   /// Loads one chart's tracks via `getTopListDetail`.
   Future<List<TrackSummary>> topListDetail(String listId) async {
     final item = _topListItems[listId];
-    if (item == null || !_runtime.hasFunction('getTopListDetail')) {
+    if (item == null || !_functions.contains('getTopListDetail')) {
       return const [];
     }
-    final raw = await _runtime.call('getTopListDetail', [item, 1]);
+    final raw = await _call('getTopListDetail', [item, 1]);
     if (raw is! Map) return const [];
     final list = raw['musicList'] ?? raw['data'];
     if (list is! List) return const [];
@@ -194,7 +274,7 @@ final class PluginCatalogSource implements CatalogSource {
   Future<String?> lyric(String itemId) async {
     final item = _items[itemId];
     if (item == null || !hasLyric) return null;
-    final raw = await _runtime.call('getLyric', [item]);
+    final raw = await _call('getLyric', [item]);
     if (raw is! Map) return null;
     final value = raw['rawLrc'] ?? raw['lrc'] ?? raw['lyric'];
     final text = value?.toString();
@@ -235,7 +315,8 @@ final class PluginCatalogSource implements CatalogSource {
   }
 
   void dispose() {
-    _runtime.dispose();
+    _disposed = true;
+    _runtime?.then((runtime) => runtime.dispose(), onError: (_) {});
     _proxy.dispose();
   }
 }
