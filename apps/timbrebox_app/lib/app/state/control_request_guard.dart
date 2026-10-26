@@ -25,9 +25,7 @@ ControlRejection? controlRequestRejection({
   required String? fetchSite,
   required int port,
 }) {
-  final normalizedHost = host?.toLowerCase();
-  if (normalizedHost != '127.0.0.1:$port' &&
-      normalizedHost != 'localhost:$port') {
+  if (!isLoopbackHost(host, port)) {
     return (status: 403, error: 'Forbidden host');
   }
   if (origin != null || (fetchSite != null && fetchSite != 'none')) {
@@ -42,4 +40,11 @@ ControlRejection? controlRequestRejection({
     return (status: 405, error: 'Use POST for $path');
   }
   return null;
+}
+
+/// Whether a request's `Host` header names the loopback server on [port]
+/// itself. Anything else reached us through a foreign name (DNS rebinding).
+bool isLoopbackHost(String? host, int port) {
+  final normalized = host?.toLowerCase();
+  return normalized == '127.0.0.1:$port' || normalized == 'localhost:$port';
 }

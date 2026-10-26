@@ -105,7 +105,7 @@ final class CatalogDownloadService {
   };
 
   /// The file extension from the stream's MIME type, else from a known audio
-  /// suffix in the URL. Proxied streams have URLs like `/s/3`, so an unknown
+  /// suffix in the URL. Proxied streams have URLs like `/s/<token>`, so an unknown
   /// suffix falls back to `audio` rather than becoming the extension.
   String _extension(String? mime, Uri uri) {
     final type = mime?.toLowerCase() ?? '';

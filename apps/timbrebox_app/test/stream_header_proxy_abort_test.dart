@@ -60,7 +60,9 @@ void main() {
     // Read the start of the stream like a player, then drop the connection
     // the way libmpv does on a seek.
     final socket = await Socket.connect(local.host, local.port);
-    socket.write('GET ${local.path} HTTP/1.1\r\nHost: ${local.host}\r\n\r\n');
+    socket.write(
+      'GET ${local.path} HTTP/1.1\r\nHost: ${local.host}:${local.port}\r\n\r\n',
+    );
     var received = 0;
     final enough = Completer<void>();
     final subscription = socket.listen((data) {

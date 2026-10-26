@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import '../net/egress_policy.dart';
 import '../net/pooled_http.dart';
+import '../state/control_request_guard.dart';
 
 /// Loopback proxy that makes header-gated / range-limited remote audio playable
 /// by media_kit.
@@ -31,7 +33,7 @@ final class StreamHeaderProxy {
   /// attached to it, so every new connection and redirect hop is vetted.
   HttpClient? _client;
   final _entries = <String, _ProxyTarget>{};
-  var _token = 0;
+  final _random = Random.secure();
 
   /// Max bytes fetched per upstream hop in chunked mode.
   static const _window = 1024 * 1024;
@@ -49,13 +51,20 @@ final class StreamHeaderProxy {
     bool chunked = false,
   }) async {
     final server = await _ensureStarted();
-    final token = '${_token++}';
+    final token = _newToken();
     _entries[token] = _ProxyTarget(upstream, headers, chunked);
     while (_entries.length > _maxEntries) {
       _entries.remove(_entries.keys.first); // insertion order = oldest first
     }
     return Uri.parse('http://127.0.0.1:${server.port}/s/$token');
   }
+
+  /// 128 random bits as hex: another local program cannot guess a published
+  /// stream's URL and pull it (with the plugin's headers) through the proxy.
+  String _newToken() => [
+    for (var i = 0; i < 16; i++)
+      _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ].join();
 
   Future<HttpServer> _ensureStarted() async {
     final existing = _server;
@@ -66,6 +75,12 @@ final class StreamHeaderProxy {
   }
 
   Future<void> _handle(HttpRequest req) async {
+    final host = req.headers.value(HttpHeaders.hostHeader);
+    if (!isLoopbackHost(host, _server?.port ?? -1)) {
+      req.response.statusCode = HttpStatus.forbidden;
+      await req.response.close();
+      return;
+    }
     final token = req.uri.pathSegments.isEmpty ? '' : req.uri.pathSegments.last;
     final target = _entries[token];
     if (target == null) {
