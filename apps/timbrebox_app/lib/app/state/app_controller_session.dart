@@ -21,6 +21,8 @@ extension AppControllerSession on AppController {
     AppStrings.lang = AppStrings.fromName(_language);
     _autoPlay = data['autoPlay'] as bool? ?? _autoPlay;
     _reducedEffects = data['reducedEffects'] as bool? ?? _reducedEffects;
+    _effectsWithoutGpu =
+        data['effectsWithoutGpu'] as bool? ?? _effectsWithoutGpu;
     _releaseAfterPause =
         data['releaseAfterPause'] as bool? ?? _releaseAfterPause;
     _diagnosticLogging =
@@ -29,7 +31,7 @@ extension AppControllerSession on AppController {
     _shortcuts
       ..clear()
       ..addAll(shortcutsFromJson(data['shortcuts']));
-    AppEffects.reduced = _reducedEffects;
+    AppEffects.reduced = reducedEffects;
     DiagnosticLog.enabled = _diagnosticLogging;
     if (_agentControl) unawaited(_startControlServer());
     await _player.setVolume(_volume);
@@ -38,23 +40,26 @@ extension AppControllerSession on AppController {
     _notify();
   }
 
-  void _persistSettings() {
-    _watchWrite(
-      _settingsStore?.save({
-        'volume': _volume,
-        'rate': _rate,
-        'loop': _loop.name,
-        'quality': _quality.name,
-        'language': _language,
-        'autoPlay': _autoPlay,
-        'reducedEffects': _reducedEffects,
-        'releaseAfterPause': _releaseAfterPause,
-        'diagnosticLogging': _diagnosticLogging,
-        'agentControl': _agentControl,
-        'shortcuts': shortcutsToJson(_shortcuts),
-      }),
-    );
-  }
+  void _persistSettings() =>
+      _watchWrite(_settingsStore?.save(settingsSnapshot));
+
+  /// The preferences as saved. `reducedEffects` is the user's own choice,
+  /// never the automatic "no GPU" default.
+  @visibleForTesting
+  Map<String, Object?> get settingsSnapshot => {
+    'volume': _volume,
+    'rate': _rate,
+    'loop': _loop.name,
+    'quality': _quality.name,
+    'language': _language,
+    'autoPlay': _autoPlay,
+    'reducedEffects': _reducedEffects,
+    'effectsWithoutGpu': _effectsWithoutGpu,
+    'releaseAfterPause': _releaseAfterPause,
+    'diagnosticLogging': _diagnosticLogging,
+    'agentControl': _agentControl,
+    'shortcuts': shortcutsToJson(_shortcuts),
+  };
 
   Future<void> _restoreSession() async {
     // "Restore last session" is gated by the autoPlay preference.

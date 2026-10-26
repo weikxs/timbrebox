@@ -6,6 +6,7 @@
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
+#include "gl_probe.h"
 
 struct _MyApplication {
   GtkApplication parent_instance;
@@ -78,9 +79,14 @@ static void my_application_activate(GApplication* application) {
 
   gtk_window_set_default_size(window, 1280, 720);
 
+  // Ask GL which renderer draws this window, once, before the engine starts:
+  // without a GPU the Dart side turns blur and animation off by default.
+  g_autofree gchar* renderer = gl_probe_renderer(GTK_WIDGET(window));
+  g_auto(GStrv) arguments =
+      gl_probe_append_argument(self->dart_entrypoint_arguments, renderer);
+
   g_autoptr(FlDartProject) project = fl_dart_project_new();
-  fl_dart_project_set_dart_entrypoint_arguments(
-      project, self->dart_entrypoint_arguments);
+  fl_dart_project_set_dart_entrypoint_arguments(project, arguments);
 
   FlView* view = fl_view_new(project);
   GdkRGBA background_color;

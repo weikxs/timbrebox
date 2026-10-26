@@ -57,6 +57,7 @@ class AppController extends ChangeNotifier {
     SearchHistoryStore? searchHistoryStore,
     PlaylistStore? playlistStore,
     Random? random,
+    this.softwareRendering = false,
   }) : _playerEngine = engine,
        // ignore: prefer_initializing_formals
        _favoritesStore = favoritesStore,
@@ -83,6 +84,7 @@ class AppController extends ChangeNotifier {
        // ignore: prefer_initializing_formals
        _sessionStore = sessionStore,
        _random = random ?? Random() {
+    AppEffects.reduced = reducedEffects;
     _enabledSources.addAll(_catalog.sources.map((source) => source.id));
     unawaited(_restoreLibrary());
     unawaited(_downloadService?.removeStaleParts());
@@ -220,6 +222,9 @@ class AppController extends ChangeNotifier {
   var _language = '简体中文';
   var _autoPlay = true;
   var _reducedEffects = false;
+
+  /// Effects kept on although [softwareRendering] turns them off by default.
+  var _effectsWithoutGpu = false;
   var _releaseAfterPause = true;
   var _diagnosticLogging = false;
   var _volume = .8;
@@ -305,7 +310,14 @@ class AppController extends ChangeNotifier {
   SettingsSection get settingsSection => _settingsSection;
   String get language => _language;
   bool get autoPlay => _autoPlay;
-  bool get reducedEffects => _reducedEffects;
+
+  /// Whether effects are off: the user's choice, or no GPU (see
+  /// [softwareRendering]) unless the user turned them back on.
+  bool get reducedEffects =>
+      _reducedEffects || (softwareRendering && !_effectsWithoutGpu);
+
+  /// The window is drawn on the CPU (see `isSoftwareRendering`).
+  final bool softwareRendering;
   bool get releaseAfterPause => _releaseAfterPause;
   bool get diagnosticLogging => _diagnosticLogging;
   double get volume => _volume;

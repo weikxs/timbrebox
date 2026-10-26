@@ -256,6 +256,9 @@ class _GeneralSettings extends StatelessWidget {
           value: controller.reducedEffects,
           onChanged: controller.setReducedEffects,
           title: Text(AppStrings.t('settings.reducedEffects')),
+          subtitle: controller.softwareRendering
+              ? Text(AppStrings.t('settings.noGpuEffects'))
+              : null,
         ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,

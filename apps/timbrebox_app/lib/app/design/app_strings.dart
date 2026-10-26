@@ -300,6 +300,7 @@ abstract final class AppStrings {
     'settings.minutesFmt': '{m} 分钟',
     'settings.appearancePrivacy': '外观与隐私',
     'settings.reducedEffects': '减少视觉效果',
+    'settings.noGpuEffects': '未检测到 GPU，已默认关闭动效与毛玻璃以节省 CPU。',
     'settings.diagnosticLogging': '本地诊断日志',
     'settings.diagnosticSubtitle': '默认关闭；仅用于导出本地排障信息。',
     'settings.viewDiagnostics': '查看诊断日志',
@@ -632,6 +633,8 @@ abstract final class AppStrings {
     'settings.minutesFmt': '{m} min',
     'settings.appearancePrivacy': 'Appearance & privacy',
     'settings.reducedEffects': 'Reduce visual effects',
+    'settings.noGpuEffects':
+        'No GPU found: spin and frosted glass are off by default to save CPU.',
     'settings.diagnosticLogging': 'Local diagnostic logging',
     'settings.diagnosticSubtitle':
         'Off by default; only for exporting local troubleshooting info.',

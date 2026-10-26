@@ -26,11 +26,18 @@ import 'state/settings_store.dart';
 import 'state/system_media_controls.dart';
 
 class TimbreBoxApp extends StatefulWidget {
-  const TimbreBoxApp({this.controller, super.key});
+  const TimbreBoxApp({
+    this.controller,
+    this.softwareRendering = false,
+    super.key,
+  });
 
   /// Tests can inject a deterministic controller. The shipped app owns a
   /// single native stream player for the whole listening session.
   final AppController? controller;
+
+  /// No GPU: visual effects default to off (see `isSoftwareRendering`).
+  final bool softwareRendering;
 
   @override
   State<TimbreBoxApp> createState() => _TimbreBoxAppState();
@@ -62,6 +69,7 @@ class _TimbreBoxAppState extends State<TimbreBoxApp>
           backend: _backend,
           resolver: CatalogPlayerSourceResolver(_catalog.streamResolver),
         ),
+        softwareRendering: widget.softwareRendering,
       );
 
   /// Windows/Linux watch media_kit's live device list; macOS/mobile use the
@@ -72,6 +80,7 @@ class _TimbreBoxAppState extends State<TimbreBoxApp>
     }
     return createAudioRouteMonitor();
   }
+
   late final bool _ownsController = widget.controller == null;
 
   @override

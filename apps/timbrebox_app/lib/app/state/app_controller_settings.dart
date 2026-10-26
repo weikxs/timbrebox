@@ -24,9 +24,11 @@ extension AppControllerSettings on AppController {
     _notify();
   }
 
+  /// Without a GPU, turning "reduce" off keeps the effects on despite it.
   void setReducedEffects(bool value) {
     _reducedEffects = value;
-    AppEffects.reduced = value;
+    if (softwareRendering) _effectsWithoutGpu = !value;
+    AppEffects.reduced = reducedEffects;
     _persistSettings();
     _notify();
   }
