@@ -240,7 +240,7 @@ class BuiltInMusicCatalog
         sourceName: sourceId,
         status: SourceSearchStatus.failure,
         tracks: const [],
-        failure: SourceFailure('未注册音源：$sourceId', retryable: false),
+        failure: SourceFailure(AppStrings.t('source.err.unregisteredFmt').replaceFirst('{id}', sourceId), retryable: false),
       );
     }
     final name = source.descriptor.name;
@@ -355,11 +355,11 @@ class AudiusCatalogSource implements CatalogSource {
       },
     );
     final body = await _readJson(uri, request.cancellation);
-    final decoded = _decodeJson(body, message: 'Audius 返回了无法识别的搜索结果。');
+    final decoded = _decodeJson(body, message: AppStrings.t('source.audius.badSearch'));
     final data = decoded is Map ? decoded['data'] : null;
     if (data is! List) {
-      throw const SourceException(
-        'Audius 返回了无法识别的搜索结果。',
+      throw SourceException(
+        AppStrings.t('source.audius.badSearch'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -381,11 +381,11 @@ class AudiusCatalogSource implements CatalogSource {
     if (genre != null && genre.isNotEmpty) query['genre'] = genre;
     final uri = BuiltInSourceConfig.audius.uri('trending', query: query);
     final body = await _readJson(uri, cancellation);
-    final decoded = _decodeJson(body, message: 'Audius 返回了无法识别的榜单结果。');
+    final decoded = _decodeJson(body, message: AppStrings.t('source.audius.badChart'));
     final data = decoded is Map ? decoded['data'] : null;
     if (data is! List) {
-      throw const SourceException(
-        'Audius 返回了无法识别的榜单结果。',
+      throw SourceException(
+        AppStrings.t('source.audius.badChart'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -409,7 +409,7 @@ class AudiusCatalogSource implements CatalogSource {
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
     return ResolvedStream(
       uri: BuiltInSourceConfig.audius.uri(
@@ -479,10 +479,10 @@ class RadioBrowserCatalogSource implements CatalogSource {
       },
     );
     final body = await _readJson(uri, request.cancellation);
-    final data = _decodeJson(body, message: 'Radio Browser 返回了无法识别的目录结果。');
+    final data = _decodeJson(body, message: AppStrings.t('source.radio.badResponse'));
     if (data is! List) {
-      throw const SourceException(
-        'Radio Browser 返回了无法识别的目录结果。',
+      throw SourceException(
+        AppStrings.t('source.radio.badResponse'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -493,7 +493,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
   @override
   CatalogTrack toCatalogTrack(TrackSummary summary) {
     if (!_streams.containsKey(summary.ref.itemId)) {
-      throw StateError('电台流已经失效，请重新搜索。');
+      throw StateError(AppStrings.t('source.radio.expired'));
     }
     return CatalogTrack(
       id: summary.ref.itemId,
@@ -510,7 +510,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
     // After a restart nothing was searched yet: look the station up by id.
     final value =
@@ -518,8 +518,8 @@ class RadioBrowserCatalogSource implements CatalogSource {
         await _lookUpStation(request.ref.itemId, request.cancellation);
     final uri = Uri.tryParse(value ?? '');
     if (uri == null || !{'https', 'http'}.contains(uri.scheme)) {
-      throw const SourceException(
-        '电台流已经失效，请重新搜索。',
+      throw SourceException(
+        AppStrings.t('source.radio.expired'),
         retryable: true,
         code: 'media_reference_expired',
       );
@@ -618,12 +618,12 @@ class InternetArchiveCatalogSource implements CatalogSource {
       },
     );
     final body = await _readJson(uri, request.cancellation);
-    final root = _decodeJson(body, message: 'Internet Archive 返回了无法识别的目录结果。');
+    final root = _decodeJson(body, message: AppStrings.t('source.archive.badSearch'));
     final response = root is Map ? root['response'] : null;
     final docs = response is Map ? response['docs'] : null;
     if (docs is! List) {
-      throw const SourceException(
-        'Internet Archive 返回了无法识别的目录结果。',
+      throw SourceException(
+        AppStrings.t('source.archive.badSearch'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -646,7 +646,7 @@ class InternetArchiveCatalogSource implements CatalogSource {
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
     var fileName = _fileNames[request.ref.itemId];
     if (fileName == null) {
@@ -654,8 +654,8 @@ class InternetArchiveCatalogSource implements CatalogSource {
       fileName = _fileNames[request.ref.itemId];
     }
     if (fileName == null || fileName.isEmpty) {
-      throw const SourceException(
-        '条目文件信息已过期，请重新搜索。',
+      throw SourceException(
+        AppStrings.t('source.archive.expired'),
         retryable: true,
         code: 'media_reference_expired',
       );
@@ -718,11 +718,11 @@ class InternetArchiveCatalogSource implements CatalogSource {
       pathValues: {'id': identifier},
     );
     final body = await _readJson(uri, cancellation);
-    final root = _decodeJson(body, message: 'Internet Archive 返回了无法识别的条目元数据。');
+    final root = _decodeJson(body, message: AppStrings.t('source.archive.badMetadata'));
     final files = root is Map ? root['files'] : null;
     if (files is! List) {
-      throw const SourceException(
-        'Internet Archive 条目没有可识别的文件列表。',
+      throw SourceException(
+        AppStrings.t('source.archive.noFiles'),
         retryable: true,
         code: 'invalid_item_metadata',
       );
@@ -733,8 +733,8 @@ class InternetArchiveCatalogSource implements CatalogSource {
         .whereType<String>()
         .firstOrNull;
     if (candidate == null) {
-      throw const SourceException(
-        '该条目没有公开可播放的音频文件。',
+      throw SourceException(
+        AppStrings.t('source.archive.noAudio'),
         retryable: false,
         code: 'audio_file_unavailable',
       );
@@ -857,7 +857,7 @@ class _CatalogStreamResolver implements StreamResolver {
   Future<ResolvedStream> resolve(StreamRequest request) {
     final source = _sources[request.ref.sourceId];
     if (source == null) {
-      throw StateError('未注册音源：${request.ref.sourceId}');
+      throw StateError(AppStrings.t('source.err.unregisteredFmt').replaceFirst('{id}', request.ref.sourceId));
     }
     return source.resolve(request);
   }

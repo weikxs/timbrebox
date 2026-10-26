@@ -36,7 +36,7 @@ final class PluginRuntime {
       debugPrint('[plugin] $args');
       return '';
     });
-    _rt.evaluate(_prelude);
+    _rt.evaluate(_localizedPrelude());
     if (shims.isNotEmpty) _rt.evaluate(shims);
     _rt.evaluate('var module={exports:{}};var exports=module.exports;');
     _rt.evaluate(pluginSource);
@@ -159,6 +159,18 @@ final class PluginRuntime {
     _http.close();
   }
 
+  /// [_prelude] with its error messages in the app's language (as JS string
+  /// literals).
+  static String _localizedPrelude() => _prelude
+      .replaceAll(
+        '__MSG_NOT_LOADED__',
+        _jsLiteral(AppStrings.t('plugin.js.moduleNotLoaded')),
+      )
+      .replaceAll(
+        '__MSG_NOT_ALLOWED__',
+        _jsLiteral(AppStrings.t('plugin.js.moduleNotAllowed')),
+      );
+
   static const _prelude = r'''
     // HTTP must go through __hostHttp, never a built-in network API.
     delete globalThis.fetch;
@@ -213,7 +225,7 @@ final class PluginRuntime {
 
     // Only the libraries a plugin names are evaluated (see PluginShims).
     function __shim(name, lib) {
-      if (lib === undefined) throw new Error('插件模块未加载：' + name);
+      if (lib === undefined) throw new Error(__MSG_NOT_LOADED__ + name);
       return lib;
     }
     function require(name) {
@@ -225,7 +237,7 @@ final class PluginRuntime {
         case 'qs': return __shim(name, globalThis.__lib_qs);
         case 'cheerio': return __shim(name, globalThis.__lib_cheerio);
         case 'big-integer': return __shim(name, globalThis.__lib_bigint);
-        default: throw new Error('插件请求了不允许的模块：' + name);
+        default: throw new Error(__MSG_NOT_ALLOWED__ + name);
       }
     }
   ''';

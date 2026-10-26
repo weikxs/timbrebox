@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:io' as io show exit;
 
+import '../design/app_strings.dart';
 import '../model/catalog_track.dart';
 import 'app_controller.dart';
 import 'control_request_guard.dart';
@@ -172,11 +173,11 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'lyric': lyric});
         case '/play-queue':
           final i = int.tryParse(query['i'] ?? '');
-          if (i == null) return _badRequest(request, 'i 参数无效');
+          if (i == null) return _badRequest(request, AppStrings.t('control.err.badIndex'));
           final ok = await _controller.playQueueIndex(i);
           return _json(request, ok ? HttpStatus.ok : HttpStatus.notFound, {
             'ok': ok,
-            ...ok ? _status() : {'error': '队列索引超范围'},
+            ...ok ? _status() : {'error': AppStrings.t('control.err.indexRange')},
           });
         case '/mode':
           final mode = query['loop'];
@@ -187,7 +188,10 @@ final class PlayerControlServer {
           if (parsed == null) {
             return _badRequest(
               request,
-              'loop 需为 ${PlaybackLoop.values.map((l) => l.name).join('/')}',
+              AppStrings.t('control.err.badLoopFmt').replaceFirst(
+                '{modes}',
+                PlaybackLoop.values.map((l) => l.name).join('/'),
+              ),
             );
           }
           _controller.setLoop(parsed);
@@ -196,7 +200,7 @@ final class PlayerControlServer {
           final id = query['id'];
           final enabled = query['enabled'];
           if (id == null || enabled == null) {
-            return _badRequest(request, '缺少 id/enabled 参数');
+            return _badRequest(request, AppStrings.t('control.err.missingSource'));
           }
           _controller.setSourceEnabled(id, enabled == 'true' || enabled == '1');
           return _json(request, HttpStatus.ok, {'ok': true});
@@ -229,17 +233,17 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'ok': true, 'quitting': true});
         case '/seek':
           final ms = int.tryParse(query['ms'] ?? '');
-          if (ms == null) return _badRequest(request, 'ms 参数无效');
+          if (ms == null) return _badRequest(request, AppStrings.t('control.err.badMs'));
           await _controller.seek(Duration(milliseconds: ms));
           return _json(request, HttpStatus.ok, _status());
         case '/volume':
           final level = double.tryParse(query['level'] ?? '');
-          if (level == null) return _badRequest(request, 'level 参数无效');
+          if (level == null) return _badRequest(request, AppStrings.t('control.err.badLevel'));
           _controller.setVolume(level);
           return _json(request, HttpStatus.ok, _status());
         case '/search':
           final q = query['q'] ?? '';
-          if (q.trim().isEmpty) return _badRequest(request, 'q 参数为空');
+          if (q.trim().isEmpty) return _badRequest(request, AppStrings.t('control.err.emptyQuery'));
           await _controller.search(q);
           return _json(request, HttpStatus.ok, {
             'query': q,
@@ -258,12 +262,12 @@ final class PlayerControlServer {
           final source = query['source'];
           final item = query['item'];
           if (source == null || item == null) {
-            return _badRequest(request, '缺少 source/item 参数');
+            return _badRequest(request, AppStrings.t('control.err.missingRef'));
           }
           final ok = await _controller.playByRef(source, item);
           return _json(request, ok ? HttpStatus.ok : HttpStatus.notFound, {
             'ok': ok,
-            ...ok ? _status() : {'error': '未找到该曲目，请先 /search'},
+            ...ok ? _status() : {'error': AppStrings.t('control.err.unknownTrack')},
           });
         default:
           return _json(request, HttpStatus.notFound, {'error': 'unknown path'});

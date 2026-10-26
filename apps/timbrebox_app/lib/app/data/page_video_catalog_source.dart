@@ -89,8 +89,8 @@ abstract base class _PageVideoCatalogSource
     );
     final records = await _parsePage(text, sourceId: id);
     if (records.isEmpty) {
-      throw const SourceException(
-        '该音源当前没有返回可播放的公开搜索结果。',
+      throw SourceException(
+        AppStrings.t('source.video.noResults'),
         retryable: true,
         code: 'source_no_public_results',
       );
@@ -158,15 +158,15 @@ abstract base class _PageVideoCatalogSource
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
     final record =
         _records[request.ref.itemId] ??
         await _recordFromPage(request.ref.itemId, request.cancellation);
     final uri = Uri.tryParse(record?.streamUrl ?? '');
     if (uri == null || uri.scheme != 'https') {
-      throw const SourceException(
-        '该音源未返回可直接播放的公开音频流。',
+      throw SourceException(
+        AppStrings.t('source.video.noStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );

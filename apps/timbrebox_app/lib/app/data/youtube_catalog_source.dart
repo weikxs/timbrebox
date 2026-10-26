@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:timbrebox_core/timbrebox_core.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt;
 
+import '../design/app_strings.dart';
 import '../model/catalog_track.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
@@ -70,14 +71,14 @@ final class YouTubeCatalogSource implements CatalogSource {
         ],
       );
     } on TimeoutException {
-      throw const SourceException(
-        'YouTube 搜索超时，请稍后重试。',
+      throw SourceException(
+        AppStrings.t('source.youtube.searchTimeout'),
         retryable: true,
         code: 'source_timeout',
       );
     } catch (_) {
-      throw const SourceException(
-        'YouTube 搜索暂时不可用。',
+      throw SourceException(
+        AppStrings.t('source.youtube.searchUnavailable'),
         retryable: true,
         code: 'source_error',
       );
@@ -92,7 +93,7 @@ final class YouTubeCatalogSource implements CatalogSource {
     sourceId: descriptor.id,
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
-    quality: 'YouTube 公开音频',
+    quality: AppStrings.t('quality.youtubeAudio'),
   );
 
   // ---- Playback + download: resolve → fresh signed googlevideo URL ----
@@ -100,7 +101,7 @@ final class YouTubeCatalogSource implements CatalogSource {
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
     request.cancellation.throwIfCancelled();
     final audio = await _bestAudio(request.ref.itemId);
@@ -128,14 +129,14 @@ final class YouTubeCatalogSource implements CatalogSource {
           .getManifest(videoId)
           .timeout(_resolveTimeout);
     } on TimeoutException {
-      throw const SourceException(
-        'YouTube 解析超时，请稍后重试。',
+      throw SourceException(
+        AppStrings.t('source.youtube.resolveTimeout'),
         retryable: true,
         code: 'source_timeout',
       );
     } catch (_) {
-      throw const SourceException(
-        'YouTube 未返回可播放的公开音频。',
+      throw SourceException(
+        AppStrings.t('source.youtube.noAudio'),
         retryable: false,
         code: 'source_stream_unavailable',
       );
@@ -145,8 +146,8 @@ final class YouTubeCatalogSource implements CatalogSource {
         (a, b) => b.bitrate.bitsPerSecond.compareTo(a.bitrate.bitsPerSecond),
       );
     if (audios.isEmpty) {
-      throw const SourceException(
-        '该视频没有可播放的公开音频流。',
+      throw SourceException(
+        AppStrings.t('source.youtube.noAudioStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );

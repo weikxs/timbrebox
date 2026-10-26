@@ -1185,7 +1185,7 @@ class AppController extends ChangeNotifier {
 
   CatalogTrack _trackFor(TrackSummary summary) {
     final track = _knownTracks[summary.ref.toString()];
-    if (track == null) throw StateError('队列项目已不可用。');
+    if (track == null) throw StateError(AppStrings.t('queue.err.unavailable'));
     return track;
   }
 }

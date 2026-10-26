@@ -97,8 +97,8 @@ final class BilibiliCatalogSource implements CatalogSource {
     final firstPage = pages is List && pages.isNotEmpty ? pages.first : null;
     final cid = _mapValue(firstPage, 'cid')?.toString();
     if (cid == null || cid.isEmpty) {
-      throw const SourceException(
-        'Bilibili 未返回可播放分段。',
+      throw SourceException(
+        AppStrings.t('source.bilibili.noPart'),
         retryable: false,
         code: 'source_stream_unavailable',
       );
@@ -123,8 +123,8 @@ final class BilibiliCatalogSource implements CatalogSource {
     final url = _mapValue(firstAudio, 'baseUrl');
     final stream = Uri.tryParse(url?.toString() ?? '');
     if (stream == null || stream.scheme != 'https') {
-      throw const SourceException(
-        'Bilibili 未返回安全音频流。',
+      throw SourceException(
+        AppStrings.t('source.bilibili.noSecureStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );
