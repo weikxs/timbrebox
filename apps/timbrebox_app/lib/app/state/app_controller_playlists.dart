@@ -83,5 +83,5 @@ extension AppControllerPlaylists on AppController {
     _notify();
   }
 
-  void _persistPlaylists() => unawaited(_playlistStore?.save(_playlists));
+  void _persistPlaylists() => _watchWrite(_playlistStore?.save(_playlists));
 }

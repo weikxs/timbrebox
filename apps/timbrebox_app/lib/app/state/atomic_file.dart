@@ -28,8 +28,18 @@ Future<void> writeFileAtomically(File file, String contents) {
 Future<void> _replace(File file, String contents) async {
   await file.parent.create(recursive: true);
   final temporary = File('${file.path}.tmp');
-  await temporary.writeAsString(contents, flush: true);
-  await temporary.rename(file.path);
+  try {
+    await temporary.writeAsString(contents, flush: true);
+    await temporary.rename(file.path);
+  } catch (_) {
+    // A failed write (full disk, no permission) leaves nothing behind.
+    try {
+      if (await temporary.exists()) await temporary.delete();
+    } on FileSystemException {
+      // Nothing more can be done about it here.
+    }
+    rethrow;
+  }
 }
 
 /// Completes once every write started so far has reached the disk (or

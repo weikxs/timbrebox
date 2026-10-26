@@ -19,7 +19,7 @@ extension AppControllerDownloads on AppController {
       _downloads.remove(key);
       _notify();
       unawaited(_deleteLocalFile(removedPath));
-      unawaited(_persistLibrary());
+      _watchWrite(_persistLibrary());
       return;
     }
     _downloadErrors.remove(key);
@@ -38,7 +38,7 @@ extension AppControllerDownloads on AppController {
       unawaited(_deleteLocalFile(path));
     }
     _notify();
-    unawaited(_persistLibrary());
+    _watchWrite(_persistLibrary());
   }
 
   /// Stops a running download; it ends without an error and leaves no
@@ -69,7 +69,7 @@ extension AppControllerDownloads on AppController {
       );
       _downloadPaths[key] = file.path;
       _downloads.add(key);
-      unawaited(_persistLibrary());
+      _watchWrite(_persistLibrary());
     } on OperationCancelled {
       DiagnosticLog.record('download cancelled: ${track.title}');
     } catch (error) {

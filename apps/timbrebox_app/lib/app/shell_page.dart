@@ -36,6 +36,27 @@ class _ShellPageState extends State<ShellPage> {
   late final AppController _controller = widget.controller;
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_showNotice);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_showNotice);
+    super.dispose();
+  }
+
+  /// Shows a one-off message from the controller (e.g. a failed save).
+  void _showNotice() {
+    final notice = _controller.takeNotice();
+    if (notice == null || !mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(notice)));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,

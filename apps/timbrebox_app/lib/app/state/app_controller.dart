@@ -619,7 +619,7 @@ class AppController extends ChangeNotifier {
       // Keep the full track so the favorites list still renders after a restart.
       _knownTracks[key] = track;
     }
-    unawaited(_persistFavorites());
+    _watchWrite(_persistFavorites());
     notifyListeners();
   }
 
@@ -811,13 +811,13 @@ class AppController extends ChangeNotifier {
     if (_searchHistory.length > _maxSearchHistory) {
       _searchHistory.removeRange(_maxSearchHistory, _searchHistory.length);
     }
-    unawaited(_searchHistoryStore?.save(_searchHistory));
+    _watchWrite(_searchHistoryStore?.save(_searchHistory));
   }
 
   void clearSearchHistory() {
     if (_searchHistory.isEmpty) return;
     _searchHistory.clear();
-    unawaited(_searchHistoryStore?.save(_searchHistory));
+    _watchWrite(_searchHistoryStore?.save(_searchHistory));
     notifyListeners();
   }
 
@@ -828,7 +828,7 @@ class AppController extends ChangeNotifier {
     final index = _plugins.indexWhere((manifest) => manifest.id == sourceId);
     if (index >= 0) {
       _plugins[index] = _plugins[index].copyWith(enabled: enabled);
-      unawaited(_pluginRepository?.setEnabled(sourceId, enabled));
+      _watchWrite(_pluginRepository?.setEnabled(sourceId, enabled));
       _pluginsChanged();
     }
     unawaited(search(_query));
@@ -876,7 +876,7 @@ class AppController extends ChangeNotifier {
   }
 
   void _persistSettings() {
-    unawaited(
+    _watchWrite(
       _settingsStore?.save({
         'volume': _volume,
         'rate': _rate,
@@ -928,7 +928,7 @@ class AppController extends ChangeNotifier {
   /// save from one that must rewrite the queue.
   String? _savedQueueKey;
 
-  void _persistSession() => unawaited(_saveSession());
+  void _persistSession() => _watchWrite(_saveSession());
 
   /// Saves what must survive a quit — the session (queue and position) —
   /// and waits for every file write still in flight.
@@ -1095,6 +1095,32 @@ class AppController extends ChangeNotifier {
       ..addAll(defaultShortcuts());
     _persistSettings();
     notifyListeners();
+  }
+
+  /// A message for the user that the shell shows once (as a snack bar), or
+  /// null. Reading it clears it.
+  String? takeNotice() {
+    final notice = _notice;
+    _notice = null;
+    return notice;
+  }
+
+  String? _notice;
+  var _storageFailureReported = false;
+
+  /// Watches a save of user data: a failure is logged, and reported to the
+  /// user once per session (a full disk fails every later save as well).
+  void _watchWrite(Future<void>? write) {
+    if (write == null) return;
+    unawaited(
+      write.catchError((Object error) {
+        DiagnosticLog.record('save failed: $error');
+        if (_storageFailureReported || _isDisposed) return;
+        _storageFailureReported = true;
+        _notice = AppStrings.t('storage.writeFailed');
+        notifyListeners();
+      }),
+    );
   }
 
   /// [notifyListeners] for the extensions in this library's part files,

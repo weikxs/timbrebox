@@ -44,4 +44,22 @@ void main() {
 
     expect(file.readAsStringSync(), '[]');
   });
+
+  test('a failed write leaves no temporary file behind', () async {
+    // A directory where the file should be: the final rename fails.
+    final blocked = await Directory('${dir.path}/settings.json').create();
+    await File('${blocked.path}/inside').writeAsString('x');
+
+    await expectLater(
+      writeFileAtomically(File(blocked.path), '{}'),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    expect(
+      dir.listSync().map(
+        (entry) => entry.uri.pathSegments.where((s) => s.isNotEmpty).last,
+      ),
+      ['settings.json'],
+    );
+  });
 }
