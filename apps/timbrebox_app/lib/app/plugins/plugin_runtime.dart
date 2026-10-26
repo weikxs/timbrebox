@@ -87,13 +87,26 @@ final class PluginRuntime {
     if (resolved.isError) {
       throw PluginRuntimeException(resolved.stringResult);
     }
-    final text = resolved.stringResult;
-    if (text.isEmpty) return null;
-    final envelope = jsonDecode(text);
+    final envelope = decodeCallEnvelope(resolved.stringResult);
     if (envelope is Map && envelope['ok'] == false) {
-      throw PluginRuntimeException('${envelope['error'] ?? AppStrings.t('plugin.runtime.execFailed')}');
+      throw PluginRuntimeException(
+        '${envelope['error'] ?? AppStrings.t('plugin.runtime.execFailed')}',
+      );
     }
     return envelope is Map ? envelope['value'] : null;
+  }
+
+  /// The `{ok, value | error}` envelope a call's promise settled with, or null.
+  /// QuickJS hands the envelope back as the JSON text the call returned;
+  /// JavaScriptCore (macOS, iOS) runs `JSON.stringify` over that text once
+  /// more, so the first decode yields a string to decode again.
+  @visibleForTesting
+  static Object? decodeCallEnvelope(String text) {
+    if (text.isEmpty) return null;
+    final decoded = jsonDecode(text);
+    return decoded is String && decoded.isNotEmpty
+        ? jsonDecode(decoded)
+        : decoded;
   }
 
   void _dispatchHttp(dynamic args) {
