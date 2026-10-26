@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import '../design/app_strings.dart';
 import 'audio_source.dart';
 import 'player_backend.dart';
+import 'position_sampler.dart';
 
 /// libmpv-backed audio backend (media_kit). mpv streams DASH/fragmented audio
 /// (YouTube) and remote URLs with request headers natively.
@@ -21,7 +22,9 @@ final class MediaKitBackend
       for (final MapEntry(:key, :value) in mpvProperties.entries) {
         unawaited(native.setProperty(key, value));
       }
+      unawaited(_samplePositions(native));
     }
+    _positionForward = _player.stream.position.listen(_positions.add);
   }
 
   /// Audio-only libmpv: an 8 MB demuxer cache instead of media_kit's 32 MB
@@ -45,12 +48,46 @@ final class MediaKitBackend
   final Player _player;
   var _disposed = false;
 
+  /// Positions from media_kit (until `time-pos` is unobserved, then only its
+  /// reset to 0 when a source is released) and from [_sampler].
+  final StreamController<Duration> _positions =
+      StreamController<Duration>.broadcast();
+  late final StreamSubscription<Duration> _positionForward;
+  PositionSampler? _sampler;
+  StreamSubscription<Duration>? _sampleForward;
+
+  /// media_kit observes libmpv's `time-pos`, which fires on every audio tick
+  /// (10-50 times a second), each one a trip into Dart. Stop that at the
+  /// source and read the position a few times a second while playing.
+  Future<void> _samplePositions(NativePlayer native) async {
+    await native.waitForPlayerInitialization;
+    if (_disposed) return;
+    // media_kit registers each observed property with its name's hashCode.
+    native.mpv.mpv_unobserve_property(native.ctx, 'time-pos'.hashCode);
+    final sampler = PositionSampler(
+      read: () => _readPosition(native),
+      playing: _player.stream.playing,
+      initiallyPlaying: _player.state.playing,
+    );
+    _sampler = sampler;
+    _sampleForward = sampler.positions.listen(_positions.add);
+  }
+
+  Future<Duration?> _readPosition(NativePlayer native) async {
+    if (_disposed) return null;
+    final seconds = double.tryParse(await native.getProperty('time-pos'));
+    if (seconds == null || _disposed) return null;
+    return Duration(
+      microseconds: (seconds * Duration.microsecondsPerSecond).round(),
+    );
+  }
+
   @override
   Stream<void> get completed =>
       _player.stream.completed.where((done) => done).map((_) {});
 
   @override
-  Stream<Duration> get positions => _player.stream.position;
+  Stream<Duration> get positions => _positions.stream;
 
   @override
   Stream<Duration> get durations => _player.stream.duration;
@@ -60,12 +97,11 @@ final class MediaKitBackend
   Stream<List<AudioDevice>> get audioDeviceList => _player.stream.audioDevices;
 
   @override
-  Future<void> setReleaseMode(AudioReleaseMode mode) => _player.setPlaylistMode(
-    switch (mode) {
-      AudioReleaseMode.loop => PlaylistMode.single,
-      AudioReleaseMode.stop => PlaylistMode.none,
-    },
-  );
+  Future<void> setReleaseMode(AudioReleaseMode mode) =>
+      _player.setPlaylistMode(switch (mode) {
+        AudioReleaseMode.loop => PlaylistMode.single,
+        AudioReleaseMode.stop => PlaylistMode.none,
+      });
 
   @override
   Future<void> setSource(AudioSourceSpec source) => _open(source, null);
@@ -120,6 +156,10 @@ final class MediaKitBackend
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    await _sampleForward?.cancel();
+    _sampler?.dispose();
+    await _positionForward.cancel();
+    await _positions.close();
     await _player.dispose();
   }
 
