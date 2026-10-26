@@ -106,14 +106,12 @@ class AppController extends ChangeNotifier {
         // 0 sent when the idle source is released, which must not erase the
         // paused position (shown, saved, and resumed from).
         if (_player.value.status == PlaybackStatus.paused) return;
-        _position = value;
+        _onPositionTick(value);
         // Keep the saved session close to where playback is, so a crash or a
         // quit resumes near the same spot.
         if ((value - _savedPosition).abs() >= _sessionSaveInterval) {
           _persistSession();
         }
-        // No notifyListeners(): ticks arrive 10-50 times a second, and only
-        // the widgets listening to [positionListenable] depend on them.
       });
       _durationSubscription = progress.durations.listen((value) {
         _playbackDuration = value;
@@ -222,8 +220,27 @@ class AppController extends ChangeNotifier {
   final ValueNotifier<Duration> _positionNotifier = ValueNotifier(
     Duration.zero,
   );
-  Duration get _position => _positionNotifier.value;
-  set _position(Duration value) => _positionNotifier.value = value;
+
+  /// The engine's latest position, for seeking and the saved session. The
+  /// UI gets it through [_positionNotifier] once per shown second.
+  var _rawPosition = Duration.zero;
+  Duration get _position => _rawPosition;
+
+  /// A jump (new track, seek, restore) shows at once.
+  set _position(Duration value) {
+    _rawPosition = value;
+    _positionNotifier.value = value;
+  }
+
+  /// Engine ticks arrive 10-50 times a second; the progress bar, the time
+  /// labels and the synced lyrics only change when the shown second does.
+  /// No notifyListeners(): nothing else depends on them.
+  void _onPositionTick(Duration value) {
+    _rawPosition = value;
+    if (value.inSeconds != _positionNotifier.value.inSeconds) {
+      _positionNotifier.value = value;
+    }
+  }
   var _playbackDuration = Duration.zero;
   CancellationToken? _searchCancellation;
   static const _loadMoreCooldown = Duration(seconds: 15);
@@ -293,9 +310,10 @@ class AppController extends ChangeNotifier {
   bool get isLoading => _player.value.status == PlaybackStatus.loading;
   Duration get position => _position;
 
-  /// The playback position on its own channel: it changes on every engine
-  /// tick, so only the progress bar and time labels listen to it while the
-  /// controller itself notifies for real state changes only.
+  /// The playback position on its own channel, updated when the shown
+  /// second changes (or on a jump), so only the progress bar, time labels
+  /// and lyrics listen to it while the controller itself notifies for real
+  /// state changes only.
   ValueListenable<Duration> get positionListenable => _positionNotifier;
   Duration get playbackDuration => _playbackDuration;
   String get positionLabel => _formatDuration(_position);

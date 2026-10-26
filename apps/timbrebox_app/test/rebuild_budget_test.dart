@@ -9,9 +9,9 @@ import 'package:timbrebox_app/app/state/app_controller.dart';
 import 'package:timbrebox_app/app/state/network_player_engine.dart';
 import 'package:timbrebox_app/app/timbrebox_app.dart';
 
-/// Playback position ticks arrive 10-50 times a second. Only the progress bar
-/// and the time labels may rebuild for them — not the app, the shell, the
-/// player chrome or the result rows.
+/// Playback position ticks arrive 10-50 times a second. The UI hears of them
+/// once per shown second, and only the progress bar and the time labels
+/// rebuild — not the app, the shell, the player chrome or the result rows.
 void main() {
   testWidgets('position ticks rebuild only the progress widgets', (
     tester,
@@ -59,8 +59,10 @@ void main() {
     expect(builds['Scaffold'] ?? 0, 0);
     expect(builds['MiniPlayer'] ?? 0, 0);
     expect(builds['_TrackRow'] ?? 0, 0);
-    // The progress bar itself still follows every tick.
-    expect(builds['Slider'] ?? 0, greaterThanOrEqualTo(_ticks));
+    // The progress bar follows the shown second, not every tick: 50 ticks
+    // 200 ms apart cross ten seconds.
+    expect(builds['Slider'] ?? 0, inInclusiveRange(9, 11));
+    expect(controller.positionListenable.value.inSeconds, 10);
     expect(controller.position, const Duration(milliseconds: _ticks * 200));
     expect(find.textContaining('00:10'), findsWidgets);
   });
