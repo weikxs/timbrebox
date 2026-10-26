@@ -36,12 +36,13 @@ void main() {
 
   tearDown(() => root.delete(recursive: true));
 
-  PluginRepository repository() => PluginRepository(
+  PluginRepository repository({Duration? idleTimeout}) => PluginRepository(
     pluginsDirectory: () async => root,
     createRuntime: () {
       started++;
       return PluginRuntime();
     },
+    idleTimeout: idleTimeout ?? const Duration(minutes: 5),
   );
 
   Future<void> store(
@@ -160,5 +161,38 @@ void main() {
 
     await expectLater(pending, throwsA(isA<SourceException>()));
     expect(started, 1);
+  });
+
+  test('an idle engine shuts down and starts again on the next call', () async {
+    await store('plugin_a');
+    final source = (await repository(
+      idleTimeout: const Duration(milliseconds: 40),
+    ).loadInstalled()).single;
+    addTearDown(source.dispose);
+
+    await search(source);
+    expect(source.isStarted, isTrue);
+
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(source.isStarted, isFalse);
+
+    final page = await search(source);
+    expect(page.items.single.ref.itemId, 'x');
+    expect(started, 2);
+  });
+
+  test('a fresh install leaves its engine stopped', () async {
+    final source = await repository().installSource(
+      _script,
+      Uri.parse('https://plugins.example/p.js'),
+    );
+    addTearDown(source.dispose);
+
+    // One engine read the plugin's metadata, then was released.
+    expect(started, 1);
+    expect(source.isStarted, isFalse);
+    expect(source.hasLyric, isTrue);
+    expect((await search(source)).items, hasLength(1));
+    expect(started, 2);
   });
 }

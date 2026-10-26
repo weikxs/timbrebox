@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../data/stream_header_proxy.dart';
@@ -24,6 +25,7 @@ final class PluginRepository {
     this.policy = const EgressPolicy(),
     Future<Directory> Function()? pluginsDirectory,
     PluginRuntime Function()? createRuntime,
+    this.idleTimeout = PluginCatalogSource.defaultIdleTimeout,
   }) : _createRuntime = createRuntime ?? PluginRuntime.new,
        // ignore: prefer_initializing_formals
        _pluginsDirectory = pluginsDirectory,
@@ -42,6 +44,9 @@ final class PluginRepository {
   /// Closes the shared stream proxy (the app is shutting down).
   Future<void> dispose() => streamProxy.dispose();
 
+  /// How long a plugin's engine may sit unused before it is shut down.
+  final Duration idleTimeout;
+
   /// Where plugins are stored; defaults to `<appSupport>/plugins`.
   final Future<Directory> Function()? _pluginsDirectory;
   final PluginRuntime Function() _createRuntime;
@@ -57,7 +62,7 @@ final class PluginRepository {
     final urls = _subscriptionUrls(content);
     if (urls == null) {
       // Not a subscription — treat the content as a single plugin script.
-      return [await _installSource(content, uri)];
+      return [await installSource(content, uri)];
     }
     if (urls.isEmpty) {
       throw PluginInstallException(AppStrings.t('plugin.err.emptySubscription'));
@@ -67,7 +72,7 @@ final class PluginRepository {
     for (final pluginUrl in urls) {
       try {
         final source = await _fetch(_normalize(pluginUrl));
-        installed.add(await _installSource(source, _normalize(pluginUrl)));
+        installed.add(await installSource(source, _normalize(pluginUrl)));
       } catch (error) {
         errors.add('$error');
       }
@@ -87,11 +92,14 @@ final class PluginRepository {
     if (sha256.convert(utf8.encode(content)).toString() == manifest.sha256) {
       return null; // Unchanged.
     }
-    return _installSource(content, _normalize(src));
+    return installSource(content, _normalize(src));
   }
 
-  /// Validates a plugin [source], stores it, and returns a live source.
-  Future<PluginCatalogSource> _installSource(String source, Uri origin) async {
+  /// Validates a plugin [source], stores it, and returns its catalog source.
+  /// The engine that read the metadata is released; like a stored plugin,
+  /// the source starts a fresh one on first use.
+  @visibleForTesting
+  Future<PluginCatalogSource> installSource(String source, Uri origin) async {
     final runtime = _createRuntime();
     try {
       await runtime.load(source);
@@ -119,14 +127,20 @@ final class PluginRepository {
       sha256: sha256.convert(utf8.encode(source)).toString(),
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
-    await _store(manifest, source);
-    return PluginCatalogSource(
-      manifest: manifest,
-      runtime: runtime,
-      proxy: streamProxy,
-      policy: policy,
-    );
+    runtime.dispose();
+    final directory = await _store(manifest, source);
+    return _lazySource(manifest, File('${directory.path}/plugin.js'));
   }
+
+  PluginCatalogSource _lazySource(PluginManifest manifest, File script) =>
+      PluginCatalogSource.lazy(
+        manifest: manifest,
+        functions: (manifest.functions ?? const []).toSet(),
+        loadRuntime: () async => _startRuntime(await script.readAsString()),
+        proxy: streamProxy,
+        policy: policy,
+        idleTimeout: idleTimeout,
+      );
 
   /// Returns the plugin URLs in a subscription JSON, or null if [content] is not
   /// a subscription (i.e. it's a plain `.js` script).
@@ -194,15 +208,10 @@ final class PluginRepository {
       final manifest = PluginManifest.fromJson(
         jsonDecode(await manifestFile.readAsString()) as Map<String, Object?>,
       );
-      final functions = manifest.functions;
-      if (functions == null) return await _loadLegacy(manifest, scriptFile);
-      return PluginCatalogSource.lazy(
-        manifest: manifest,
-        functions: functions.toSet(),
-        loadRuntime: () async => _startRuntime(await scriptFile.readAsString()),
-        proxy: streamProxy,
-        policy: policy,
-      );
+      if (manifest.functions == null) {
+        return await _loadLegacy(manifest, scriptFile);
+      }
+      return _lazySource(manifest, scriptFile);
     } catch (_) {
       return null; // A broken stored plugin is skipped.
     }
@@ -216,16 +225,12 @@ final class PluginRepository {
     final recorded = manifest.copyWith(
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
+    runtime.dispose();
     await writeFileAtomically(
       File('${scriptFile.parent.path}/manifest.json'),
       jsonEncode(recorded.toJson()),
     );
-    return PluginCatalogSource(
-      manifest: recorded,
-      runtime: runtime,
-      proxy: streamProxy,
-      policy: policy,
-    );
+    return _lazySource(recorded, scriptFile);
   }
 
   Future<PluginRuntime> _startRuntime(String script) async {
@@ -239,7 +244,7 @@ final class PluginRepository {
     }
   }
 
-  Future<void> _store(PluginManifest manifest, String source) async {
+  Future<Directory> _store(PluginManifest manifest, String source) async {
     final dir = Directory('${(await _pluginsDir()).path}/${manifest.id}');
     await dir.create(recursive: true);
     // Each file is replaced in one step, so a crash mid-install leaves the
@@ -249,6 +254,7 @@ final class PluginRepository {
       File('${dir.path}/manifest.json'),
       jsonEncode(manifest.toJson()),
     );
+    return dir;
   }
 
   Future<Directory> _pluginsDir() async {

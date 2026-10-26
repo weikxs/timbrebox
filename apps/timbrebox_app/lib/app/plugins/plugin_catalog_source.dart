@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
@@ -34,21 +36,26 @@ final class PluginCatalogSource implements CatalogSource {
          loadRuntime: () async => runtime,
          proxy: proxy,
          policy: policy,
+         idleTimeout: null,
        );
 
-  /// Starts the plugin's runtime with [loadRuntime] on first use.
+  /// Starts the plugin's runtime with [loadRuntime] on first use, and shuts
+  /// it down again after [idleTimeout] without a call (the next call starts
+  /// a fresh one).
   PluginCatalogSource.lazy({
     required PluginManifest manifest,
     required Set<String> functions,
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
     EgressPolicy policy = const EgressPolicy(),
+    Duration idleTimeout = defaultIdleTimeout,
   }) : this._(
          manifest: manifest,
          functions: functions,
          loadRuntime: loadRuntime,
          proxy: proxy,
          policy: policy,
+         idleTimeout: idleTimeout,
        );
 
   PluginCatalogSource._({
@@ -57,7 +64,10 @@ final class PluginCatalogSource implements CatalogSource {
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
     required EgressPolicy policy,
+    required Duration? idleTimeout,
   }) : _functions = Set.unmodifiable(functions),
+       // ignore: prefer_initializing_formals
+       _idleTimeout = idleTimeout,
        // ignore: prefer_initializing_formals
        _loadRuntime = loadRuntime,
        _proxy = proxy ?? StreamHeaderProxy(policy: policy),
@@ -80,11 +90,20 @@ final class PluginCatalogSource implements CatalogSource {
       if (runtime.hasFunction(name)) name,
   };
 
+  /// How long an engine may sit unused before it is shut down.
+  static const defaultIdleTimeout = Duration(minutes: 5);
+
   final PluginManifest manifest;
   final Set<String> _functions;
   final Future<PluginRuntime> Function() _loadRuntime;
   Future<PluginRuntime>? _runtime;
   var _disposed = false;
+
+  /// Null keeps the engine for the source's lifetime (a runtime handed to
+  /// the constructor cannot be started again once released).
+  final Duration? _idleTimeout;
+  Timer? _idleTimer;
+  var _activeCalls = 0;
   final StreamHeaderProxy _proxy;
 
   /// False when the proxy is shared (see [PluginRepository.streamProxy]):
@@ -116,8 +135,31 @@ final class PluginCatalogSource implements CatalogSource {
 
   /// Calls a plugin function, starting the runtime first if needed.
   Future<Object?> _call(String function, List<Object?> args) async {
-    final runtime = await _started();
-    return runtime.call(function, args);
+    _idleTimer?.cancel();
+    _activeCalls++;
+    try {
+      final runtime = await _started();
+      return await runtime.call(function, args);
+    } finally {
+      _activeCalls--;
+      _scheduleIdleStop();
+    }
+  }
+
+  void _scheduleIdleStop() {
+    final timeout = _idleTimeout;
+    if (timeout == null || _activeCalls > 0 || _disposed) return;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(timeout, _stopIdleEngine);
+  }
+
+  /// Releases an engine nobody has used for [_idleTimeout]; the metadata,
+  /// search items and charts stay, so the next call simply starts it again.
+  void _stopIdleEngine() {
+    if (_activeCalls > 0) return;
+    final runtime = _runtime;
+    _runtime = null;
+    runtime?.then((engine) => engine.dispose(), onError: (_) {});
   }
 
   Future<PluginRuntime> _started() {
@@ -331,6 +373,7 @@ final class PluginCatalogSource implements CatalogSource {
 
   void dispose() {
     _disposed = true;
+    _idleTimer?.cancel();
     _runtime?.then((runtime) => runtime.dispose(), onError: (_) {});
     if (_ownsProxy) _proxy.dispose();
   }
