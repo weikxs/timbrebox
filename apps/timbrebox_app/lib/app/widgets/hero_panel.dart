@@ -1,6 +1,8 @@
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../design/app_effects.dart';
 import '../design/app_strings.dart';
@@ -510,7 +512,8 @@ String _stripLrcTimestamps(String raw) => raw
     .join('\n');
 
 /// The turntable halo behind the now-playing text. It spins while audio is
-/// playing and freezes in place when paused, like a real record deck.
+/// playing and freezes in place when paused, like a real record deck. It also
+/// stops while the app is not in the foreground.
 class _VinylHalo extends StatefulWidget {
   const _VinylHalo({required this.spinning});
 
@@ -526,18 +529,29 @@ class _VinylHaloState extends State<_VinylHalo>
     vsync: this,
     duration: const Duration(seconds: 14),
   );
+  late final AppLifecycleListener _lifecycle;
 
-  bool get _shouldSpin => widget.spinning && !AppEffects.reduced;
+  bool get _foreground {
+    final state = SchedulerBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
+
+  bool get _shouldSpin => widget.spinning && !AppEffects.reduced && _foreground;
 
   @override
   void initState() {
     super.initState();
-    if (_shouldSpin) _spin.repeat();
+    _lifecycle = AppLifecycleListener(onStateChange: (_) => _syncSpin());
+    _syncSpin();
   }
 
   @override
   void didUpdateWidget(covariant _VinylHalo oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _syncSpin();
+  }
+
+  void _syncSpin() {
     if (_shouldSpin && !_spin.isAnimating) {
       _spin.repeat();
     } else if (!_shouldSpin && _spin.isAnimating) {
@@ -547,19 +561,22 @@ class _VinylHaloState extends State<_VinylHalo>
 
   @override
   void dispose() {
+    _lifecycle.dispose();
     _spin.dispose();
     super.dispose();
   }
 
+  // The painter repaints itself from [_spin] (no rebuild, no relayout of the
+  // panel), and the boundary keeps each frame from repainting the frosted
+  // panel around it.
   @override
   Widget build(BuildContext context) => IgnorePointer(
     child: Align(
       alignment: const Alignment(.85, -.24),
-      child: RotationTransition(
-        turns: _spin,
+      child: RepaintBoundary(
         child: CustomPaint(
           size: const Size.square(218),
-          painter: _VinylPainter(),
+          painter: _VinylPainter(_spin),
         ),
       ),
     ),
@@ -567,12 +584,42 @@ class _VinylHaloState extends State<_VinylHalo>
 }
 
 /// Paints the vinyl record: grooves, a rotating light glint that makes the
-/// spin visible, a gold centre label, and the spindle hole.
+/// spin visible, a gold centre label, and the spindle hole. The record is
+/// recorded once into a picture; each frame only draws it rotated by [turns].
 class _VinylPainter extends CustomPainter {
+  _VinylPainter(this.turns) : super(repaint: turns);
+
+  final Animation<double> turns;
+
   static const _gold = Color(0xffe1b27b);
+
+  /// The recorded record and the size it was recorded at.
+  static (Size, Picture)? _record;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    canvas
+      ..save()
+      ..translate(center.dx, center.dy)
+      ..rotate(turns.value * 2 * pi)
+      ..translate(-center.dx, -center.dy)
+      ..drawPicture(_recordFor(size))
+      ..restore();
+  }
+
+  static Picture _recordFor(Size size) {
+    final cached = _record;
+    if (cached != null && cached.$1 == size) return cached.$2;
+    cached?.$2.dispose();
+    final recorder = PictureRecorder();
+    _drawRecord(Canvas(recorder), size);
+    final picture = recorder.endRecording();
+    _record = (size, picture);
+    return picture;
+  }
+
+  static void _drawRecord(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2;
 
@@ -628,7 +675,7 @@ class _VinylPainter extends CustomPainter {
   }
 
   /// Draws a music note glyph as the record's centre label art.
-  void _paintNote(Canvas canvas, Offset center, double labelRadius) {
+  static void _paintNote(Canvas canvas, Offset center, double labelRadius) {
     const note = Icons.music_note_rounded;
     final painter = TextPainter(
       text: TextSpan(
@@ -646,8 +693,9 @@ class _VinylPainter extends CustomPainter {
       canvas,
       center - Offset(painter.width / 2, painter.height / 2),
     );
+    painter.dispose();
   }
 
   @override
-  bool shouldRepaint(_VinylPainter oldDelegate) => false;
+  bool shouldRepaint(_VinylPainter oldDelegate) => oldDelegate.turns != turns;
 }
