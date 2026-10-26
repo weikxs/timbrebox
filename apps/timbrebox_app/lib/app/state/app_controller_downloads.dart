@@ -40,6 +40,7 @@ extension AppControllerDownloads on AppController {
 
   Future<void> _download(CatalogTrack track) async {
     final key = track.ref.toString();
+    _rememberResolveHint(track);
     try {
       final file = await _downloadService!.download(track);
       _downloadPaths[key] = file.path;

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:timbrebox_core/timbrebox_core.dart';
 
@@ -23,7 +24,8 @@ import 'plugin_stream_url.dart';
 /// ([PluginCatalogSource.lazy]), so installed plugins cost nothing at launch
 /// and disabled ones never start; capabilities come from the functions
 /// recorded in the manifest, never from evaluating JS on a read.
-final class PluginCatalogSource implements CatalogSource {
+final class PluginCatalogSource
+    implements CatalogSource, HintedCatalogSource {
   /// Wraps an already loaded [runtime] (a fresh install).
   PluginCatalogSource({
     required PluginManifest manifest,
@@ -228,7 +230,14 @@ final class PluginCatalogSource implements CatalogSource {
     duration: summary.duration ?? Duration.zero,
     quality: AppStrings.t('plugin.src.qualityFmt').replaceFirst('{p}', manifest.platform),
     artworkUrl: _artwork[summary.ref.itemId],
+    resolveHint: pluginResolveHint(_items[summary.ref.itemId]),
   );
+
+  @override
+  void rememberHint(String itemId, Map<String, Object?> hint) {
+    final item = hint['item'];
+    if (item is Map) _items.putIfAbsent(itemId, () => Map.of(item.cast()));
+  }
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
@@ -407,3 +416,42 @@ class PluginTopListItem {
   final String title;
   final String? cover;
 }
+
+/// The largest plugin item kept as a resolve hint, in JSON characters.
+const _maxHintChars = 8 * 1024;
+
+/// Field names that may hold credentials a plugin put into its items.
+final _secretKey = RegExp(
+  'token|cookie|auth|secret|session|passw|sign|key',
+  caseSensitive: false,
+);
+
+/// [item] (what the plugin's `getMediaSource` gets back) as a resolve hint:
+/// without URLs (stream or artwork, which expire or are not needed) and
+/// without fields that look like credentials. Null when nothing remains or
+/// the item is too large to keep.
+Map<String, Object?>? pluginResolveHint(Map<String, Object?>? item) {
+  if (item == null) return null;
+  final kept = _withoutUrlsOrSecrets(item);
+  if (kept is! Map<String, Object?> || kept.isEmpty) return null;
+  final hint = {'item': kept};
+  return jsonEncode(hint).length > _maxHintChars ? null : hint;
+}
+
+Object? _withoutUrlsOrSecrets(Object? value) => switch (value) {
+  final Map<Object?, Object?> map => <String, Object?>{
+    for (final MapEntry(:key, :value) in map.entries)
+      if (!_secretKey.hasMatch('$key') && !'$key'.toLowerCase().contains('url'))
+        if (_withoutUrlsOrSecrets(value) case final kept? when !_isUrl(value))
+          '$key': kept,
+  },
+  final List<Object?> list => [
+    for (final entry in list)
+      if (!_isUrl(entry)) _withoutUrlsOrSecrets(entry),
+  ],
+  _ => value,
+};
+
+bool _isUrl(Object? value) =>
+    value is String &&
+    (value.startsWith('http://') || value.startsWith('https://'));

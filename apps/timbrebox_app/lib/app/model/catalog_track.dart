@@ -14,6 +14,7 @@ class CatalogTrack {
     required this.quality,
     this.album,
     this.artworkUrl,
+    this.resolveHint,
   });
 
   final String id;
@@ -29,6 +30,12 @@ class CatalogTrack {
   /// sources without artwork; the UI then shows a derived placeholder.
   final String? artworkUrl;
 
+  /// What a source needs to resolve this track again after a restart, when
+  /// it resolves from state kept in memory since a search (a plugin's item
+  /// minus its URLs, a short video's page). Never a stream URL, header,
+  /// token or cookie. Null for sources that resolve from the id alone.
+  final Map<String, Object?>? resolveHint;
+
   Map<String, Object?> toJson() => {
     'id': id,
     'title': title,
@@ -39,6 +46,7 @@ class CatalogTrack {
     'quality': quality,
     'album': album,
     'artworkUrl': artworkUrl,
+    if (resolveHint != null) 'resolveHint': resolveHint,
   };
 
   factory CatalogTrack.fromJson(Map<String, Object?> json) => CatalogTrack(
@@ -51,6 +59,10 @@ class CatalogTrack {
     quality: json['quality'] as String? ?? '',
     album: json['album'] as String?,
     artworkUrl: json['artworkUrl'] as String?,
+    resolveHint: switch (json['resolveHint']) {
+      final Map<String, Object?> hint => hint,
+      _ => null,
+    },
   );
 
   MediaRef get ref => MediaRef(sourceId: sourceId, itemId: id);

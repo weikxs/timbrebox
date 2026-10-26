@@ -3,10 +3,14 @@
 library;
 
 const moreZhStrings = <String, String>{
+  // player
+  'player.searchAgain': '重新搜索',
   // plugins
   'plugin.skippedFmt': '有插件无法加载，已跳过：{ids}。文件可能已损坏，请从原链接重新安装。',
   'plugin.updatedSomeFailedFmt': '更新了 {n} 个插件；以下插件检查失败：{names}',
   'plugin.runtime.timeout': '插件脚本运行过久，已被终止。',
+  // sources
+  'source.radio.badResponse': 'Radio Browser 返回了无法识别的目录结果。',
   // playback engine
   'stream.err.resolveTimeout': '获取播放地址超时，请重试。',
   'stream.err.notLoaded': '播放前必须先解析音频流。',
@@ -15,6 +19,8 @@ const moreZhStrings = <String, String>{
 };
 
 const moreEnStrings = <String, String>{
+  // player
+  'player.searchAgain': 'Search again',
   // plugins
   'plugin.skippedFmt':
       'Some plugins could not be loaded and were skipped: {ids}. Their files '
@@ -22,6 +28,9 @@ const moreEnStrings = <String, String>{
   'plugin.updatedSomeFailedFmt':
       'Updated {n} plugin(s); these could not be checked: {names}',
   'plugin.runtime.timeout': 'The plugin script ran too long and was stopped.',
+  // sources
+  'source.radio.badResponse':
+      'Radio Browser returned a directory response it could not read.',
   // playback engine
   'stream.err.resolveTimeout': 'Getting the stream took too long — try again.',
   'stream.err.notLoaded': 'The audio stream must be resolved before playing.',

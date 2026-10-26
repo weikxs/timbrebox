@@ -221,4 +221,13 @@ extension AppControllerSearch on AppController {
       _notify();
     }
   }
+
+  /// Searches for the current track by title and artist: the way back when
+  /// a saved track no longer resolves (its source forgot it, or the item is
+  /// gone).
+  Future<void> searchAgainForCurrent() async {
+    final track = _currentTrack;
+    if (track == null) return;
+    await search('${track.title} ${track.artist}'.trim());
+  }
 }

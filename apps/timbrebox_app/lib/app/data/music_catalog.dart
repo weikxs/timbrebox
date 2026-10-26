@@ -32,6 +32,12 @@ abstract interface class ResolvableMusicCatalog {
   StreamResolver get streamResolver;
 }
 
+/// Hands a saved track's [CatalogTrack.resolveHint] back to its source (see
+/// [HintedCatalogSource]) before it is played or downloaded.
+abstract interface class ResolveHintCatalog {
+  void rememberResolveHint(CatalogTrack track);
+}
+
 /// Lets sources (e.g. installed plugins) be added or removed at runtime.
 abstract interface class MutableMusicCatalog {
   void registerSource(CatalogSource source);
@@ -85,6 +91,7 @@ class BuiltInMusicCatalog
         PagedMusicCatalog,
         ChartMusicCatalog,
         ResolvableMusicCatalog,
+        ResolveHintCatalog,
         MutableMusicCatalog {
   BuiltInMusicCatalog(Iterable<CatalogSource> sources)
     : _sources = {for (final source in sources) source.descriptor.id: source},
@@ -111,6 +118,15 @@ class BuiltInMusicCatalog
 
   @override
   StreamResolver get streamResolver => _CatalogStreamResolver(_sources);
+
+  @override
+  void rememberResolveHint(CatalogTrack track) {
+    final hint = track.resolveHint;
+    final source = _sources[track.sourceId];
+    if (hint != null && source is HintedCatalogSource) {
+      (source as HintedCatalogSource).rememberHint(track.id, hint);
+    }
+  }
 
   @override
   void registerSource(CatalogSource source) {
@@ -495,7 +511,10 @@ class RadioBrowserCatalogSource implements CatalogSource {
     if (request.ref.sourceId != descriptor.id) {
       throw StateError('音源引用与解析器不匹配。');
     }
-    final value = _streams[request.ref.itemId];
+    // After a restart nothing was searched yet: look the station up by id.
+    final value =
+        _streams[request.ref.itemId] ??
+        await _lookUpStation(request.ref.itemId, request.cancellation);
     final uri = Uri.tryParse(value ?? '');
     if (uri == null || !{'https', 'http'}.contains(uri.scheme)) {
       throw const SourceException(
@@ -505,6 +524,27 @@ class RadioBrowserCatalogSource implements CatalogSource {
       );
     }
     return ResolvedStream(uri: uri);
+  }
+
+  /// The station's current stream address, by its id, or null when the
+  /// directory no longer lists it.
+  Future<String?> _lookUpStation(
+    String id,
+    CancellationToken cancellation,
+  ) async {
+    final uri = BuiltInSourceConfig.radioBrowser.uri(
+      'station',
+      pathValues: {'id': id},
+    );
+    final data = _decodeJson(
+      await _readJson(uri, cancellation),
+      message: AppStrings.t('source.radio.badResponse'),
+    );
+    if (data is! List) return null;
+    for (final entry in data) {
+      if (_summaryFrom(entry)?.ref.itemId == id) return _streams[id];
+    }
+    return null;
   }
 
   TrackSummary? _summaryFrom(Object? entry) {

@@ -378,6 +378,7 @@ class AppController extends ChangeNotifier {
             id: Uri.file(path).toString(),
             label: 'offline',
           );
+    _rememberResolveHint(track);
     DiagnosticLog.record('play ${track.sourceName}: ${track.title}');
     final generation = ++_playGeneration;
     final startAt = resumeTo != null && resumeTo > Duration.zero
@@ -401,6 +402,15 @@ class AppController extends ChangeNotifier {
     }
     _persistSession();
     notifyListeners();
+  }
+
+  /// A track saved before a restart resolves from its hint (see
+  /// [CatalogTrack.resolveHint]); its source has not seen it in a search.
+  void _rememberResolveHint(CatalogTrack track) {
+    final catalog = _catalog;
+    if (track.resolveHint != null && catalog is ResolveHintCatalog) {
+      (catalog as ResolveHintCatalog).rememberResolveHint(track);
+    }
   }
 
   Future<void> togglePlayback() async {

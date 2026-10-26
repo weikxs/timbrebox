@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
@@ -302,11 +303,28 @@ class _QueueDesk extends StatelessWidget {
           ),
           if (controller.playbackError != null) ...[
             const SizedBox(height: 8),
-            Text(
-              controller.playbackError!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: TimbreColors.gold, fontSize: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    controller.playbackError!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: TimbreColors.gold, fontSize: 10),
+                  ),
+                ),
+                // The way back when a saved track no longer resolves.
+                TextButton(
+                  onPressed: () {
+                    unawaited(controller.searchAgainForCurrent());
+                    onOpenSearch();
+                  },
+                  child: Text(
+                    AppStrings.t('player.searchAgain'),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
             ),
           ],
         ],

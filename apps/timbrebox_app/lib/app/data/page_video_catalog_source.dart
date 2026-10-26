@@ -17,6 +17,10 @@ final class DouyinCatalogSource extends _PageVideoCatalogSource {
     pathValues: {'query': query},
     query: const {'type': 'general'},
   );
+
+  @override
+  Uri pageUri(String id, {String? handle}) =>
+      endpoint.uri('video', pathValues: {'id': id});
 }
 
 /// TikTok's public web search page uses the same page-state approach. It is
@@ -33,9 +37,14 @@ final class TikTokCatalogSource extends _PageVideoCatalogSource {
   @override
   Uri searchUri(String query) =>
       endpoint.uri('search', query: {'q': query, 'lang': 'en'});
+
+  @override
+  Uri pageUri(String id, {String? handle}) =>
+      endpoint.uri('video', pathValues: {'author': handle ?? '', 'id': id});
 }
 
-abstract base class _PageVideoCatalogSource implements CatalogSource {
+abstract base class _PageVideoCatalogSource
+    implements CatalogSource, HintedCatalogSource {
   _PageVideoCatalogSource({
     required this.http,
     required this.id,
@@ -50,6 +59,9 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
   final SourceEndpoint endpoint;
   final String referer;
   final Map<String, _PageVideoRecord> _records = <String, _PageVideoRecord>{};
+
+  /// Video pages of saved tracks, from their resolve hints.
+  final Map<String, Uri> _pages = <String, Uri>{};
   late final SourceHttpClient _client = http ?? SourceHttpClient();
 
   @override
@@ -60,6 +72,10 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
   );
 
   Uri searchUri(String query);
+
+  /// The public page of video [id] (by its author's [handle] where the
+  /// site's URL needs one).
+  Uri pageUri(String id, {String? handle});
 
   @override
   Future<SearchPage> search(SearchRequest request) async {
@@ -104,7 +120,39 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
     sourceName: name,
     duration: summary.duration ?? Duration.zero,
     quality: '$name public stream',
+    resolveHint: {
+      'page': pageUri(
+        summary.ref.itemId,
+        handle: _records[summary.ref.itemId]?.handle,
+      ).toString(),
+    },
   );
+
+  @override
+  void rememberHint(String itemId, Map<String, Object?> hint) {
+    final page = Uri.tryParse('${hint['page']}');
+    // Only this source's own site: the hint is read back from a file.
+    if (page != null && page.scheme == 'https' && page.host == endpoint.host) {
+      _pages[itemId] = page;
+    }
+  }
+
+  /// Reads the record for [id] from its video page (a saved track after a
+  /// restart, when no search has filled [_records]).
+  Future<_PageVideoRecord?> _recordFromPage(
+    String id,
+    CancellationToken cancellation,
+  ) async {
+    final text = await _client.get(
+      _pages[id] ?? pageUri(id),
+      cancellation,
+      headers: {'Referer': referer},
+    );
+    for (final record in await _parsePage(text, sourceId: this.id)) {
+      if (record.id == id) return _records[id] = record;
+    }
+    return null;
+  }
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
@@ -112,7 +160,9 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
     if (request.ref.sourceId != id) {
       throw StateError('音源引用与解析器不匹配。');
     }
-    final record = _records[request.ref.itemId];
+    final record =
+        _records[request.ref.itemId] ??
+        await _recordFromPage(request.ref.itemId, request.cancellation);
     final uri = Uri.tryParse(record?.streamUrl ?? '');
     if (uri == null || uri.scheme != 'https') {
       throw const SourceException(
@@ -136,6 +186,7 @@ final class _PageVideoRecord {
     required this.artist,
     required this.streamUrl,
     this.duration,
+    this.handle,
   });
 
   final String id;
@@ -143,6 +194,9 @@ final class _PageVideoRecord {
   final String artist;
   final String? streamUrl;
   final Duration? duration;
+
+  /// The author's account name, where the page URL needs it (TikTok).
+  final String? handle;
 }
 
 /// Pages above this size are parsed on a background isolate: decoding up to
@@ -226,7 +280,12 @@ _PageVideoRecord? _recordFromMap(
   final durationNumber = durationValue is num ? durationValue.round() : null;
   final streamUrl = _streamUrl(media);
   if (streamUrl == null) return null;
+  final owner = _firstValue(map, const ['author']);
+  final handle = owner is Map
+      ? _firstText(owner, const ['uniqueId', 'unique_id'])
+      : null;
   return _PageVideoRecord(
+    handle: handle?.trim().isNotEmpty == true ? handle!.trim() : null,
     id: id,
     title: _stripHtml(title).trim(),
     artist: author?.trim().isNotEmpty == true ? author!.trim() : sourceId,
