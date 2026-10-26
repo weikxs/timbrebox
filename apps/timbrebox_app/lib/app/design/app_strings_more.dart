@@ -11,6 +11,7 @@ const moreZhStrings = <String, String>{
   'stream.err.resolveTimeout': '获取播放地址超时，请重试。',
   'stream.err.notLoaded': '播放前必须先解析音频流。',
   'stream.err.engineReleased': '音频引擎已经释放。',
+  'stream.err.backendReleased': '音频后端已经释放。',
 };
 
 const moreEnStrings = <String, String>{
@@ -25,4 +26,5 @@ const moreEnStrings = <String, String>{
   'stream.err.resolveTimeout': 'Getting the stream took too long — try again.',
   'stream.err.notLoaded': 'The audio stream must be resolved before playing.',
   'stream.err.engineReleased': 'The audio engine has been released.',
+  'stream.err.backendReleased': 'The audio backend has been released.',
 };

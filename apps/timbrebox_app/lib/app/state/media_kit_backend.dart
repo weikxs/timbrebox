@@ -2,19 +2,45 @@ import 'dart:async';
 
 import 'package:media_kit/media_kit.dart';
 
+import '../design/app_strings.dart';
 import 'audio_source.dart';
 import 'player_backend.dart';
 
 /// libmpv-backed audio backend (media_kit). mpv streams DASH/fragmented audio
-/// (YouTube) and remote URLs with request headers natively, so no loopback relay
-/// or file buffering is needed.
+/// (YouTube) and remote URLs with request headers natively.
 final class MediaKitBackend
     implements
         AudioBackend,
         ProgressAudioBackend,
         RateAudioBackend,
         StartPositionAudioBackend {
-  MediaKitBackend({Player? player}) : _player = player ?? Player();
+  MediaKitBackend({Player? player})
+    : _player = player ?? Player(configuration: configuration) {
+    final native = _player.platform;
+    if (native is NativePlayer) {
+      for (final MapEntry(:key, :value) in mpvProperties.entries) {
+        unawaited(native.setProperty(key, value));
+      }
+    }
+  }
+
+  /// Audio-only libmpv: an 8 MB demuxer cache instead of media_kit's 32 MB
+  /// (sized for video), and no video output. Video decoding stays off too:
+  /// media_kit opens with `vid=no` until a video view attaches, and none
+  /// does, so Douyin / TikTok MP4s play their audio track only.
+  static const configuration = PlayerConfiguration(
+    bufferSize: 8 * 1024 * 1024,
+    vo: 'null',
+  );
+
+  /// Set right after the player is created. media_kit keeps as much behind
+  /// the playhead as ahead of it; a music player seeks back rarely, so 2 MB
+  /// is plenty. `vid=no` is stated here as well rather than left to
+  /// media_kit's default.
+  static const mpvProperties = {
+    'demuxer-max-back-bytes': '${2 * 1024 * 1024}',
+    'vid': 'no',
+  };
 
   final Player _player;
   var _disposed = false;
@@ -98,6 +124,6 @@ final class MediaKitBackend
   }
 
   void _ensureLive() {
-    if (_disposed) throw StateError('音频后端已经释放。');
+    if (_disposed) throw StateError(AppStrings.t('stream.err.backendReleased'));
   }
 }
