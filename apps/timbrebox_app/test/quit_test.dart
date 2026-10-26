@@ -34,6 +34,8 @@ void main() {
     final exited = Completer<int>();
     final server = PlayerControlServer(
       controller,
+      // Never the real ~/.timbrebox/control.json, whatever quit() touches.
+      endpointFile: File('${root.path}/control.json'),
       exit: (code) {
         events.add('exit');
         exited.complete(code);
