@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'data/music_catalog.dart';
 import 'design/app_themes.dart';
 import 'design/timbre_colors.dart';
+import 'plugins/plugin_platform.dart';
 import 'plugins/plugin_repository.dart';
 import 'shell_page.dart';
 import 'widgets/player_hotkeys.dart';
@@ -50,7 +51,8 @@ class _TimbreBoxAppState extends State<TimbreBoxApp>
         appearanceStore: AppearanceStore(),
         mediaControls: createSystemMediaControls(),
         routeMonitor: _createRouteMonitor(),
-        pluginRepository: PluginRepository(),
+        // No repository on mobile: plugin code is never fetched or run there.
+        pluginRepository: pluginsAllowedHere ? PluginRepository() : null,
         settingsStore: SettingsStore(),
         sessionStore: FileSessionStore(),
         favoritesStore: FileFavoritesStore(),
