@@ -30,6 +30,11 @@ import 'session_store.dart';
 import 'settings_store.dart';
 import 'system_media_controls.dart';
 
+part 'app_controller_downloads.dart';
+part 'app_controller_playlists.dart';
+part 'app_controller_plugins.dart';
+part 'app_controller_search.dart';
+
 class AppController extends ChangeNotifier {
   AppController({
     required PlayerEngine engine,
@@ -148,6 +153,8 @@ class AppController extends ChangeNotifier {
   List<Playlist> _playlists = [];
   final List<PluginManifest> _plugins = [];
   final Map<String, PluginCatalogSource> _pluginSources = {};
+  final List<PluginTopListItem> _pluginTopLists = [];
+  var _pluginTopListsLoaded = false;
   late final PlayerControlServer _controlServer = PlayerControlServer(this);
   // On by default (loopback + per-session token); a saved preference overrides.
   var _agentControl = true;
@@ -218,6 +225,8 @@ class AppController extends ChangeNotifier {
   set _position(Duration value) => _positionNotifier.value = value;
   var _playbackDuration = Duration.zero;
   CancellationToken? _searchCancellation;
+  static const _loadMoreCooldown = Duration(seconds: 15);
+  final Map<String, DateTime> _loadMoreRetryAt = {};
 
   List<CatalogTrack> get searchResults => List.unmodifiable(_results);
   List<CatalogTrack> searchResultsFor(String sourceId) {
@@ -503,157 +512,6 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- Plugins (third-party sources installed from a GitHub URL) ----
-
-  List<PluginManifest> get plugins => List.unmodifiable(_plugins);
-  bool get supportsPlugins =>
-      _pluginRepository != null && _catalog is MutableMusicCatalog;
-
-  final List<PluginTopListItem> _pluginTopLists = [];
-  var _pluginTopListsLoaded = false;
-  List<PluginTopListItem> get pluginTopLists =>
-      List.unmodifiable(_pluginTopLists);
-
-  /// Aggregates every enabled plugin's charts (`getTopLists`) for the hot library.
-  Future<void> loadPluginTopLists({bool force = false}) async {
-    if (_pluginTopListsLoaded && !force) return;
-    _pluginTopListsLoaded = true;
-    final all = <PluginTopListItem>[];
-    // Snapshot before awaiting so install/remove mid-load can't throw a
-    // ConcurrentModificationError.
-    for (final entry in _pluginSources.entries.toList()) {
-      if (!sourceEnabled(entry.key)) continue;
-      try {
-        all.addAll(await entry.value.topLists());
-      } catch (error) {
-        DiagnosticLog.record('plugin ${entry.key} top lists failed: $error');
-      }
-    }
-    _pluginTopLists
-      ..clear()
-      ..addAll(all);
-    notifyListeners();
-  }
-
-  /// Plugins were restored, installed, updated, removed or switched on/off:
-  /// charts already shown must reflect that (ones not shown yet load when
-  /// the hot library opens).
-  void _pluginsChanged() {
-    if (!_pluginTopListsLoaded) return;
-    unawaited(loadPluginTopLists(force: true));
-  }
-
-  bool get currentTrackHasLyric {
-    final track = _currentTrack;
-    if (track == null) return false;
-    final source = _pluginSources[track.sourceId];
-    return source != null && source.hasLyric;
-  }
-
-  /// The current track's lyric text, if it comes from a plugin providing one.
-  Future<String?> currentLyric() async {
-    final track = _currentTrack;
-    if (track == null) return null;
-    final source = _pluginSources[track.sourceId];
-    if (source == null || !source.hasLyric) return null;
-    return source.lyric(track.id);
-  }
-
-  Future<void> _restorePlugins() async {
-    final repository = _pluginRepository;
-    final catalog = _catalog;
-    if (repository == null || catalog is! MutableMusicCatalog) return;
-    final mutable = catalog as MutableMusicCatalog;
-    final sources = await repository.loadInstalled();
-    for (final source in sources) {
-      _adoptSource(mutable, source, enabledDefault: source.manifest.enabled);
-    }
-    if (sources.isNotEmpty) {
-      _pluginsChanged();
-      notifyListeners();
-    }
-  }
-
-  /// Registers [source] (replacing any prior one with the same id, disposing it)
-  /// and tracks its manifest + enabled state. A track playing from the old
-  /// source keeps playing: its stream lives in the repository's shared proxy.
-  void _adoptSource(
-    MutableMusicCatalog mutable,
-    PluginCatalogSource source, {
-    bool enabledDefault = true,
-  }) {
-    final id = source.manifest.id;
-    _pluginSources.remove(id)?.dispose();
-    mutable.registerSource(source);
-    _pluginSources[id] = source;
-    _plugins.removeWhere((manifest) => manifest.id == id);
-    _plugins.add(source.manifest);
-    if (enabledDefault) {
-      _enabledSources.add(id);
-    } else {
-      _catalog.setEnabled(id, false);
-    }
-  }
-
-  /// Installs from a raw plugin `.js` URL or a subscription JSON URL. Returns
-  /// how many plugins were installed. Throws on failure.
-  Future<int> installPluginFromUrl(String url) async {
-    final repository = _pluginRepository;
-    final catalog = _catalog;
-    if (repository == null || catalog is! MutableMusicCatalog) {
-      throw PluginInstallException(AppStrings.t('plugin.err.unsupportedPlatform'));
-    }
-    final mutable = catalog as MutableMusicCatalog;
-    final sources = await repository.installFromUrl(url);
-    for (final source in sources) {
-      _adoptSource(mutable, source);
-    }
-    _pluginsChanged();
-    notifyListeners();
-    return sources.length;
-  }
-
-  /// Re-fetches every plugin from its srcUrl; returns how many were updated.
-  Future<int> updatePlugins() async {
-    final repository = _pluginRepository;
-    final catalog = _catalog;
-    if (repository == null || catalog is! MutableMusicCatalog) return 0;
-    final mutable = catalog as MutableMusicCatalog;
-    var updated = 0;
-    for (final manifest in List.of(_plugins)) {
-      try {
-        final fresh = await repository.update(manifest);
-        if (fresh == null) continue;
-        _adoptSource(
-          mutable,
-          fresh,
-          enabledDefault: _enabledSources.contains(manifest.id),
-        );
-        updated++;
-      } catch (_) {
-        // A single failed update must not abort the rest.
-      }
-    }
-    if (updated > 0) {
-      _pluginsChanged();
-      notifyListeners();
-    }
-    return updated;
-  }
-
-  Future<void> removePlugin(String id) async {
-    await _pluginRepository?.remove(id);
-    final catalog = _catalog;
-    if (catalog is MutableMusicCatalog) {
-      (catalog as MutableMusicCatalog).unregisterSource(id);
-    }
-    _pluginSources.remove(id)?.dispose();
-    _enabledSources.remove(id);
-    _plugins.removeWhere((manifest) => manifest.id == id);
-    _pluginsChanged();
-    notifyListeners();
-  }
-
   // ---- Appearance: built-in themes + optional custom skin ----
 
   String get themeId => _themeId;
@@ -728,95 +586,6 @@ class AppController extends ChangeNotifier {
 
   Future<void> _persistFavorites() async =>
       _favoritesStore?.save(favorites);
-
-  void toggleDownload(CatalogTrack track) {
-    final key = track.ref.toString();
-    _knownTracks[key] = track;
-    if (_downloadService == null) {
-      _downloads.contains(key) ? _downloads.remove(key) : _downloads.add(key);
-      notifyListeners();
-      return;
-    }
-    if (_downloading.contains(key)) return;
-    if (_downloadPaths.containsKey(key)) {
-      final removedPath = _downloadPaths.remove(key);
-      _downloads.remove(key);
-      notifyListeners();
-      unawaited(_deleteLocalFile(removedPath));
-      unawaited(_persistLibrary());
-      return;
-    }
-    _downloadErrors.remove(key);
-    _downloading.add(key);
-    notifyListeners();
-    unawaited(_download(track));
-  }
-
-  /// Removes every downloaded track and deletes its local file.
-  void clearDownloads() {
-    final keys = _downloads.toList();
-    if (keys.isEmpty) return;
-    for (final key in keys) {
-      final path = _downloadPaths.remove(key);
-      _downloads.remove(key);
-      unawaited(_deleteLocalFile(path));
-    }
-    notifyListeners();
-    unawaited(_persistLibrary());
-  }
-
-  Future<void> _download(CatalogTrack track) async {
-    final key = track.ref.toString();
-    try {
-      final file = await _downloadService!.download(track);
-      _downloadPaths[key] = file.path;
-      _downloads.add(key);
-      unawaited(_persistLibrary());
-    } catch (error) {
-      _downloadErrors[key] = _friendlyDownloadError(error);
-    } finally {
-      _downloading.remove(key);
-      notifyListeners();
-    }
-  }
-
-  /// Rebuilds the local-music library from the persisted index so downloaded
-  /// files keep playing straight from disk after a restart, with no network.
-  Future<void> _restoreLibrary() async {
-    final store = _downloadStore;
-    if (store == null) return;
-    final entries = await store.load();
-    if (entries.isEmpty) return;
-    for (final entry in entries) {
-      final key = entry.ref.toString();
-      _knownTracks[key] = entry.track;
-      _downloadPaths[key] = entry.path;
-      _downloads.add(key);
-    }
-    notifyListeners();
-  }
-
-  Future<void> _persistLibrary() async {
-    final store = _downloadStore;
-    if (store == null) return;
-    final entries = <DownloadedEntry>[
-      for (final key in _downloads)
-        if (_downloadPaths[key] != null && _knownTracks[key] != null)
-          DownloadedEntry(track: _knownTracks[key]!, path: _downloadPaths[key]!),
-    ];
-    await store.save(entries);
-  }
-
-  Future<void> _deleteLocalFile(String? path) async {
-    if (path == null) return;
-    try {
-      final file = File(path);
-      if (await file.exists()) await file.delete();
-    } on FileSystemException {
-      // Best-effort cleanup: a missing or locked file must not surface as an
-      // error in the library UI.
-    }
-  }
 
   Future<void> seek(Duration position) async {
     if (_playerEngine is! PlaybackProgressEvents) return;
@@ -999,313 +768,6 @@ class AppController extends ChangeNotifier {
     _searchHistory.clear();
     unawaited(_searchHistoryStore?.save(_searchHistory));
     notifyListeners();
-  }
-
-  // ---- User playlists ----
-
-  List<Playlist> get playlists => List.unmodifiable(_playlists);
-
-  Future<void> _restorePlaylists() async {
-    final store = _playlistStore;
-    if (store == null) return;
-    final saved = await store.load();
-    if (saved.isEmpty) return;
-    _playlists = saved;
-    notifyListeners();
-  }
-
-  /// Creates a playlist (optionally seeded with one track) and returns its id.
-  String createPlaylist(String name, {CatalogTrack? seed}) {
-    final id =
-        'pl-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 20)}';
-    _playlists = [
-      ..._playlists,
-      Playlist(id: id, name: name.trim(), tracks: [?seed]),
-    ];
-    _persistPlaylists();
-    notifyListeners();
-    return id;
-  }
-
-  /// Creates a playlist from the current play queue and returns its id.
-  String saveQueueAsPlaylist(String name) {
-    final id =
-        'pl-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 20)}';
-    _playlists = [
-      ..._playlists,
-      Playlist(id: id, name: name.trim(), tracks: List.of(queue)),
-    ];
-    _persistPlaylists();
-    notifyListeners();
-    return id;
-  }
-
-  void renamePlaylist(String id, String name) {
-    _updatePlaylist(id, (playlist) => playlist.copyWith(name: name.trim()));
-  }
-
-  void deletePlaylist(String id) {
-    _playlists = _playlists.where((playlist) => playlist.id != id).toList();
-    _persistPlaylists();
-    notifyListeners();
-  }
-
-  /// Adds [track] to the playlist (no-op if already present).
-  void addToPlaylist(String id, CatalogTrack track) {
-    _updatePlaylist(id, (playlist) {
-      if (playlist.tracks.any((t) => t.ref == track.ref)) return playlist;
-      return playlist.copyWith(tracks: [...playlist.tracks, track]);
-    });
-  }
-
-  void removeFromPlaylist(String id, MediaRef ref) {
-    _updatePlaylist(
-      id,
-      (playlist) => playlist.copyWith(
-        tracks: playlist.tracks.where((t) => t.ref != ref).toList(),
-      ),
-    );
-  }
-
-  Future<void> playPlaylist(String id) async {
-    final playlist = _playlists.firstWhere(
-      (p) => p.id == id,
-      orElse: () => const Playlist(id: '', name: ''),
-    );
-    if (playlist.tracks.isNotEmpty) await playAll(playlist.tracks);
-  }
-
-  void _updatePlaylist(String id, Playlist Function(Playlist) update) {
-    _playlists = [
-      for (final playlist in _playlists)
-        if (playlist.id == id) update(playlist) else playlist,
-    ];
-    _persistPlaylists();
-    notifyListeners();
-  }
-
-  void _persistPlaylists() => unawaited(_playlistStore?.save(_playlists));
-
-  Future<void> search(String value) async {
-    _query = value.trim();
-    if (_query.isNotEmpty) _recordSearch(_query);
-    final generation = ++_searchGeneration;
-    _searchCancellation?.cancel();
-    _searchCancellation = null;
-    _loadMoreCancellation?.cancel();
-    _loadMoreCancellation = null;
-    _resetPaging();
-    if (_query.isEmpty) {
-      _results = [];
-      _searchBatch = null;
-      _searchError = null;
-      _isSearching = false;
-      notifyListeners();
-      return;
-    }
-    final cancellation = CancellationToken();
-    _searchCancellation = cancellation;
-    if (_enabledSources.isEmpty) {
-      _results = [];
-      _searchBatch = null;
-      _searchError = AppStrings.t('search.noSources');
-      _isSearching = false;
-      notifyListeners();
-      return;
-    }
-    _isSearching = true;
-    _searchError = null;
-    notifyListeners();
-    try {
-      final groupedCatalog = _catalog is GroupedMusicCatalog
-          ? _catalog as GroupedMusicCatalog
-          : null;
-      if (groupedCatalog != null) {
-        // Results show per source as each one finishes; the previous query's
-        // results are gone from the start so the two never mix.
-        _searchBatch = CatalogSearchBatch(query: _query, groups: const []);
-        _results = [];
-        await for (final batch in groupedCatalog.searchGrouped(
-          _query,
-          cancellation: cancellation,
-        )) {
-          if (generation != _searchGeneration) return;
-          _searchBatch = batch;
-          _results = batch.tracks;
-          _initPagingFromBatch(batch);
-          for (final track in _results) {
-            _knownTracks[track.ref.toString()] = track;
-          }
-          notifyListeners();
-        }
-        if (generation != _searchGeneration) return;
-        _searchError = _globalSearchError(_searchBatch!);
-      } else {
-        final results = await _catalog.search(
-          _query,
-          cancellation: cancellation,
-        );
-        if (generation != _searchGeneration) return;
-        _searchBatch = null;
-        _results = results;
-        _searchError = null;
-        for (final track in results) {
-          _knownTracks[track.ref.toString()] = track;
-        }
-      }
-    } on MusicCatalogException catch (error) {
-      if (generation != _searchGeneration) return;
-      _results = [];
-      _searchBatch = null;
-      _searchError = error.message;
-    } catch (_) {
-      if (generation != _searchGeneration) return;
-      _results = [];
-      _searchBatch = null;
-      _searchError = AppStrings.t('search.unavailable');
-    } finally {
-      if (generation == _searchGeneration) {
-        _isSearching = false;
-        notifyListeners();
-      }
-    }
-  }
-
-  /// Loads the next page for a single source (the selected tab) and appends any
-  /// new tracks. Sources without real pagination return an empty page, which
-  /// marks them exhausted so the list stops asking.
-  Future<void> loadMore(String sourceId) async {
-    if (_query.isEmpty) return;
-    if (!hasMoreResults(sourceId)) return;
-    if (_loadingMore.contains(sourceId)) return;
-    // After a failure, wait before asking again: the list asks for more on
-    // every frame while it is shorter than the screen.
-    final retryAt = _loadMoreRetryAt[sourceId];
-    if (retryAt != null && DateTime.now().isBefore(retryAt)) return;
-    final catalog = _catalog;
-    if (catalog is! PagedMusicCatalog) return;
-    _loadingMore.add(sourceId);
-    notifyListeners();
-    final generation = _searchGeneration;
-    final nextPage = (_sourcePage[sourceId] ?? 1) + 1;
-    final cancellation = CancellationToken();
-    _loadMoreCancellation = cancellation;
-    try {
-      final group = await (catalog as PagedMusicCatalog).searchMore(
-        sourceId,
-        _query,
-        page: nextPage,
-        cancellation: cancellation,
-      );
-      if (generation != _searchGeneration) return;
-      final existing = _pagedResults[sourceId] ?? const <CatalogTrack>[];
-      final seen = existing.map((track) => track.ref.toString()).toSet();
-      final fresh = <CatalogTrack>[
-        for (final track in group.tracks)
-          if (seen.add(track.ref.toString())) track,
-      ];
-      if (fresh.isNotEmpty) {
-        _pagedResults[sourceId] = [...existing, ...fresh];
-        for (final track in fresh) {
-          _knownTracks[track.ref.toString()] = track;
-        }
-        _sourcePage[sourceId] = nextPage;
-      }
-      // Only a genuinely empty page ends the waterfall — a partial page may
-      // still have a next one, so we keep loading until nothing new arrives.
-      final failure = group.failure;
-      if (failure == null && fresh.isEmpty) {
-        _sourceExhausted.add(sourceId);
-      } else if (failure != null && !failure.retryable) {
-        _sourceExhausted.add(sourceId);
-      } else if (failure != null) {
-        _loadMoreRetryAt[sourceId] = DateTime.now().add(_loadMoreCooldown);
-      } else {
-        _loadMoreRetryAt.remove(sourceId);
-      }
-    } finally {
-      _loadingMore.remove(sourceId);
-      if (generation == _searchGeneration) notifyListeners();
-    }
-  }
-
-  static const _loadMoreCooldown = Duration(seconds: 15);
-  final Map<String, DateTime> _loadMoreRetryAt = {};
-
-  void _resetPaging() {
-    _loadMoreRetryAt.clear();
-    _pagedResults.clear();
-    _sourcePage.clear();
-    _sourceExhausted.clear();
-    _loadingMore.clear();
-  }
-
-  /// Starts paging for each source that just reported; one already paging
-  /// (it may have loaded more pages meanwhile) is left alone. [search] resets
-  /// paging before the first batch.
-  void _initPagingFromBatch(CatalogSearchBatch batch) {
-    for (final group in batch.groups) {
-      if (_pagedResults.containsKey(group.sourceId)) continue;
-      _pagedResults[group.sourceId] = List.of(group.tracks);
-      _sourcePage[group.sourceId] = 1;
-    }
-  }
-
-  /// Loads a hot-library category's playlist on demand. A category is either an
-  /// Audius genre (real genre trending) or a Bilibili keyword (a Chinese
-  /// category via real B站 search). Cached after the first load.
-  Future<void> loadCategory(
-    String key, {
-    String? audiusGenre,
-    String? bilibiliQuery,
-    PluginTopListItem? pluginTopList,
-    bool force = false,
-  }) async {
-    if (!force && _categoryTracks.containsKey(key)) return;
-    if (_categoryLoading.contains(key)) return;
-    _categoryLoading.add(key);
-    _categoryErrors.remove(key);
-    notifyListeners();
-    final cancellation = CancellationToken();
-    final catalog = _catalog;
-    try {
-      var tracks = const <CatalogTrack>[];
-      if (pluginTopList != null) {
-        final source = _pluginSources[pluginTopList.sourceId];
-        if (source != null) {
-          final summaries = await source.topListDetail(pluginTopList.id);
-          tracks = summaries.map(source.toCatalogTrack).toList();
-        }
-      } else if (audiusGenre != null && catalog is ChartMusicCatalog) {
-        tracks = await (catalog as ChartMusicCatalog).trendingByGenre(
-          audiusGenre,
-          cancellation: cancellation,
-        );
-      } else if (bilibiliQuery != null && catalog is PagedMusicCatalog) {
-        final group = await (catalog as PagedMusicCatalog).searchMore(
-          'bilibili',
-          bilibiliQuery,
-          page: 1,
-          cancellation: cancellation,
-        );
-        if (group.tracks.isEmpty && group.failure != null) {
-          throw SourceException(group.failure!.message, retryable: true);
-        }
-        tracks = group.tracks;
-      }
-      _categoryTracks[key] = tracks;
-      for (final track in tracks) {
-        _knownTracks[track.ref.toString()] = track;
-      }
-      if (tracks.isEmpty) _categoryErrors[key] = AppStrings.t('category.empty');
-    } on SourceException catch (error) {
-      _categoryErrors[key] = error.message;
-    } catch (_) {
-      _categoryErrors[key] = AppStrings.t('category.loadFailed');
-    } finally {
-      _categoryLoading.remove(key);
-      notifyListeners();
-    }
   }
 
   void setSourceEnabled(String sourceId, bool enabled) {
@@ -1545,6 +1007,10 @@ class AppController extends ChangeNotifier {
     _persistSettings();
     notifyListeners();
   }
+
+  /// [notifyListeners] for the extensions in this library's part files,
+  /// which may not call the protected member themselves.
+  void _notify() => notifyListeners();
 
   @override
   void dispose() {
