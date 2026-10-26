@@ -47,6 +47,56 @@ class TrackList extends StatelessWidget {
   }
 }
 
+/// [TrackList] as a lazily built sliver, for long result lists inside a
+/// [CustomScrollView]: only the rows on screen are built. Every row has the
+/// same height, so the first one doubles as the extent prototype. The glass
+/// fill, edge and shadow match [GlassPanel]; a backdrop blur cannot wrap a
+/// sliver, so the frosting is left out here.
+class SliverTrackList extends StatelessWidget {
+  const SliverTrackList({
+    required this.tracks,
+    required this.controller,
+    this.emptyTitle,
+    this.emptyDetail,
+    super.key,
+  });
+
+  final List<CatalogTrack> tracks;
+  final AppController controller;
+  final String? emptyTitle;
+  final String? emptyDetail;
+
+  static const _radius = BorderRadius.all(Radius.circular(22));
+
+  @override
+  Widget build(BuildContext context) {
+    if (tracks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _EmptyState(
+          title: emptyTitle ?? AppStrings.t('track.emptyTitle'),
+          detail: emptyDetail ?? AppStrings.t('track.emptyDetail'),
+        ),
+      );
+    }
+    Widget row(CatalogTrack track) =>
+        _TrackRow(track: track, controller: controller, showQueueAction: true);
+    return DecoratedSliver(
+      decoration: glassShadowDecoration(_radius),
+      sliver: DecoratedSliver(
+        decoration: glassSurfaceDecoration(_radius),
+        sliver: SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          sliver: SliverPrototypeExtentList.builder(
+            prototypeItem: row(tracks.first),
+            itemCount: tracks.length,
+            itemBuilder: (context, index) => row(tracks[index]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackRow extends StatelessWidget {
   const _TrackRow({
     required this.track,

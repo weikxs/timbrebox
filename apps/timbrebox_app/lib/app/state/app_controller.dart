@@ -107,7 +107,8 @@ class AppController extends ChangeNotifier {
         if ((value - _savedPosition).abs() >= _sessionSaveInterval) {
           _persistSession();
         }
-        notifyListeners();
+        // No notifyListeners(): ticks arrive 10-50 times a second, and only
+        // the widgets listening to [positionListenable] depend on them.
       });
       _durationSubscription = progress.durations.listen((value) {
         _playbackDuration = value;
@@ -164,7 +165,9 @@ class AppController extends ChangeNotifier {
   StreamSubscription<AudioRouteEvent>? _routeSubscription;
 
   Timer? _sleepTimer;
-  Duration? _sleepRemaining;
+  final ValueNotifier<Duration?> _sleepRemainingNotifier = ValueNotifier(null);
+  Duration? get _sleepRemaining => _sleepRemainingNotifier.value;
+  set _sleepRemaining(Duration? value) => _sleepRemainingNotifier.value = value;
   Duration? _sleepTotal;
   // True while playback is paused because the output device (Bluetooth /
   // headphones) went away — so we auto-resume only what we auto-paused.
@@ -208,7 +211,11 @@ class AppController extends ChangeNotifier {
   String? _searchError;
   var _isSearching = false;
   var _searchGeneration = 0;
-  var _position = Duration.zero;
+  final ValueNotifier<Duration> _positionNotifier = ValueNotifier(
+    Duration.zero,
+  );
+  Duration get _position => _positionNotifier.value;
+  set _position(Duration value) => _positionNotifier.value = value;
   var _playbackDuration = Duration.zero;
   CancellationToken? _searchCancellation;
 
@@ -271,6 +278,11 @@ class AppController extends ChangeNotifier {
   bool get isPlaying => _player.value.isPlaying;
   bool get isLoading => _player.value.status == PlaybackStatus.loading;
   Duration get position => _position;
+
+  /// The playback position on its own channel: it changes on every engine
+  /// tick, so only the progress bar and time labels listen to it while the
+  /// controller itself notifies for real state changes only.
+  ValueListenable<Duration> get positionListenable => _positionNotifier;
   Duration get playbackDuration => _playbackDuration;
   String get positionLabel => _formatDuration(_position);
   String get playbackDurationLabel => _formatDuration(
@@ -643,6 +655,19 @@ class AppController extends ChangeNotifier {
   String? get skinImagePath => _skinImagePath;
   bool get hasSkin => _skinImagePath != null;
 
+  /// Notifies only when the theme or skin changes, so the app root (which
+  /// rebuilds MaterialApp + ThemeData) does not follow every controller change.
+  Listenable get appearanceListenable => _appearance;
+  final ValueNotifier<(String, String?)> _appearance = ValueNotifier((
+    kDefaultThemeId,
+    null,
+  ));
+
+  void _appearanceChanged() {
+    _appearance.value = (_themeId, _skinImagePath);
+    notifyListeners();
+  }
+
   Future<void> _restoreAppearance() async {
     final store = _appearanceStore;
     if (store == null) return;
@@ -650,14 +675,14 @@ class AppController extends ChangeNotifier {
     final skin = await store.loadSkin();
     if (themeId != null) _themeId = themeId;
     _skinImagePath = skin?.path;
-    notifyListeners();
+    _appearanceChanged();
   }
 
   /// Selects a built-in theme and drops any custom skin image.
   Future<void> selectTheme(String id) async {
     _themeId = id;
     _skinImagePath = null;
-    notifyListeners();
+    _appearanceChanged();
     await _appearanceStore?.saveThemeId(id);
     await _appearanceStore?.clearSkin();
   }
@@ -668,7 +693,7 @@ class AppController extends ChangeNotifier {
     if (store == null) return;
     final file = await store.saveSkin(sourcePath);
     _skinImagePath = file.path;
-    notifyListeners();
+    _appearanceChanged();
   }
 
   void toggleFavorite(CatalogTrack track) {
@@ -865,6 +890,10 @@ class AppController extends ChangeNotifier {
   bool get hasSleepTimer => _sleepTimer != null;
   Duration? get sleepTimerRemaining => _sleepRemaining;
   Duration? get sleepTimerTotal => _sleepTimer == null ? null : _sleepTotal;
+
+  /// The sleep countdown on its own channel (it ticks every second).
+  ValueListenable<Duration?> get sleepRemainingListenable =>
+      _sleepRemainingNotifier;
   String? get sleepTimerLabel =>
       _sleepRemaining == null ? null : _formatDuration(_sleepRemaining!);
 
@@ -894,10 +923,10 @@ class AppController extends ChangeNotifier {
           _pauseWhenStarted = true; // play() pauses once the track starts
         }
         _syncPlaybackState();
+        notifyListeners();
       } else {
-        _sleepRemaining = next;
+        _sleepRemaining = next; // Only the countdown label listens to this.
       }
-      notifyListeners();
     });
     notifyListeners();
   }
@@ -1525,6 +1554,9 @@ class AppController extends ChangeNotifier {
     unawaited(_controlServer.stop());
     unawaited(_mediaControls.dispose());
     unawaited(_player.dispose());
+    _positionNotifier.dispose();
+    _sleepRemainingNotifier.dispose();
+    _appearance.dispose();
     super.dispose();
   }
 

@@ -87,9 +87,12 @@ class _PlayerRow extends StatelessWidget {
         ),
       if (!compact) const SizedBox(width: 4),
       if (!compact)
-        Text(
-          '${controller.positionLabel}  /  ${controller.playbackDurationLabel}',
-          style: TextStyle(color: TimbreColors.muted, fontSize: 11),
+        ValueListenableBuilder<Duration>(
+          valueListenable: controller.positionListenable,
+          builder: (context, _, _) => Text(
+            '${controller.positionLabel}  /  ${controller.playbackDurationLabel}',
+            style: TextStyle(color: TimbreColors.muted, fontSize: 11),
+          ),
         ),
     ],
   );

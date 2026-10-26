@@ -19,6 +19,9 @@ class _SearchViewState extends State<SearchView> {
   String? _selectedSourceId;
   final _scroll = ScrollController();
 
+  /// The source + result count the last autofill check ran for.
+  String? _autofillCheckedFor;
+
   @override
   void dispose() {
     _scroll.dispose();
@@ -31,9 +34,7 @@ class _SearchViewState extends State<SearchView> {
     final selectedSource = _sourceFor(sources);
     final query = widget.controller.query;
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _autofill(selectedSource),
-    );
+    _scheduleAutofill(selectedSource);
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) => _onScroll(notification, selectedSource),
@@ -64,12 +65,7 @@ class _SearchViewState extends State<SearchView> {
             SliverToBoxAdapter(
               child: _RecentSearches(controller: widget.controller),
             ),
-          SliverToBoxAdapter(
-            child: _ResultBody(
-              controller: widget.controller,
-              source: selectedSource,
-            ),
-          ),
+          _resultSliver(widget.controller, selectedSource),
           SliverToBoxAdapter(
             child: _LoadMoreFooter(
               controller: widget.controller,
@@ -94,10 +90,23 @@ class _SearchViewState extends State<SearchView> {
     return false;
   }
 
+  /// Checks once per new page (or tab) whether the list is still too short to
+  /// scroll, instead of after every build.
+  void _scheduleAutofill(SourceDescriptor? source) {
+    if (source == null) return;
+    final controller = widget.controller;
+    if (!controller.hasMoreResults(source.id)) return;
+    if (controller.isLoadingMore(source.id)) return;
+    final key = '${source.id}:${controller.searchResultCount(source.id)}';
+    if (key == _autofillCheckedFor) return;
+    _autofillCheckedFor = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _autofill(source));
+  }
+
   /// Keeps loading pages until the list is long enough to scroll (or the source
   /// is exhausted), so a short first page still becomes a real waterfall.
-  void _autofill(SourceDescriptor? source) {
-    if (!mounted || source == null || !_scroll.hasClients) return;
+  void _autofill(SourceDescriptor source) {
+    if (!mounted || !_scroll.hasClients) return;
     final controller = widget.controller;
     if (!controller.hasMoreResults(source.id)) return;
     if (controller.isLoadingMore(source.id)) return;
@@ -296,53 +305,50 @@ class _ResultHeader extends StatelessWidget {
   }
 }
 
-class _ResultBody extends StatelessWidget {
-  const _ResultBody({required this.controller, required this.source});
-
-  final AppController controller;
-  final SourceDescriptor? source;
-
-  @override
-  Widget build(BuildContext context) {
-    if (controller.searchError case final error?) {
-      return _SearchNotice(
-        icon: Icons.wifi_off_rounded,
-        title: AppStrings.t('search.errorTitle'),
-        detail: error,
+/// The selected source's results as a lazily built sliver, or a notice.
+Widget _resultSliver(AppController controller, SourceDescriptor? source) {
+  Widget notice(IconData icon, String title, String detail) =>
+      SliverToBoxAdapter(
+        child: _SearchNotice(icon: icon, title: title, detail: detail),
       );
-    }
-    if (source == null) {
-      return _SearchNotice(
-        icon: Icons.tune_rounded,
-        title: AppStrings.t('search.pickSourceTitle'),
-        detail: AppStrings.t('search.pickSourceDetail'),
-      );
-    }
-    final selectedSource = source!;
-    if (controller.query.isEmpty) {
-      return _SearchNotice(
-        icon: Icons.travel_explore_rounded,
-        title: AppStrings.t('search.readyTitle'),
-        detail: AppStrings.t('search.readyDetailFmt')
-            .replaceFirst('{name}', selectedSource.name),
-      );
-    }
-    if (controller.searchFailureFor(selectedSource.id) case final failure?) {
-      return _SearchNotice(
-        icon: Icons.cloud_off_rounded,
-        title: AppStrings.t('search.sourceUnavailableFmt')
-            .replaceFirst('{name}', selectedSource.name),
-        detail: failure.message,
-      );
-    }
-    return TrackList(
-      tracks: controller.searchResultsFor(selectedSource.id),
-      controller: controller,
-      emptyTitle: AppStrings.t('search.noMatchFmt')
-          .replaceFirst('{name}', selectedSource.name),
-      emptyDetail: AppStrings.t('search.noMatchDetail'),
+  if (controller.searchError case final error?) {
+    return notice(
+      Icons.wifi_off_rounded,
+      AppStrings.t('search.errorTitle'),
+      error,
     );
   }
+  if (source == null) {
+    return notice(
+      Icons.tune_rounded,
+      AppStrings.t('search.pickSourceTitle'),
+      AppStrings.t('search.pickSourceDetail'),
+    );
+  }
+  if (controller.query.isEmpty) {
+    return notice(
+      Icons.travel_explore_rounded,
+      AppStrings.t('search.readyTitle'),
+      AppStrings.t('search.readyDetailFmt').replaceFirst('{name}', source.name),
+    );
+  }
+  if (controller.searchFailureFor(source.id) case final failure?) {
+    return notice(
+      Icons.cloud_off_rounded,
+      AppStrings.t(
+        'search.sourceUnavailableFmt',
+      ).replaceFirst('{name}', source.name),
+      failure.message,
+    );
+  }
+  return SliverTrackList(
+    tracks: controller.searchResultsFor(source.id),
+    controller: controller,
+    emptyTitle: AppStrings.t(
+      'search.noMatchFmt',
+    ).replaceFirst('{name}', source.name),
+    emptyDetail: AppStrings.t('search.noMatchDetail'),
+  );
 }
 
 class _LoadMoreFooter extends StatelessWidget {

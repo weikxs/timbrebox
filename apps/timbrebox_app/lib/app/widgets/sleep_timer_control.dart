@@ -16,7 +16,6 @@ class SleepTimerControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = controller.sleepTimerTotal;
-    final remaining = controller.sleepTimerLabel;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -26,17 +25,25 @@ class SleepTimerControl extends StatelessWidget {
               AppStrings.t('settings.sleepTimer'),
               style: TextStyle(color: TimbreColors.muted, fontSize: 12),
             ),
-            if (remaining != null) ...[
-              const SizedBox(width: 8),
-              Text(
-                '· $remaining',
-                style: TextStyle(
-                  color: TimbreColors.gold,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+            // The countdown ticks every second; only this label follows it.
+            ValueListenableBuilder<Duration?>(
+              valueListenable: controller.sleepRemainingListenable,
+              builder: (context, _, _) {
+                final remaining = controller.sleepTimerLabel;
+                if (remaining == null) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    '· $remaining',
+                    style: TextStyle(
+                      color: TimbreColors.gold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
         const SizedBox(height: 8),

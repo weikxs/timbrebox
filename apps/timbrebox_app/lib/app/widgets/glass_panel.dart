@@ -23,42 +23,16 @@ class GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final light = TimbreColors.active.brightness == Brightness.light;
     final rounded = BorderRadius.circular(radius);
     final content = padding == null
         ? child
         : Padding(padding: padding!, child: child);
     final surface = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: rounded,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [TimbreColors.panelStrong, TimbreColors.panel],
-        ),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: light ? .55 : .12),
-          width: .8,
-        ),
-      ),
+      decoration: glassSurfaceDecoration(rounded),
       child: content,
     );
     return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: rounded,
-        // "Reduce visual effects" also drops the (relatively costly) shadow.
-        boxShadow: AppEffects.reduced
-            ? null
-            : [
-                BoxShadow(
-                  color: light
-                      ? const Color(0x1f101826)
-                      : const Color(0x59000000),
-                  blurRadius: light ? 26 : 32,
-                  offset: const Offset(0, 14),
-                ),
-              ],
-      ),
+      decoration: glassShadowDecoration(rounded),
       child: ClipRRect(
         borderRadius: rounded,
         // Skip the backdrop blur when effects are reduced — it's the heaviest
@@ -72,4 +46,39 @@ class GlassPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The glass fill and edge hairline, for the active palette.
+BoxDecoration glassSurfaceDecoration(BorderRadius rounded) {
+  final light = TimbreColors.active.brightness == Brightness.light;
+  return BoxDecoration(
+    borderRadius: rounded,
+    gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [TimbreColors.panelStrong, TimbreColors.panel],
+    ),
+    border: Border.all(
+      color: Colors.white.withValues(alpha: light ? .55 : .12),
+      width: .8,
+    ),
+  );
+}
+
+/// The soft drop shadow under a glass surface.
+BoxDecoration glassShadowDecoration(BorderRadius rounded) {
+  final light = TimbreColors.active.brightness == Brightness.light;
+  return BoxDecoration(
+    borderRadius: rounded,
+    // "Reduce visual effects" also drops the (relatively costly) shadow.
+    boxShadow: AppEffects.reduced
+        ? null
+        : [
+            BoxShadow(
+              color: light ? const Color(0x1f101826) : const Color(0x59000000),
+              blurRadius: light ? 26 : 32,
+              offset: const Offset(0, 14),
+            ),
+          ],
+  );
 }
