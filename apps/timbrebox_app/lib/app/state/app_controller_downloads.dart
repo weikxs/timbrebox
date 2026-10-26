@@ -93,7 +93,8 @@ extension AppControllerDownloads on AppController {
     final fraction = (received / total).clamp(0.0, 1.0);
     final previous = _downloadProgress.value[key];
     final sameStep =
-        previous != null && (fraction * 100).floor() == (previous * 100).floor();
+        previous != null &&
+        (fraction * 100).floor() == (previous * 100).floor();
     if (sameStep || _isDisposed) return;
     _downloadProgress.value = {..._downloadProgress.value, key: fraction};
   }
@@ -120,7 +121,10 @@ extension AppControllerDownloads on AppController {
     final entries = <DownloadedEntry>[
       for (final key in _downloads)
         if (_downloadPaths[key] != null && _knownTracks[key] != null)
-          DownloadedEntry(track: _knownTracks[key]!, path: _downloadPaths[key]!),
+          DownloadedEntry(
+            track: _knownTracks[key]!,
+            path: _downloadPaths[key]!,
+          ),
     ];
     await store.save(entries);
   }

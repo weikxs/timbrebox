@@ -111,7 +111,9 @@ extension AppControllerPlugins on AppController {
     final repository = _pluginRepository;
     final catalog = _catalog;
     if (repository == null || catalog is! MutableMusicCatalog) {
-      throw PluginInstallException(AppStrings.t('plugin.err.unsupportedPlatform'));
+      throw PluginInstallException(
+        AppStrings.t('plugin.err.unsupportedPlatform'),
+      );
     }
     final mutable = catalog as MutableMusicCatalog;
     final sources = await repository.installFromUrl(url);

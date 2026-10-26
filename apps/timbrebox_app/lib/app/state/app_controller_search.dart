@@ -135,7 +135,9 @@ extension AppControllerSearch on AppController {
       } else if (failure != null && !failure.retryable) {
         _sourceExhausted.add(sourceId);
       } else if (failure != null) {
-        _loadMoreRetryAt[sourceId] = DateTime.now().add(AppController._loadMoreCooldown);
+        _loadMoreRetryAt[sourceId] = DateTime.now().add(
+          AppController._loadMoreCooldown,
+        );
       } else {
         _loadMoreRetryAt.remove(sourceId);
       }
@@ -144,7 +146,6 @@ extension AppControllerSearch on AppController {
       if (generation == _searchGeneration) _notify();
     }
   }
-
 
   void _resetPaging() {
     _loadMoreRetryAt.clear();
@@ -229,5 +230,13 @@ extension AppControllerSearch on AppController {
     final track = _currentTrack;
     if (track == null) return;
     await search('${track.title} ${track.artist}'.trim());
+  }
+
+  String? _globalSearchError(CatalogSearchBatch batch) {
+    if (batch.hasResults) return null;
+    for (final group in batch.groups) {
+      if (group.failure case final failure?) return failure.message;
+    }
+    return null;
   }
 }
