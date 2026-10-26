@@ -140,6 +140,11 @@ final class PluginCatalogSource implements CatalogSource {
     try {
       final runtime = await _started();
       return await runtime.call(function, args);
+    } on PluginScriptTimeout {
+      // A script stopped mid-run may have left the engine in any state:
+      // the next call starts a fresh one.
+      if (_idleTimeout != null) _discardEngine();
+      rethrow;
     } finally {
       _activeCalls--;
       _scheduleIdleStop();
@@ -156,7 +161,10 @@ final class PluginCatalogSource implements CatalogSource {
   /// Releases an engine nobody has used for [_idleTimeout]; the metadata,
   /// search items and charts stay, so the next call simply starts it again.
   void _stopIdleEngine() {
-    if (_activeCalls > 0) return;
+    if (_activeCalls == 0) _discardEngine();
+  }
+
+  void _discardEngine() {
     final runtime = _runtime;
     _runtime = null;
     runtime?.then((engine) => engine.dispose(), onError: (_) {});

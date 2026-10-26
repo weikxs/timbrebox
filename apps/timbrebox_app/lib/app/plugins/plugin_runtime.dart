@@ -6,6 +6,7 @@ import 'package:flutter_js/flutter_js.dart';
 import '../design/app_strings.dart';
 import 'plugin_http.dart';
 import 'plugin_shims.dart';
+import 'script_time_limit.dart';
 
 /// Runs one plugin's JavaScript in a sandboxed engine (QuickJS on
 /// Android/Windows/Linux, JavaScriptCore on Apple). The only capability crossing
@@ -15,9 +16,9 @@ import 'plugin_shims.dart';
 final class PluginRuntime {
   PluginRuntime({PluginHttpClient? http})
     : _http = http ?? PluginHttpClient(),
-      // `xhr: false` keeps flutter_js from installing its own fetch /
-      // XMLHttpRequest, which would bypass PluginHttpClient's egress policy.
-      _rt = getJavascriptRuntime(xhr: false);
+      // No fetch / XMLHttpRequest from flutter_js (they would bypass
+      // PluginHttpClient's egress policy), and a time limit on each run.
+      _rt = createTimeLimitedRuntime();
 
   final PluginHttpClient _http;
   final JavascriptRuntime _rt;
@@ -79,8 +80,15 @@ final class PluginRuntime {
         }
       })()
     ''';
+    final watch = Stopwatch()..start();
     final async = await _rt.evaluateAsync(code);
     _rt.executePendingJob();
+    // A run as long as the limit was cut off by the engine (JavaScriptCore
+    // reports no error for it, so the clock is what tells).
+    if (watch.elapsed >= pluginScriptTimeLimit) {
+      throw PluginScriptTimeout(AppStrings.t('plugin.runtime.timeout'));
+    }
+    if (async.isError) throw PluginRuntimeException(async.stringResult);
     final resolved = await _rt
         .handlePromise(async)
         .timeout(const Duration(seconds: 25));
@@ -228,4 +236,10 @@ class PluginRuntimeException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// The plugin ran past [pluginScriptTimeLimit] and was stopped; its engine
+/// should not be trusted for further calls.
+class PluginScriptTimeout extends PluginRuntimeException {
+  const PluginScriptTimeout(super.message);
 }
