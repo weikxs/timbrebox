@@ -70,7 +70,7 @@ void main() {
     expect(recordPaints, greaterThan(0));
   });
 
-  testWidgets('the record turns at about 12 frames a second, not 60', (
+  testWidgets('the record turns at about 6 frames a second, not 60', (
     tester,
   ) async {
     await pumpPlaying(tester);
@@ -78,7 +78,7 @@ void main() {
 
     final recordPaints = await recordPaintsOverOneSecond(tester);
 
-    expect(recordPaints, inInclusiveRange(11, 13));
+    expect(recordPaints, inInclusiveRange(5, 7));
   });
 
   testWidgets('no frames are requested between two turns of the record', (
@@ -87,7 +87,7 @@ void main() {
     await pumpPlaying(tester);
     await tester.pump(_vsync);
     // Let a turn land, then draw it.
-    await tester.pump(const Duration(milliseconds: 90));
+    await tester.pump(const Duration(milliseconds: 170));
     await tester.pump(_vsync);
 
     // Until the next turn is due, nothing asks the engine for a frame.

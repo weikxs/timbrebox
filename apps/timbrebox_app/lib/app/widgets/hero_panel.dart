@@ -477,10 +477,10 @@ class _VinylHaloState extends State<_VinylHalo> {
   /// One full turn of the record.
   static const _period = Duration(seconds: 14);
 
-  /// About 12 frames a second: smooth enough for a slow-turning record, and
-  /// a fifth of the frames a vsync-driven animation would make. Every frame
+  /// About 6 frames a second: enough to read as a slow-turning record, and a
+  /// tenth of the frames a vsync-driven animation would make. Every frame
   /// recomposites the whole window, frosted glass included.
-  static const _frameInterval = Duration(milliseconds: 83);
+  static const _frameInterval = Duration(milliseconds: 167);
 
   static final double _turnsPerFrame =
       _frameInterval.inMicroseconds / _period.inMicroseconds;
