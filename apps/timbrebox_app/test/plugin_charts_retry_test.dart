@@ -42,7 +42,7 @@ module.exports = {
       pluginRepository: PluginRepository(pluginsDirectory: () async => root),
     );
     addTearDown(controller.dispose);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await controller.pluginsRestored;
 
     await controller.loadPluginTopLists();
     expect(controller.pluginTopLists, isEmpty);

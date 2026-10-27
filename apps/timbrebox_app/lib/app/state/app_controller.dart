@@ -94,7 +94,7 @@ class AppController extends ChangeNotifier {
     unawaited(_restoreAppearance());
     unawaited(_initMediaControls());
     unawaited(_initRouteMonitor());
-    unawaited(_restorePlugins());
+    _pluginsRestored = _restorePlugins();
     unawaited(_restoreSettings().then((_) => _restoreSession()));
     unawaited(_player.setVolume(_volume));
     unawaited(_player.setReleaseAfterPause(_releaseAfterPause));
@@ -705,10 +705,19 @@ class AppController extends ChangeNotifier {
   var _storageFailureReported = false;
 
   /// [notifyListeners] for the extensions in this library's part files,
-  /// which may not call the protected member themselves.
-  void _notify() => notifyListeners();
+  /// which may not call the protected member themselves. Does nothing once
+  /// disposed: the restores at start finish later and may outlive it.
+  void _notify() {
+    if (!_isDisposed) notifyListeners();
+  }
 
   var _isDisposed = false;
+
+  late final Future<void> _pluginsRestored;
+
+  /// Completes when the installed plugins have been loaded at start.
+  @visibleForTesting
+  Future<void> get pluginsRestored => _pluginsRestored;
 
   @override
   void dispose() {
