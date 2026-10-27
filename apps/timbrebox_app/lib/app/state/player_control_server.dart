@@ -180,8 +180,9 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'lyric': lyric});
         case '/play-queue':
           final i = int.tryParse(query['i'] ?? '');
-          if (i == null)
+          if (i == null) {
             return _badRequest(request, AppStrings.t('control.err.badIndex'));
+          }
           final ok = await _controller.playQueueIndex(i);
           return _json(request, ok ? HttpStatus.ok : HttpStatus.notFound, {
             'ok': ok,
@@ -246,20 +247,23 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'ok': true, 'quitting': true});
         case '/seek':
           final ms = int.tryParse(query['ms'] ?? '');
-          if (ms == null)
+          if (ms == null) {
             return _badRequest(request, AppStrings.t('control.err.badMs'));
+          }
           await _controller.seek(Duration(milliseconds: ms));
           return _json(request, HttpStatus.ok, _status());
         case '/volume':
           final level = double.tryParse(query['level'] ?? '');
-          if (level == null)
+          if (level == null) {
             return _badRequest(request, AppStrings.t('control.err.badLevel'));
+          }
           _controller.setVolume(level);
           return _json(request, HttpStatus.ok, _status());
         case '/search':
           final q = query['q'] ?? '';
-          if (q.trim().isEmpty)
+          if (q.trim().isEmpty) {
             return _badRequest(request, AppStrings.t('control.err.emptyQuery'));
+          }
           await _controller.search(q);
           return _json(request, HttpStatus.ok, {
             'query': q,

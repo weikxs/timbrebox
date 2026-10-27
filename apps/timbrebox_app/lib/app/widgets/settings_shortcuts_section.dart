@@ -102,8 +102,9 @@ class _ShortcutRowState extends State<_ShortcutRow> {
       setState(() => _capturing = false);
       return KeyEventResult.handled;
     }
-    if (_modifiers.contains(key))
+    if (_modifiers.contains(key)) {
       return KeyEventResult.handled; // await a real key
+    }
     final keyboard = HardwareKeyboard.instance;
     final hasModifier =
         keyboard.isShiftPressed ||
