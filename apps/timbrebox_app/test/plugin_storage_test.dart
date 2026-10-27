@@ -58,7 +58,7 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await controller.pluginsRestored;
 
     expect(controller.skippedPlugins, ['plugin_bad']);
   });
@@ -92,7 +92,7 @@ void main() {
       pluginRepository: repository(),
     );
     addTearDown(controller.dispose);
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await controller.pluginsRestored;
 
     final report = await controller.updatePlugins();
 
