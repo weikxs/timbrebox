@@ -29,6 +29,7 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 - [截图](#截图)
 - [功能特性](#功能特性)
 - [架构](#架构)
+- [安装](#安装)
 - [快速开始](#快速开始)
 - [项目结构](#项目结构)
 - [插件系统](#插件系统)
@@ -37,6 +38,7 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 - [开发](#开发)
 - [路线图](#路线图)
 - [贡献](#贡献)
+- [安全策略](#安全策略)
 - [许可证](#许可证)
 
 ## 截图
@@ -160,16 +162,82 @@ flowchart TD
 - **`StreamHeaderProxy`** 是运行在 `127.0.0.1` 上的纯 Dart 回环 `HttpServer`，让带请求头校验 / 范围受限的远程音频能被音频引擎播放。它按每一跳注入 Referer / Cookie / User-Agent，并在分块模式下把有界（≤ 1 MB）的 range 窗口拼接成一条连续响应——这是必需的，因为 googlevideo 会用 403 拒绝开放或过大的 range 请求。所有内容都驻留在内存中，停止时即销毁。
 - **系统媒体会话**——`createSystemMediaControls()` 在 iOS / macOS / Android 上返回基于系统媒体会话集成的实现，其他平台返回 `NoopMediaControls`；一个处理器把传输控制按钮（包括蓝牙 AVRCP）翻译为 `MediaCommand`。
 
+## 安装
+
+发布包由 GitHub Actions 从本仓库源码构建，发布在 [Releases 页面](https://github.com/weikxs/timbrebox/releases)。
+目前还没有发布过任何版本；在此之前，请按[快速开始](#快速开始)从源码构建。
+
+### macOS 与 Linux，全自动安装
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/weikxs/timbrebox/main/install.sh | sh
+```
+
+脚本会为你的系统挑选安装包，用该版本的 `checksums.txt` 校验后再安装——不会改动其他任何东西：
+
+| 系统 | 安装内容 |
+|---|---|
+| macOS | 把 `TimbreBox.app` 装到 `/Applications`（或 `~/Applications`），不会弹出“从互联网下载”的提示 |
+| Debian、Ubuntu（x86_64） | 用 `apt` 安装 `.deb`（会请求 `sudo`） |
+| 其他 Linux（x86_64） | 把 `.tar.gz` 解压到 `~/.local/share/timbrebox`，在 `~/.local/bin` 中放置 `timbrebox-app`，并添加应用菜单项；GTK 3 与 libmpv 由发行版提供 |
+
+再次运行即可升级。参数写在 `sh -s --` 之后，例如 `sh -s -- --version v0.1.0`：
+
+| 参数 | 含义 |
+|---|---|
+| `--version <tag>` | 安装指定版本，而不是最新版本 |
+| `--format deb\|tar` | Linux：选择安装包格式 |
+| `--dir <folder>` | macOS：`TimbreBox.app` 的安装位置；`.tar.gz`：`timbrebox-app` 的位置 |
+| `--no-modify-path` | `.tar.gz`：不把该目录加入 shell 的 `PATH` |
+
+### Homebrew（macOS）
+
+```sh
+brew install --cask weikxs/tap/timbrebox
+brew upgrade --cask timbrebox          # 之后升级
+```
+
+### 安装包
+
+从[最新版本](https://github.com/weikxs/timbrebox/releases/latest)下载，并用 `checksums.txt` 校验
+（`shasum -a 256 -c checksums.txt --ignore-missing`）：
+
+| 文件 | 平台 |
+|---|---|
+| `timbrebox_<version>_darwin_universal.dmg` | macOS 10.15+，Apple 芯片与 Intel |
+| `timbrebox_<version>_linux_amd64.deb` | Debian 12+、Ubuntu 22.04+ 及其衍生版（x86_64） |
+| `timbrebox_<version>_linux_amd64.tar.gz` | 其他带 glibc、GTK 3 与 libmpv 的 Linux 发行版（x86_64） |
+| `timbrebox_<version>_windows_amd64.zip` | Windows 10 与 11（x64）：解压后运行 `timbrebox_app.exe` |
+
+Android 与 iOS 不提供发布包，请从源码构建。
+
+macOS 应用没有经过 Apple 签名或公证，也不打算签名。安装脚本和 Homebrew 会替你处理这一点。如果自己安装磁盘映像，
+请先用 `checksums.txt` 校验，打开一次 TimbreBox，然后在“系统设置 → 隐私与安全性”中选择**仍要打开**，再次打开——
+或者运行 `xattr -dr com.apple.quarantine /Applications/TimbreBox.app`。Windows 应用同样没有签名：如果 SmartScreen
+拦截，请选择**更多信息** → **仍要运行**。详见 [SECURITY.md](SECURITY.md#release-packages-and-macos)。
+
+### 卸载
+
+| 安装方式 | 卸载方式 |
+|---|---|
+| 安装脚本或磁盘映像（macOS） | 退出 TimbreBox，然后把 `TimbreBox.app` 移到废纸篓 |
+| Homebrew | `brew uninstall --cask timbrebox` |
+| `.deb` | `sudo apt remove timbrebox` |
+| `.tar.gz`（用安装脚本安装） | `rm -r ~/.local/share/timbrebox ~/.local/bin/timbrebox-app ~/.local/share/applications/timbrebox.desktop ~/.local/share/icons/hicolor/512x512/apps/timbrebox.png` |
+| `.zip`（Windows） | 删除解压出的 `TimbreBox` 文件夹 |
+
+卸载不会动你的收藏、歌单、下载和设置：它们保存在应用自己的目录里。
+
 ## 快速开始
 
-TimbreBox 目前还没有发布预编译安装包，请按下面的步骤从源码构建。
+按下面的步骤从源码构建并运行 TimbreBox。
 
 ### 先决条件
 - **Flutter SDK**，Dart **`^3.12.0`**（`flutter --version`）。
 - 面向目标平台的工具链：
   - **macOS**：Xcode + CocoaPods。
   - **Windows**：带“使用 C++ 的桌面开发”工作负载的 Visual Studio。
-  - **Linux**：标准的 Flutter Linux 桌面依赖（GTK、`ninja`、`clang`、`pkg-config`，以及音频引擎的运行时依赖）。
+  - **Linux**：标准的 Flutter Linux 桌面依赖，外加音频引擎所需的 libmpv（Debian 与 Ubuntu 上为 `clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev`）。
   - **iOS**：Xcode + CocoaPods。
   - **Android**：Android SDK + NDK（推荐使用 Android Studio）。
 
@@ -279,14 +347,20 @@ TimbreBox 支持采用 TimbreBox 插件格式的第三方音源插件。一个�
 - **测试目标**——80%+ 覆盖率目标；解析针对录制的 fixture 进行测试；网络集成测试单独打标签。
 
 ### 命令
-```bash
-flutter analyze          # 静态分析（必须无告警）
-flutter test             # 应用单元/组件测试
-flutter pub get          # 在 packages/timbrebox_core 中为核心包执行
 
-cd ../../packages/timbrebox_core
-dart test                # 核心领域测试
+在仓库根目录运行（`make help` 列出所有目标）：
+
+```bash
+make check      # CI 运行的全部检查：隐私、静态分析、格式和每个包的测试
+make test       # 核心包、CLI 和应用的测试
+make fmt        # 格式化 Dart 代码
+make hooks      # 启用仓库的 git hooks（隐私检查、约定式提交）
+make app        # 为本机构建桌面应用的 release 版本
+make package    # 同样的构建，按发布时的方式打包到 dist/
 ```
+
+`make check` 运行 [`tools/check.sh`](tools/check.sh)，CI 的 `check` 任务在 Flutter 3.44 容器中运行的也是它。
+参见 [CONTRIBUTING.md](CONTRIBUTING.md) 与[开发规范](docs/development/standards.md)。
 
 当前状态：应用、核心包和 CLI 的测试全部通过，静态分析无告警，macOS release 构建干净。
 
@@ -325,15 +399,20 @@ dart test                # 核心领域测试
 
 ## 贡献
 
-欢迎贡献。提交前请：
+欢迎贡献。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 与[行为准则](CODE_OF_CONDUCT.md)。提交前请：
 
 1. 遵循 [`AGENTS.md`](./AGENTS.md) 中的工作流：规划 → 审阅现有代码 → 提出方案 → 实现 → 验证。
-2. 运行 `flutter analyze` 与 `flutter test`（以及在 `packages/timbrebox_core` 中运行 `dart test`）——两者都必须干净通过。
+2. 运行 `make check`——隐私检查、静态分析、格式和每个包的测试都必须干净通过。
 3. 保持文件 ≤ 800 行，优先使用不可变数据，并复用现有工具。
 4. 不使用 mock/硬编码数据，不打包第三方源码，不含密钥。
-5. 使用约定式提交信息（`feat:`、`fix:`、`refactor:`、`docs:`、`test:`、`chore:`）。
+5. 使用[约定式提交](https://www.conventionalcommits.org/)（`feat:`、`fix:`、`perf:`、`refactor:`、`docs:`、`test:`、`chore:`）；`make hooks` 会检查提交信息。
 
 新增音源应实现 `CatalogSource` 适配器契约，而不是去改动 UI 或播放代码。
+重要变更记录在[更新日志](CHANGELOG.md)中。
+
+## 安全策略
+
+请按 [SECURITY.md](SECURITY.md) 中的方式私下报告漏洞，不要发公开 issue。
 
 ## 许可证
 

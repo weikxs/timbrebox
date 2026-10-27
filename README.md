@@ -29,6 +29,7 @@ The product goal is honesty and calm: no sign-up wall, real (not promised) audio
 - [Screenshots](#screenshots)
 - [Features](#features)
 - [Architecture](#architecture)
+- [Install](#install)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
 - [Plugin System](#plugin-system)
@@ -37,6 +38,7 @@ The product goal is honesty and calm: no sign-up wall, real (not promised) audio
 - [Development](#development)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
+- [Security policy](#security-policy)
 - [License](#license)
 
 ## Screenshots
@@ -160,16 +162,85 @@ Key pieces:
 - **`StreamHeaderProxy`** is a pure-Dart loopback `HttpServer` on `127.0.0.1` that makes header-gated / range-limited remote audio playable by the audio engine. It injects Referer / Cookie / User-Agent per hop and, in chunked mode, stitches bounded (≤ 1 MB) range windows into one continuous response — required because googlevideo rejects open or large ranges with 403. Everything lives in memory and is torn down on stop.
 - **System media session** — `createSystemMediaControls()` returns a media-session-backed implementation on iOS / macOS / Android and a `NoopMediaControls` elsewhere; a handler translates transport buttons (including Bluetooth AVRCP) into `MediaCommand`s.
 
+## Install
+
+Release packages are published on the [Releases page](https://github.com/weikxs/timbrebox/releases), built by
+GitHub Actions from this repository. No release has been published so far; until then, build TimbreBox from source
+as in [Getting Started](#getting-started).
+
+### macOS and Linux, fully automatic
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/weikxs/timbrebox/main/install.sh | sh
+```
+
+The script picks the package for your system, checks it against the release's `checksums.txt` and installs it —
+nothing else is changed:
+
+| System | What it installs |
+|---|---|
+| macOS | `TimbreBox.app` into `/Applications` (or `~/Applications`), without the "downloaded from the internet" prompt |
+| Debian, Ubuntu (x86_64) | the `.deb`, with `apt` (asks for `sudo`) |
+| Any other Linux (x86_64) | the `.tar.gz`, into `~/.local/share/timbrebox`, as `timbrebox-app` in `~/.local/bin`, with an applications-menu entry; GTK 3 and libmpv come from your distribution |
+
+Run it again to upgrade. Options go after `sh -s --`, for example `sh -s -- --version v0.1.0`:
+
+| Option | Meaning |
+|---|---|
+| `--version <tag>` | install this release instead of the latest |
+| `--format deb\|tar` | Linux: choose the package format |
+| `--dir <folder>` | macOS: where `TimbreBox.app` goes; `.tar.gz`: where `timbrebox-app` goes |
+| `--no-modify-path` | `.tar.gz`: do not add the folder to your shell's `PATH` |
+
+### Homebrew (macOS)
+
+```sh
+brew install --cask weikxs/tap/timbrebox
+brew upgrade --cask timbrebox          # later, to upgrade
+```
+
+### Packages
+
+Download from the [latest release](https://github.com/weikxs/timbrebox/releases/latest) and check the file against
+`checksums.txt` (`shasum -a 256 -c checksums.txt --ignore-missing`):
+
+| File | Platform |
+|---|---|
+| `timbrebox_<version>_darwin_universal.dmg` | macOS 10.15+, Apple silicon and Intel |
+| `timbrebox_<version>_linux_amd64.deb` | Debian 12+, Ubuntu 22.04+ and their relatives (x86_64) |
+| `timbrebox_<version>_linux_amd64.tar.gz` | Other Linux distributions with glibc, GTK 3 and libmpv (x86_64) |
+| `timbrebox_<version>_windows_amd64.zip` | Windows 10 and 11 (x64): unzip and start `timbrebox_app.exe` |
+
+Android and iOS are not released as packages; build them from source.
+
+The macOS app is not signed or notarized by Apple, and we do not plan to sign it. The script and Homebrew handle
+that for you. If you install the disk image yourself, check it against `checksums.txt`, open TimbreBox once, then
+choose **Open Anyway** in System Settings → Privacy & Security and open it again — or run
+`xattr -dr com.apple.quarantine /Applications/TimbreBox.app`. The Windows app is not signed either: if SmartScreen
+stops it, choose **More info** → **Run anyway**. Details in [SECURITY.md](SECURITY.md#release-packages-and-macos).
+
+### Uninstall
+
+| Installed with | Remove with |
+|---|---|
+| The script or the disk image (macOS) | Quit TimbreBox, then move `TimbreBox.app` to the Trash |
+| Homebrew | `brew uninstall --cask timbrebox` |
+| `.deb` | `sudo apt remove timbrebox` |
+| `.tar.gz` (with the script) | `rm -r ~/.local/share/timbrebox ~/.local/bin/timbrebox-app ~/.local/share/applications/timbrebox.desktop ~/.local/share/icons/hicolor/512x512/apps/timbrebox.png` |
+| `.zip` (Windows) | Delete the unzipped `TimbreBox` folder |
+
+Uninstalling never touches your favorites, playlists, downloads or settings: they stay in the app's own folder.
+
 ## Getting Started
 
-TimbreBox does not publish prebuilt packages yet; build it from source as below.
+To build and run TimbreBox from source, follow these steps.
 
 ### Prerequisites
 - **Flutter SDK** with Dart **`^3.12.0`** (`flutter --version`).
 - Platform toolchains for your targets:
   - **macOS**: Xcode + CocoaPods.
   - **Windows**: Visual Studio with the "Desktop development with C++" workload.
-  - **Linux**: standard Flutter Linux desktop dependencies (GTK, `ninja`, `clang`, `pkg-config`, plus the audio engine's runtime dependencies).
+  - **Linux**: standard Flutter Linux desktop dependencies plus libmpv for the audio engine (on Debian and Ubuntu: `clang cmake ninja-build pkg-config libgtk-3-dev libmpv-dev`).
   - **iOS**: Xcode + CocoaPods.
   - **Android**: Android SDK + NDK (Android Studio recommended).
 
@@ -279,14 +350,20 @@ See [`AGENTS.md`](./AGENTS.md) and [`docs/DESIGN.md`](./docs/DESIGN.md). Core ru
 - **Test target** — 80%+ coverage goal; parsing is tested against recorded fixtures; network integration tests are separately tagged.
 
 ### Commands
-```bash
-flutter analyze          # Static analysis (must be clean)
-flutter test             # App unit/widget tests
-flutter pub get          # From packages/timbrebox_core for the core package
 
-cd ../../packages/timbrebox_core
-dart test                # Core domain tests
+From the repository root (`make help` lists every target):
+
+```bash
+make check      # everything CI runs: privacy, analysis, formatting and tests of every package
+make test       # the tests of the core, CLI and app packages
+make fmt        # format the Dart code
+make hooks      # use the repository's git hooks (privacy check, Conventional Commits)
+make app        # release build of the desktop app for this machine
+make package    # the same build, packaged as a release packages it, into dist/
 ```
+
+`make check` runs [`tools/check.sh`](tools/check.sh), which CI's `check` job runs in the Flutter 3.44 container.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [development standards](docs/development/standards.md).
 
 Current status: app, core and CLI tests passing, static analysis clean, macOS release build clean.
 
@@ -325,15 +402,20 @@ Legend: ✅ done · 🚧 in progress · 📋 planned
 
 ## Contributing
 
-Contributions are welcome. Before submitting:
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [code of conduct](CODE_OF_CONDUCT.md) first. Before submitting:
 
 1. Follow the workflow in [`AGENTS.md`](./AGENTS.md): plan → review existing code → propose options → implement → verify.
-2. Run `flutter analyze` and `flutter test` (plus `dart test` in `packages/timbrebox_core`) — both must pass cleanly.
+2. Run `make check` — privacy, analysis, formatting and the tests of every package must pass cleanly.
 3. Keep files ≤ 800 lines, prefer immutable data, and reuse existing utilities.
 4. No mock/hardcoded data, no bundled third-party source code, no secrets.
-5. Use conventional commit messages (`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`).
+5. Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `perf:`, `refactor:`, `docs:`, `test:`, `chore:`); `make hooks` checks them.
 
 New sources should implement the `CatalogSource` adapter contract rather than touching UI or playback code.
+Notable changes are recorded in the [changelog](CHANGELOG.md).
+
+## Security policy
+
+Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), not in public issues.
 
 ## License
 
