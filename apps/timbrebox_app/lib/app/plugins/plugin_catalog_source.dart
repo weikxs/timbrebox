@@ -25,8 +25,7 @@ import 'plugin_stream_url.dart';
 /// ([PluginCatalogSource.lazy]), so installed plugins cost nothing at launch
 /// and disabled ones never start; capabilities come from the functions
 /// recorded in the manifest, never from evaluating JS on a read.
-final class PluginCatalogSource
-    implements CatalogSource, HintedCatalogSource {
+final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
   /// Wraps an already loaded [runtime] (a fresh install).
   PluginCatalogSource({
     required PluginManifest manifest,
@@ -229,7 +228,9 @@ final class PluginCatalogSource
     sourceId: descriptor.id,
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
-    quality: AppStrings.t('plugin.src.qualityFmt').replaceFirst('{p}', manifest.platform),
+    quality: AppStrings.t(
+      'plugin.src.qualityFmt',
+    ).replaceFirst('{p}', manifest.platform),
     artworkUrl: _artwork[summary.ref.itemId],
     resolveHint: pluginResolveHint(_items[summary.ref.itemId]),
   );

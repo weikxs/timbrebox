@@ -82,7 +82,10 @@ class PlayerController {
     try {
       await _engine.play();
       _emit(
-        PlaybackState(status: PlaybackStatus.playing, candidate: _value.candidate),
+        PlaybackState(
+          status: PlaybackStatus.playing,
+          candidate: _value.candidate,
+        ),
       );
       return true;
     } catch (_) {

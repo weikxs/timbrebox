@@ -13,10 +13,7 @@ import 'package:timbrebox_cli/timbrebox_cli.dart';
 final ControlApiClient _client = ControlApiClient();
 
 Future<void> main() async {
-  stdin
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .listen(_onLine);
+  stdin.transform(utf8.decoder).transform(const LineSplitter()).listen(_onLine);
 }
 
 Future<void> _onLine(String line) async {
@@ -98,8 +95,11 @@ Future<void> _handleToolCall(Object? id, Object? params) async {
     // Discovery sends the run's token too, and says so when it is refused.
     final base = await _client.discover();
     if (base == null) {
-      _toolResult(id, 'TimbreBox is not running or Agent control is off.',
-          isError: true);
+      _toolResult(
+        id,
+        'TimbreBox is not running or Agent control is off.',
+        isError: true,
+      );
       return;
     }
     _toolResult(id, await _runTool(base, name, args));
@@ -109,7 +109,10 @@ Future<void> _handleToolCall(Object? id, Object? params) async {
 }
 
 Future<String> _runTool(
-    String base, String? name, Map<Object?, Object?> args) async {
+  String base,
+  String? name,
+  Map<Object?, Object?> args,
+) async {
   String enc(Object? v) => Uri.encodeQueryComponent('$v');
   switch (name) {
     case 'play_music':
@@ -162,12 +165,16 @@ void _send(Map<String, Object?> message) => stdout.writeln(jsonEncode(message));
 void _reply(Object? id, Object? result) =>
     _send({'jsonrpc': '2.0', 'id': id, 'result': result});
 
-void _error(Object? id, int code, String message) =>
-    _send({'jsonrpc': '2.0', 'id': id, 'error': {'code': code, 'message': message}});
-
-void _toolResult(Object? id, String text, {bool isError = false}) => _reply(id, {
-  'content': [
-    {'type': 'text', 'text': text},
-  ],
-  if (isError) 'isError': true,
+void _error(Object? id, int code, String message) => _send({
+  'jsonrpc': '2.0',
+  'id': id,
+  'error': {'code': code, 'message': message},
 });
+
+void _toolResult(Object? id, String text, {bool isError = false}) =>
+    _reply(id, {
+      'content': [
+        {'type': 'text', 'text': text},
+      ],
+      if (isError) 'isError': true,
+    });

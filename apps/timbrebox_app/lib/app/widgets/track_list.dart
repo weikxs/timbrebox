@@ -114,8 +114,9 @@ class _TrackRow extends StatelessWidget {
     final loading = controller.isLoadingTrack(track);
     return Semantics(
       button: true,
-      label: AppStrings.t(loading ? 'track.resolvingFmt' : 'track.playFmt')
-          .replaceFirst('{name}', track.title),
+      label: AppStrings.t(
+        loading ? 'track.resolvingFmt' : 'track.playFmt',
+      ).replaceFirst('{name}', track.title),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: loading ? null : () => controller.play(track),
@@ -159,10 +160,7 @@ class _TrackRow extends StatelessWidget {
                     Text(
                       '${track.artist} · ${track.sourceName}',
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: TimbreColors.muted,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: TimbreColors.muted, fontSize: 11),
                     ),
                   ],
                 ),
@@ -178,7 +176,11 @@ class _TrackRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: () => controller.toggleFavorite(track),
-                tooltip: AppStrings.t(controller.isFavorite(track) ? 'common.unfavorite' : 'common.favorite'),
+                tooltip: AppStrings.t(
+                  controller.isFavorite(track)
+                      ? 'common.unfavorite'
+                      : 'common.favorite',
+                ),
                 iconSize: 18,
                 icon: Icon(
                   controller.isFavorite(track)
@@ -200,11 +202,13 @@ class _TrackRow extends StatelessWidget {
               // While downloading, the same button cancels.
               IconButton(
                 onPressed: () => controller.toggleDownload(track),
-                tooltip: AppStrings.t(controller.isDownloading(track)
-                    ? 'download.cancel'
-                    : controller.isDownloaded(track)
-                    ? 'download.remove'
-                    : 'download.toLocal'),
+                tooltip: AppStrings.t(
+                  controller.isDownloading(track)
+                      ? 'download.cancel'
+                      : controller.isDownloaded(track)
+                      ? 'download.remove'
+                      : 'download.toLocal',
+                ),
                 iconSize: 18,
                 icon: controller.isDownloading(track)
                     ? const SizedBox(

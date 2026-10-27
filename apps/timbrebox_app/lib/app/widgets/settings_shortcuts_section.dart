@@ -102,9 +102,11 @@ class _ShortcutRowState extends State<_ShortcutRow> {
       setState(() => _capturing = false);
       return KeyEventResult.handled;
     }
-    if (_modifiers.contains(key)) return KeyEventResult.handled; // await a real key
+    if (_modifiers.contains(key))
+      return KeyEventResult.handled; // await a real key
     final keyboard = HardwareKeyboard.instance;
-    final hasModifier = keyboard.isShiftPressed ||
+    final hasModifier =
+        keyboard.isShiftPressed ||
         keyboard.isControlPressed ||
         keyboard.isAltPressed ||
         keyboard.isMetaPressed;
@@ -131,9 +133,7 @@ class _ShortcutRowState extends State<_ShortcutRow> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Expanded(
-            child: Text(AppStrings.t('shortcut.${widget.action.name}')),
-          ),
+          Expanded(child: Text(AppStrings.t('shortcut.${widget.action.name}'))),
           if (_capturing)
             Focus(
               focusNode: _focus,
@@ -152,7 +152,11 @@ class _ShortcutRowState extends State<_ShortcutRow> {
     );
   }
 
-  Widget _chip(String text, {required bool active, required VoidCallback onTap}) {
+  Widget _chip(
+    String text, {
+    required bool active,
+    required VoidCallback onTap,
+  }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(

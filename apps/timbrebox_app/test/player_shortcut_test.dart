@@ -8,7 +8,11 @@ void main() {
   test('defaults bind every action', () {
     final defaults = defaultShortcuts();
     for (final action in PlayerAction.values) {
-      expect(defaults[action], isNotNull, reason: '$action must have a default');
+      expect(
+        defaults[action],
+        isNotNull,
+        reason: '$action must have a default',
+      );
     }
   });
 

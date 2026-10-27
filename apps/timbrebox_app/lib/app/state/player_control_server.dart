@@ -56,7 +56,16 @@ final class PlayerControlServer {
   /// app's HOME into its container, so a shared discovery file isn't visible to
   /// an external CLI, but a fixed port range always is.
   static const preferredPorts = [
-    8787, 8788, 8789, 8790, 8791, 8792, 8793, 8794, 8795, 8796,
+    8787,
+    8788,
+    8789,
+    8790,
+    8791,
+    8792,
+    8793,
+    8794,
+    8795,
+    8796,
   ];
 
   bool get running => _server != null;
@@ -153,9 +162,7 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, _status());
         case '/queue':
           return _json(request, HttpStatus.ok, {
-            'items': [
-              for (final track in _controller.queue) _trackJson(track),
-            ],
+            'items': [for (final track in _controller.queue) _trackJson(track)],
           });
         case '/sources':
           return _json(request, HttpStatus.ok, {
@@ -173,11 +180,14 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'lyric': lyric});
         case '/play-queue':
           final i = int.tryParse(query['i'] ?? '');
-          if (i == null) return _badRequest(request, AppStrings.t('control.err.badIndex'));
+          if (i == null)
+            return _badRequest(request, AppStrings.t('control.err.badIndex'));
           final ok = await _controller.playQueueIndex(i);
           return _json(request, ok ? HttpStatus.ok : HttpStatus.notFound, {
             'ok': ok,
-            ...ok ? _status() : {'error': AppStrings.t('control.err.indexRange')},
+            ...ok
+                ? _status()
+                : {'error': AppStrings.t('control.err.indexRange')},
           });
         case '/mode':
           final mode = query['loop'];
@@ -200,7 +210,10 @@ final class PlayerControlServer {
           final id = query['id'];
           final enabled = query['enabled'];
           if (id == null || enabled == null) {
-            return _badRequest(request, AppStrings.t('control.err.missingSource'));
+            return _badRequest(
+              request,
+              AppStrings.t('control.err.missingSource'),
+            );
           }
           _controller.setSourceEnabled(id, enabled == 'true' || enabled == '1');
           return _json(request, HttpStatus.ok, {'ok': true});
@@ -233,17 +246,20 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, {'ok': true, 'quitting': true});
         case '/seek':
           final ms = int.tryParse(query['ms'] ?? '');
-          if (ms == null) return _badRequest(request, AppStrings.t('control.err.badMs'));
+          if (ms == null)
+            return _badRequest(request, AppStrings.t('control.err.badMs'));
           await _controller.seek(Duration(milliseconds: ms));
           return _json(request, HttpStatus.ok, _status());
         case '/volume':
           final level = double.tryParse(query['level'] ?? '');
-          if (level == null) return _badRequest(request, AppStrings.t('control.err.badLevel'));
+          if (level == null)
+            return _badRequest(request, AppStrings.t('control.err.badLevel'));
           _controller.setVolume(level);
           return _json(request, HttpStatus.ok, _status());
         case '/search':
           final q = query['q'] ?? '';
-          if (q.trim().isEmpty) return _badRequest(request, AppStrings.t('control.err.emptyQuery'));
+          if (q.trim().isEmpty)
+            return _badRequest(request, AppStrings.t('control.err.emptyQuery'));
           await _controller.search(q);
           return _json(request, HttpStatus.ok, {
             'query': q,
@@ -267,13 +283,17 @@ final class PlayerControlServer {
           final ok = await _controller.playByRef(source, item);
           return _json(request, ok ? HttpStatus.ok : HttpStatus.notFound, {
             'ok': ok,
-            ...ok ? _status() : {'error': AppStrings.t('control.err.unknownTrack')},
+            ...ok
+                ? _status()
+                : {'error': AppStrings.t('control.err.unknownTrack')},
           });
         default:
           return _json(request, HttpStatus.notFound, {'error': 'unknown path'});
       }
     } catch (error) {
-      return _json(request, HttpStatus.internalServerError, {'error': '$error'});
+      return _json(request, HttpStatus.internalServerError, {
+        'error': '$error',
+      });
     }
   }
 

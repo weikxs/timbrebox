@@ -50,8 +50,16 @@ String? _pathFor(List<String> args) {
   final cmd = args.first;
   String q(int i) => Uri.encodeQueryComponent(args[i]);
   switch (cmd) {
-    case 'status' || 'queue' || 'sources' || 'lyric' || 'play' || 'pause' ||
-        'toggle' || 'next' || 'stop' || 'quit':
+    case 'status' ||
+        'queue' ||
+        'sources' ||
+        'lyric' ||
+        'play' ||
+        'pause' ||
+        'toggle' ||
+        'next' ||
+        'stop' ||
+        'quit':
       return '/$cmd';
     case 'prev':
       return '/previous';

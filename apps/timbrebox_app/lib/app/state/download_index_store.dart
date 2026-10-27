@@ -49,7 +49,8 @@ class DownloadedEntry {
         sourceId: sourceId,
         sourceName: value['sourceName']?.toString() ?? sourceId,
         duration: Duration(milliseconds: durationMs),
-        quality: value['quality']?.toString() ?? AppStrings.t('quality.localFile'),
+        quality:
+            value['quality']?.toString() ?? AppStrings.t('quality.localFile'),
         album: value['album']?.toString(),
         artworkUrl: value['artworkUrl']?.toString(),
       ),
@@ -125,7 +126,9 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
   static String? _inside(Directory directory, String stored) {
     final base = _normalized(directory.absolute.path);
     final candidate = _normalized(
-      File(stored).isAbsolute ? stored : '$base${Platform.pathSeparator}$stored',
+      File(stored).isAbsolute
+          ? stored
+          : '$base${Platform.pathSeparator}$stored',
     );
     return File(candidate).parent.path == base ? candidate : null;
   }

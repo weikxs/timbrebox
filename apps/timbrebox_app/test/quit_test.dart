@@ -27,9 +27,10 @@ void main() {
     final root = await Directory.systemTemp.createTemp('quit');
     addTearDown(() => root.delete(recursive: true));
     unawaited(
-      writeFileAtomically(File('${root.path}/settings.json'), '{}').then(
-        (_) => events.add('write'),
-      ),
+      writeFileAtomically(
+        File('${root.path}/settings.json'),
+        '{}',
+      ).then((_) => events.add('write')),
     );
     final exited = Completer<int>();
     final server = PlayerControlServer(

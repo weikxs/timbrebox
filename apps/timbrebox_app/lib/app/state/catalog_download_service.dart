@@ -74,7 +74,8 @@ final class CatalogDownloadService {
     await directory.create(recursive: true);
     // The short id keeps two different tracks with the same artist and title
     // (or the same song from two sources) from sharing one file.
-    final base = '${_safeName('${track.artist} - ${track.title}')} '
+    final base =
+        '${_safeName('${track.artist} - ${track.title}')} '
         '[${_shortId(track.ref)}]';
     final extension = _extension(stream.mimeType, stream.uri);
     final target = File('${directory.path}/$base.$extension');
@@ -179,7 +180,16 @@ final class CatalogDownloadService {
   };
 
   static const _audioSuffixes = {
-    'm4a', 'mp4', 'aac', 'webm', 'mp3', 'flac', 'ogg', 'oga', 'opus', 'wav',
+    'm4a',
+    'mp4',
+    'aac',
+    'webm',
+    'mp3',
+    'flac',
+    'ogg',
+    'oga',
+    'opus',
+    'wav',
   };
 
   /// The file extension from the stream's MIME type, else from a known audio
@@ -216,7 +226,8 @@ String friendlyDownloadError(Object error) => switch (error) {
   EgressDeniedException(:final message) => message,
   TimeoutException() => AppStrings.t('download.errStalled'),
   FileSystemException() => AppStrings.t('download.errDisk'),
-  SocketException() || HttpException() || TlsException() =>
-    AppStrings.t('download.errNetwork'),
+  SocketException() ||
+  HttpException() ||
+  TlsException() => AppStrings.t('download.errNetwork'),
   _ => AppStrings.t('download.failed'),
 };

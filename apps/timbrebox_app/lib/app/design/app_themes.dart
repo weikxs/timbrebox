@@ -10,6 +10,7 @@ class AppTheme {
   const AppTheme(this.id, this.nameKey, this.palette);
 
   final String id;
+
   /// AppStrings key for the display name (resolved at build time for i18n).
   final String nameKey;
   final TimbrePalette? palette; // null => system
@@ -25,8 +26,10 @@ const kAppThemes = <AppTheme>[
   AppTheme('black', 'theme.black', kBlackPalette),
 ];
 
-AppTheme appThemeById(String id) =>
-    kAppThemes.firstWhere((theme) => theme.id == id, orElse: () => kAppThemes[1]);
+AppTheme appThemeById(String id) => kAppThemes.firstWhere(
+  (theme) => theme.id == id,
+  orElse: () => kAppThemes[1],
+);
 
 /// Resolves the concrete palette for [id], mapping "system" to light/dark by
 /// the current OS [platformBrightness].

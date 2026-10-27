@@ -62,7 +62,13 @@ class _AppearanceSettings extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => _pickSkin(context, controller),
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: Text(AppStrings.t(controller.hasSkin ? 'settings.changeBg' : 'settings.uploadBg')),
+              label: Text(
+                AppStrings.t(
+                  controller.hasSkin
+                      ? 'settings.changeBg'
+                      : 'settings.uploadBg',
+                ),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: TimbreColors.gold,
                 foregroundColor: const Color(0xff2b1e13),
@@ -90,9 +96,13 @@ class _AppearanceSettings extends StatelessWidget {
       final path = result?.files.single.path;
       if (path == null) return;
       await controller.setSkinFromFile(path);
-      messenger.showSnackBar(SnackBar(content: Text(AppStrings.t('settings.bgApplied'))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppStrings.t('settings.bgApplied'))),
+      );
     } catch (_) {
-      messenger.showSnackBar(SnackBar(content: Text(AppStrings.t('settings.bgReadFailed'))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppStrings.t('settings.bgReadFailed'))),
+      );
     }
   }
 }
@@ -204,7 +214,9 @@ class _GeneralSettings extends StatelessWidget {
           title: Text(AppStrings.t('settings.restoreSession')),
         ),
         GroupLabel(AppStrings.t('settings.playback')),
-        Text('${AppStrings.t('settings.volume')} ${(controller.volume * 100).round()}%'),
+        Text(
+          '${AppStrings.t('settings.volume')} ${(controller.volume * 100).round()}%',
+        ),
         Slider(value: controller.volume, onChanged: controller.setVolume),
         const SizedBox(height: 2),
         Text(
@@ -235,7 +247,9 @@ class _GeneralSettings extends StatelessWidget {
               for (final quality in QualityPreference.values)
                 DropdownMenuItem(
                   value: quality,
-                  child: Text('${AppStrings.t('settings.defaultQuality')}${quality.label}'),
+                  child: Text(
+                    '${AppStrings.t('settings.defaultQuality')}${quality.label}',
+                  ),
                 ),
             ],
           ),
@@ -284,7 +298,8 @@ class _GeneralSettings extends StatelessWidget {
           title: Text(AppStrings.t('agent.localInterface')),
           subtitle: Text(AppStrings.t('agent.interfaceSubtitle')),
         ),
-        if (controller.agentControlEnabled) _AgentControlInfo(controller: controller),
+        if (controller.agentControlEnabled)
+          _AgentControlInfo(controller: controller),
       ],
     ),
   );
@@ -337,7 +352,9 @@ class _AgentControlInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final error = controller.agentControlError;
     final address =
-        error ?? controller.agentControlAddress ?? AppStrings.t('agent.starting');
+        error ??
+        controller.agentControlAddress ??
+        AppStrings.t('agent.starting');
     final tokenPath = controller.agentControlTokenPath ?? '…';
     final example =
         'curl -H "X-TimbreBox-Token: \$(cat \'$tokenPath\')" "$address/status"';
@@ -461,32 +478,36 @@ class _DownloadSettingsState extends State<_DownloadSettings> {
           FutureBuilder<Directory>(
             future: _directory,
             builder: (context, snapshot) => _DirectoryTile(
-            path: snapshot.hasData ? snapshot.data!.path : AppStrings.t('download.resolving'),
-            ready: snapshot.hasData,
-          ),
-        ),
-        Divider(height: 22, color: TimbreColors.line),
-        Row(
-          children: [
-            Text(AppStrings.t('download.downloaded')),
-            const Spacer(),
-            Text(
-              AppStrings.t('count.tracksFmt').replaceFirst('{n}', '${controller.downloads.length}'),
-              style: TextStyle(color: TimbreColors.gold),
+              path: snapshot.hasData
+                  ? snapshot.data!.path
+                  : AppStrings.t('download.resolving'),
+              ready: snapshot.hasData,
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: controller.downloads.isEmpty
-                ? null
-                : () => _confirmClear(context, controller),
-            icon: const Icon(Icons.delete_outline_rounded, size: 16),
-            label: Text(AppStrings.t('download.clearLocal')),
           ),
-        ),
+          Divider(height: 22, color: TimbreColors.line),
+          Row(
+            children: [
+              Text(AppStrings.t('download.downloaded')),
+              const Spacer(),
+              Text(
+                AppStrings.t(
+                  'count.tracksFmt',
+                ).replaceFirst('{n}', '${controller.downloads.length}'),
+                style: TextStyle(color: TimbreColors.gold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: controller.downloads.isEmpty
+                  ? null
+                  : () => _confirmClear(context, controller),
+              icon: const Icon(Icons.delete_outline_rounded, size: 16),
+              label: Text(AppStrings.t('download.clearLocal')),
+            ),
+          ),
         ],
       ),
     );
@@ -587,7 +608,10 @@ void _confirmClear(BuildContext context, AppController controller) {
             controller.clearDownloads();
             Navigator.of(dialogContext).pop();
           },
-          child: Text(AppStrings.t('common.clear'), style: TextStyle(color: TimbreColors.gold)),
+          child: Text(
+            AppStrings.t('common.clear'),
+            style: TextStyle(color: TimbreColors.gold),
+          ),
         ),
       ],
     ),

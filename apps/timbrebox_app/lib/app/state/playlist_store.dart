@@ -21,9 +21,7 @@ final class FilePlaylistStore implements PlaylistStore {
     if (!await file.exists()) return const [];
     try {
       final list = jsonDecode(await file.readAsString()) as List? ?? const [];
-      return [
-        for (final entry in list) ?Playlist.fromJson(entry),
-      ];
+      return [for (final entry in list) ?Playlist.fromJson(entry)];
     } catch (_) {
       return const [];
     }

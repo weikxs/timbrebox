@@ -201,8 +201,9 @@ final class StreamHeaderProxy {
     _Range range,
     int total,
   ) {
-    response.statusCode =
-        range.isPartial ? HttpStatus.partialContent : HttpStatus.ok;
+    response.statusCode = range.isPartial
+        ? HttpStatus.partialContent
+        : HttpStatus.ok;
     final contentType = upstream.headers.value(HttpHeaders.contentTypeHeader);
     if (contentType != null) {
       response.headers.set(HttpHeaders.contentTypeHeader, contentType);
@@ -237,7 +238,9 @@ final class StreamHeaderProxy {
     if (dash < 0) return _Range(0, lastByte, isPartial: false);
     final start = int.tryParse(spec.substring(0, dash)) ?? 0;
     final endText = spec.substring(dash + 1).trim();
-    final end = endText.isEmpty ? lastByte : (int.tryParse(endText) ?? lastByte);
+    final end = endText.isEmpty
+        ? lastByte
+        : (int.tryParse(endText) ?? lastByte);
     return _Range(start, end < start ? lastByte : end, isPartial: true);
   }
 

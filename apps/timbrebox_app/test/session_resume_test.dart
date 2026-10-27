@@ -52,8 +52,10 @@ void main() {
         positionMs: 90000, // 1:30
       ),
     );
-    final controller =
-        AppController(engine: TestPlayerEngine(), sessionStore: store);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      sessionStore: store,
+    );
     addTearDown(controller.dispose);
 
     await Future<void>.delayed(Duration.zero); // let the async restore run

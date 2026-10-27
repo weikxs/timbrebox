@@ -192,7 +192,9 @@ class _PluginSettingsState extends State<PluginSettings> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            AppStrings.t('plugin.updateFailedFmt').replaceFirst('{e}', '$error'),
+            AppStrings.t(
+              'plugin.updateFailedFmt',
+            ).replaceFirst('{e}', '$error'),
           ),
         ),
       );

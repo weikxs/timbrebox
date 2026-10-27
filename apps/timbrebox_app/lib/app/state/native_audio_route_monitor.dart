@@ -24,7 +24,8 @@ class NativeAudioRouteMonitor implements AudioRouteMonitor {
         final mapped = _map(event);
         if (mapped != null) controller.add(mapped);
       },
-      onError: (_) {}, // Best-effort: a channel error just disables the feature.
+      onError:
+          (_) {}, // Best-effort: a channel error just disables the feature.
     );
   }
 

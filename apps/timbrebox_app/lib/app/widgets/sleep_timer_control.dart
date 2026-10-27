@@ -59,10 +59,9 @@ class SleepTimerControl extends StatelessWidget {
             for (final minutes in _minuteOptions)
               ChoiceChip(
                 label: Text(
-                  AppStrings.t('settings.minutesFmt').replaceFirst(
-                    '{m}',
-                    '$minutes',
-                  ),
+                  AppStrings.t(
+                    'settings.minutesFmt',
+                  ).replaceFirst('{m}', '$minutes'),
                 ),
                 selected: total == Duration(minutes: minutes),
                 onSelected: (_) =>

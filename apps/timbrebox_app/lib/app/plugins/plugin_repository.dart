@@ -65,7 +65,9 @@ final class PluginRepository {
       return [await installSource(content, uri)];
     }
     if (urls.isEmpty) {
-      throw PluginInstallException(AppStrings.t('plugin.err.emptySubscription'));
+      throw PluginInstallException(
+        AppStrings.t('plugin.err.emptySubscription'),
+      );
     }
     final installed = <PluginCatalogSource>[];
     final errors = <String>[];
@@ -78,7 +80,11 @@ final class PluginRepository {
       }
     }
     if (installed.isEmpty) {
-      throw PluginInstallException(AppStrings.t('plugin.err.subscriptionAllFailed').replaceFirst('{e}', errors.take(2).join('；')));
+      throw PluginInstallException(
+        AppStrings.t(
+          'plugin.err.subscriptionAllFailed',
+        ).replaceFirst('{e}', errors.take(2).join('；')),
+      );
     }
     return installed;
   }
@@ -278,7 +284,8 @@ final class PluginRepository {
     if (uri.scheme != 'https') {
       throw PluginInstallException(AppStrings.t('plugin.err.invalidUrl'));
     }
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 20);
     policy.attach(client, httpsOnly: true);
     try {
       final request = await client.getUrl(uri);
@@ -288,8 +295,9 @@ final class PluginRepository {
       );
       if (response.statusCode != HttpStatus.ok) {
         throw PluginInstallException(
-          AppStrings.t('plugin.err.downloadHttp')
-              .replaceFirst('{code}', '${response.statusCode}'),
+          AppStrings.t(
+            'plugin.err.downloadHttp',
+          ).replaceFirst('{code}', '${response.statusCode}'),
         );
       }
       final bytes = <int>[];

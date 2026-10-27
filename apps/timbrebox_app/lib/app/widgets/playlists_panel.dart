@@ -7,7 +7,10 @@ import '../state/app_controller.dart';
 import 'glass_panel.dart';
 
 /// Prompts for a playlist name (used for create and rename).
-Future<String?> promptPlaylistName(BuildContext context, {String initial = ''}) {
+Future<String?> promptPlaylistName(
+  BuildContext context, {
+  String initial = '',
+}) {
   final field = TextEditingController(text: initial);
   return showDialog<String>(
     context: context,
@@ -143,10 +146,9 @@ class _PlaylistTile extends StatelessWidget {
         tilePadding: EdgeInsets.zero,
         title: Text(playlist.name),
         subtitle: Text(
-          AppStrings.t('library.playlistCountFmt').replaceFirst(
-            '{n}',
-            '${playlist.tracks.length}',
-          ),
+          AppStrings.t(
+            'library.playlistCountFmt',
+          ).replaceFirst('{n}', '${playlist.tracks.length}'),
           style: TextStyle(color: TimbreColors.muted, fontSize: 11),
         ),
         leading: IconButton(
@@ -161,13 +163,24 @@ class _PlaylistTile extends StatelessWidget {
             ListTile(
               dense: true,
               contentPadding: const EdgeInsets.only(left: 8, right: 0),
-              title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text(track.artist, maxLines: 1, overflow: TextOverflow.ellipsis),
+              title: Text(
+                track.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                track.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               onTap: () => controller.play(track),
               trailing: IconButton(
                 tooltip: AppStrings.t('library.removeFromPlaylist'),
-                icon: Icon(Icons.remove_circle_outline,
-                    size: 18, color: TimbreColors.muted),
+                icon: Icon(
+                  Icons.remove_circle_outline,
+                  size: 18,
+                  color: TimbreColors.muted,
+                ),
                 onPressed: () =>
                     controller.removeFromPlaylist(playlist.id, track.ref),
               ),
@@ -183,8 +196,10 @@ class _PlaylistTile extends StatelessWidget {
                 ),
               TextButton(
                 onPressed: () async {
-                  final name =
-                      await promptPlaylistName(context, initial: playlist.name);
+                  final name = await promptPlaylistName(
+                    context,
+                    initial: playlist.name,
+                  );
                   if (name != null && name.isNotEmpty) {
                     controller.renamePlaylist(playlist.id, name);
                   }

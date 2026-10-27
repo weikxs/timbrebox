@@ -55,7 +55,9 @@ class CatalogTrack {
     artist: json['artist'] as String? ?? '',
     sourceId: json['sourceId'] as String,
     sourceName: json['sourceName'] as String? ?? '',
-    duration: Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
+    duration: Duration(
+      milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0,
+    ),
     quality: json['quality'] as String? ?? '',
     album: json['album'] as String?,
     artworkUrl: json['artworkUrl'] as String?,
@@ -83,7 +85,14 @@ class CatalogTrack {
 
 enum QualityPreference { standard, high, lossless, hires }
 
-enum SettingsSection { general, appearance, sources, plugins, downloads, shortcuts }
+enum SettingsSection {
+  general,
+  appearance,
+  sources,
+  plugins,
+  downloads,
+  shortcuts,
+}
 
 enum PlaybackLoop { queue, track, off, shuffle }
 

@@ -51,9 +51,7 @@ class _ShellPageState extends State<ShellPage> {
   void _showNotice() {
     final notice = _controller.takeNotice();
     if (notice == null || !mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(notice)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(notice)));
   }
 
   @override

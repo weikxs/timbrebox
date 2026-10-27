@@ -21,7 +21,10 @@ void main() {
     catalog: BuiltInMusicCatalog.standard(),
   );
 
-  Future<void> pumpHotkeys(WidgetTester tester, AppController controller) async {
+  Future<void> pumpHotkeys(
+    WidgetTester tester,
+    AppController controller,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: PlayerHotkeys(

@@ -110,7 +110,8 @@ const moreEnStrings = <String, String>{
   'plugin.js.moduleNotAllowed':
       'The plugin asked for a module that is not allowed: ',
   // hot library
-  'hot.pluginChartsFailedFmt': 'Charts from these plugins did not load: {names}',
+  'hot.pluginChartsFailedFmt':
+      'Charts from these plugins did not load: {names}',
   // storage
   'storage.writeFailed':
       'Some settings or library data could not be saved (is the disk full, '

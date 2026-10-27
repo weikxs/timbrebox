@@ -140,8 +140,7 @@ class AudioServiceMediaControls implements SystemMediaControls {
       _handler?.commands.stream ?? const Stream.empty();
 
   @override
-  Stream<Duration> get seeks =>
-      _handler?.seeks.stream ?? const Stream.empty();
+  Stream<Duration> get seeks => _handler?.seeks.stream ?? const Stream.empty();
 
   @override
   Future<void> dispose() async {

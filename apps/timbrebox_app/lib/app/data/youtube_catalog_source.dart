@@ -109,11 +109,9 @@ final class YouTubeCatalogSource implements CatalogSource {
     // media_kit/ffmpeg can't open the googlevideo URL directly (it omits the
     // Range header that the URL demands → 403), so route it through the local
     // proxy which injects the Range and the browser User-Agent per hop.
-    final localUri = await _proxy.publish(
-      audio.url,
-      const {'User-Agent': _browserUserAgent},
-      chunked: true,
-    );
+    final localUri = await _proxy.publish(audio.url, const {
+      'User-Agent': _browserUserAgent,
+    }, chunked: true);
     return ResolvedStream(
       uri: localUri,
       mimeType: isMp4 ? 'audio/mp4' : 'audio/webm',

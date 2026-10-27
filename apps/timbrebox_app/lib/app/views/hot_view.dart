@@ -67,23 +67,107 @@ List<_Category> _pluginCategories(List<PluginTopListItem> lists) => [
 ];
 
 const _audiusCategories = <_Category>[
-  _Category('jazz', 'hot.cat.jazz', localized: true, audiusGenre: 'Jazz', gradient: [Color(0xff8e2de2), Color(0xff4a00e0)]),
-  _Category('electronic', 'hot.cat.electronic', localized: true, audiusGenre: 'Electronic', gradient: [Color(0xff00c6ff), Color(0xff0072ff)]),
-  _Category('hiphop', 'hot.cat.hiphop', localized: true, audiusGenre: 'Hip-Hop/Rap', gradient: [Color(0xfff7971e), Color(0xffffd200)]),
-  _Category('pop', 'hot.cat.pop', localized: true, audiusGenre: 'Pop', gradient: [Color(0xffff5f6d), Color(0xffffc371)]),
-  _Category('rock', 'hot.cat.rock', localized: true, audiusGenre: 'Rock', gradient: [Color(0xffcb2d3e), Color(0xffef473a)]),
-  _Category('classical', 'hot.cat.classical', localized: true, audiusGenre: 'Classical', gradient: [Color(0xff2c3e50), Color(0xff4ca1af)]),
-  _Category('ambient', 'hot.cat.ambient', localized: true, audiusGenre: 'Ambient', gradient: [Color(0xff30cfd0), Color(0xff330867)]),
-  _Category('soul', 'hot.cat.soul', localized: true, audiusGenre: 'R&B/Soul', gradient: [Color(0xffee0979), Color(0xffff6a00)]),
+  _Category(
+    'jazz',
+    'hot.cat.jazz',
+    localized: true,
+    audiusGenre: 'Jazz',
+    gradient: [Color(0xff8e2de2), Color(0xff4a00e0)],
+  ),
+  _Category(
+    'electronic',
+    'hot.cat.electronic',
+    localized: true,
+    audiusGenre: 'Electronic',
+    gradient: [Color(0xff00c6ff), Color(0xff0072ff)],
+  ),
+  _Category(
+    'hiphop',
+    'hot.cat.hiphop',
+    localized: true,
+    audiusGenre: 'Hip-Hop/Rap',
+    gradient: [Color(0xfff7971e), Color(0xffffd200)],
+  ),
+  _Category(
+    'pop',
+    'hot.cat.pop',
+    localized: true,
+    audiusGenre: 'Pop',
+    gradient: [Color(0xffff5f6d), Color(0xffffc371)],
+  ),
+  _Category(
+    'rock',
+    'hot.cat.rock',
+    localized: true,
+    audiusGenre: 'Rock',
+    gradient: [Color(0xffcb2d3e), Color(0xffef473a)],
+  ),
+  _Category(
+    'classical',
+    'hot.cat.classical',
+    localized: true,
+    audiusGenre: 'Classical',
+    gradient: [Color(0xff2c3e50), Color(0xff4ca1af)],
+  ),
+  _Category(
+    'ambient',
+    'hot.cat.ambient',
+    localized: true,
+    audiusGenre: 'Ambient',
+    gradient: [Color(0xff30cfd0), Color(0xff330867)],
+  ),
+  _Category(
+    'soul',
+    'hot.cat.soul',
+    localized: true,
+    audiusGenre: 'R&B/Soul',
+    gradient: [Color(0xffee0979), Color(0xffff6a00)],
+  ),
 ];
 
 const _bilibiliCategories = <_Category>[
-  _Category('guofeng', 'hot.cat.guofeng', localized: true, bilibiliQuery: '古风音乐', gradient: [Color(0xff642b73), Color(0xffc6426e)]),
-  _Category('cpop', 'hot.cat.cpop', localized: true, bilibiliQuery: '华语流行', gradient: [Color(0xffff512f), Color(0xffdd2476)]),
-  _Category('cover', 'hot.cat.cover', localized: true, bilibiliQuery: '翻唱', gradient: [Color(0xff11998e), Color(0xff38ef7d)]),
-  _Category('acg', 'hot.cat.acg', localized: true, bilibiliQuery: 'ACG 音乐', gradient: [Color(0xff2193b0), Color(0xff6dd5ed)]),
-  _Category('folk', 'hot.cat.folk', localized: true, bilibiliQuery: '民谣', gradient: [Color(0xfff12711), Color(0xfff5af19)]),
-  _Category('guochao', 'hot.cat.guochao', localized: true, bilibiliQuery: '国风电音', gradient: [Color(0xff3a1c71), Color(0xffd76d77)]),
+  _Category(
+    'guofeng',
+    'hot.cat.guofeng',
+    localized: true,
+    bilibiliQuery: '古风音乐',
+    gradient: [Color(0xff642b73), Color(0xffc6426e)],
+  ),
+  _Category(
+    'cpop',
+    'hot.cat.cpop',
+    localized: true,
+    bilibiliQuery: '华语流行',
+    gradient: [Color(0xffff512f), Color(0xffdd2476)],
+  ),
+  _Category(
+    'cover',
+    'hot.cat.cover',
+    localized: true,
+    bilibiliQuery: '翻唱',
+    gradient: [Color(0xff11998e), Color(0xff38ef7d)],
+  ),
+  _Category(
+    'acg',
+    'hot.cat.acg',
+    localized: true,
+    bilibiliQuery: 'ACG 音乐',
+    gradient: [Color(0xff2193b0), Color(0xff6dd5ed)],
+  ),
+  _Category(
+    'folk',
+    'hot.cat.folk',
+    localized: true,
+    bilibiliQuery: '民谣',
+    gradient: [Color(0xfff12711), Color(0xfff5af19)],
+  ),
+  _Category(
+    'guochao',
+    'hot.cat.guochao',
+    localized: true,
+    bilibiliQuery: '国风电音',
+    gradient: [Color(0xff3a1c71), Color(0xffd76d77)],
+  ),
 ];
 
 Color _sourceColor(String sourceId) => switch (sourceId) {
@@ -248,8 +332,7 @@ class _Tiles extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final columns = (constraints.maxWidth / _minCard).floor().clamp(2, 5);
-      final cardWidth =
-          (constraints.maxWidth - _gap * (columns - 1)) / columns;
+      final cardWidth = (constraints.maxWidth - _gap * (columns - 1)) / columns;
       return Wrap(
         spacing: _gap,
         runSpacing: _gap,
@@ -338,34 +421,34 @@ class _CategoryCard extends StatelessWidget {
                   ),
                 ),
               ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  category.displayLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -.4,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.displayLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.4,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                Text(
-                  category.source,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: .82),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                  const Spacer(),
+                  Text(
+                    category.source,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: .82),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     ),
-  ),
   );
 }
 
@@ -487,7 +570,11 @@ class _PlayAllButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 19),
+              const Icon(
+                Icons.play_arrow_rounded,
+                color: Colors.white,
+                size: 19,
+              ),
               const SizedBox(width: 7),
               Text(
                 AppStrings.t('player.playAll'),
@@ -603,7 +690,10 @@ class _TrackRowState extends State<_TrackRow> {
                         '${track.artist} · ${track.sourceName}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: TimbreColors.muted, fontSize: 12),
+                        style: TextStyle(
+                          color: TimbreColors.muted,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -628,7 +718,9 @@ class _TrackRowState extends State<_TrackRow> {
                 ),
                 IconButton(
                   onPressed: () => controller.toggleFavorite(track),
-                  tooltip: AppStrings.t(favorite ? 'common.unfavorite' : 'common.favorite'),
+                  tooltip: AppStrings.t(
+                    favorite ? 'common.unfavorite' : 'common.favorite',
+                  ),
                   iconSize: 18,
                   visualDensity: VisualDensity.compact,
                   color: favorite ? _magenta : TimbreColors.muted,
@@ -713,7 +805,10 @@ class _Notice extends StatelessWidget {
           width: 26,
           height: 26,
           child: loading
-              ? CircularProgressIndicator(strokeWidth: 2, color: TimbreColors.gold)
+              ? CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: TimbreColors.gold,
+                )
               : Icon(
                   error != null
                       ? Icons.wifi_off_rounded

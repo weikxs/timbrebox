@@ -268,7 +268,9 @@ class _ResultHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = query.isEmpty ? AppStrings.t('search.startTitle') : '“$query”';
+    final title = query.isEmpty
+        ? AppStrings.t('search.startTitle')
+        : '“$query”';
     final sourceName = source?.name;
     final detail = sourceName == null
         ? AppStrings.t('search.sourceDisabled')

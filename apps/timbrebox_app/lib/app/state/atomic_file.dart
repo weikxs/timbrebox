@@ -45,6 +45,5 @@ Future<void> _replace(File file, String contents) async {
 /// Completes once every write started so far has reached the disk (or
 /// failed), e.g. before the app quits.
 Future<void> pendingAtomicWrites() => Future.wait([
-  for (final write in _pendingWrites.values)
-    write.catchError((Object _) {}),
+  for (final write in _pendingWrites.values) write.catchError((Object _) {}),
 ]);
