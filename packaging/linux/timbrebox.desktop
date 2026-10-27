@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TimbreBox
+Comment=Music player for public music sources
+Exec=timbrebox-app
+Icon=timbrebox
+Categories=AudioVideo;Audio;Player;
+Terminal=false
+StartupWMClass=io.timbrebox.timbrebox_app
