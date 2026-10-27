@@ -1,0 +1,31 @@
+# One pull request per ecosystem per month at most: the month's updates are grouped together.
+# Major versions of Dart packages are not proposed automatically: they change APIs and are
+# upgraded on purpose, with their own tests.
+version: 2
+updates:
+  - package-ecosystem: pub
+    directories:
+      - /apps/timbrebox_app
+      - /packages/timbrebox_core
+      - /packages/timbrebox_cli
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      pub:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    commit-message:
+      prefix: build
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci

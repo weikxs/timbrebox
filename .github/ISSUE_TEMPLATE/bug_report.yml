@@ -1,0 +1,57 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please replace personal paths, account names and private links with placeholders
+        (for example `~/Music` and `https://example.com/plugin.js`) before posting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Search for "demo" in Audius
+        2. Play the first result
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [macOS, Windows, Linux, iOS, Android]
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system version and CPU
+      placeholder: macOS 15 on Apple silicon / Ubuntu 24.04 on x86_64
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TimbreBox version or commit
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Music source or plugin involved
+      placeholder: Audius / Radio Browser / a plugin's name and version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: With personal paths and private links replaced by placeholders.
+      render: text
