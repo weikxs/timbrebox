@@ -25,13 +25,15 @@ void main() {
   test('the file store persists entries and prunes missing files', () async {
     final dir = await Directory.systemTemp.createTemp('tb_library');
     addTearDown(() => dir.delete(recursive: true));
-    final present = File('${dir.path}/present.mp3')
-      ..writeAsStringSync('audio');
+    final present = File('${dir.path}/present.mp3')..writeAsStringSync('audio');
     final store = FileDownloadIndexStore(directoryProvider: () async => dir);
 
     await store.save([
       DownloadedEntry(track: _track('present'), path: present.path),
-      DownloadedEntry(track: _track('missing'), path: '${dir.path}/missing.mp3'),
+      DownloadedEntry(
+        track: _track('missing'),
+        path: '${dir.path}/missing.mp3',
+      ),
     ]);
     final loaded = await store.load();
 

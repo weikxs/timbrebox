@@ -17,6 +17,10 @@ final class DouyinCatalogSource extends _PageVideoCatalogSource {
     pathValues: {'query': query},
     query: const {'type': 'general'},
   );
+
+  @override
+  Uri pageUri(String id, {String? handle}) =>
+      endpoint.uri('video', pathValues: {'id': id});
 }
 
 /// TikTok's public web search page uses the same page-state approach. It is
@@ -33,9 +37,14 @@ final class TikTokCatalogSource extends _PageVideoCatalogSource {
   @override
   Uri searchUri(String query) =>
       endpoint.uri('search', query: {'q': query, 'lang': 'en'});
+
+  @override
+  Uri pageUri(String id, {String? handle}) =>
+      endpoint.uri('video', pathValues: {'author': handle ?? '', 'id': id});
 }
 
-abstract base class _PageVideoCatalogSource implements CatalogSource {
+abstract base class _PageVideoCatalogSource
+    implements CatalogSource, HintedCatalogSource {
   _PageVideoCatalogSource({
     required this.http,
     required this.id,
@@ -49,7 +58,10 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
   final String name;
   final SourceEndpoint endpoint;
   final String referer;
-  final Map<String, _PageVideoRecord> _records = <String, _PageVideoRecord>{};
+  final _records = BoundedCache<String, _PageVideoRecord>();
+
+  /// Video pages of saved tracks, from their resolve hints.
+  final _pages = BoundedCache<String, Uri>();
   late final SourceHttpClient _client = http ?? SourceHttpClient();
 
   @override
@@ -61,6 +73,10 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
 
   Uri searchUri(String query);
 
+  /// The public page of video [id] (by its author's [handle] where the
+  /// site's URL needs one).
+  Uri pageUri(String id, {String? handle});
+
   @override
   Future<SearchPage> search(SearchRequest request) async {
     // The embedded page state is a single batch; later pages would require a
@@ -71,10 +87,10 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
       request.cancellation,
       headers: {'Referer': referer},
     );
-    final records = _pageRecords(text, sourceId: id);
+    final records = await _parsePage(text, sourceId: id);
     if (records.isEmpty) {
-      throw const SourceException(
-        '该音源当前没有返回可播放的公开搜索结果。',
+      throw SourceException(
+        AppStrings.t('source.video.noResults'),
         retryable: true,
         code: 'source_no_public_results',
       );
@@ -104,19 +120,53 @@ abstract base class _PageVideoCatalogSource implements CatalogSource {
     sourceName: name,
     duration: summary.duration ?? Duration.zero,
     quality: '$name public stream',
+    resolveHint: {
+      'page': pageUri(
+        summary.ref.itemId,
+        handle: _records[summary.ref.itemId]?.handle,
+      ).toString(),
+    },
   );
+
+  @override
+  void rememberHint(String itemId, Map<String, Object?> hint) {
+    final page = Uri.tryParse('${hint['page']}');
+    // Only this source's own site: the hint is read back from a file.
+    if (page != null && page.scheme == 'https' && page.host == endpoint.host) {
+      _pages[itemId] = page;
+    }
+  }
+
+  /// Reads the record for [id] from its video page (a saved track after a
+  /// restart, when no search has filled [_records]).
+  Future<_PageVideoRecord?> _recordFromPage(
+    String id,
+    CancellationToken cancellation,
+  ) async {
+    final text = await _client.get(
+      _pages[id] ?? pageUri(id),
+      cancellation,
+      headers: {'Referer': referer},
+    );
+    for (final record in await _parsePage(text, sourceId: this.id)) {
+      if (record.id == id) return _records[id] = record;
+    }
+    return null;
+  }
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != id) {
-      throw StateError('音源引用与解析器不匹配。');
+      throw StateError(AppStrings.t('source.err.refMismatch'));
     }
-    final record = _records[request.ref.itemId];
+    final record =
+        _records[request.ref.itemId] ??
+        await _recordFromPage(request.ref.itemId, request.cancellation);
     final uri = Uri.tryParse(record?.streamUrl ?? '');
     if (uri == null || uri.scheme != 'https') {
-      throw const SourceException(
-        '该音源未返回可直接播放的公开音频流。',
+      throw SourceException(
+        AppStrings.t('source.video.noStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );
@@ -136,6 +186,7 @@ final class _PageVideoRecord {
     required this.artist,
     required this.streamUrl,
     this.duration,
+    this.handle,
   });
 
   final String id;
@@ -143,6 +194,25 @@ final class _PageVideoRecord {
   final String artist;
   final String? streamUrl;
   final Duration? duration;
+
+  /// The author's account name, where the page URL needs it (TikTok).
+  final String? handle;
+}
+
+/// Pages above this size are parsed on a background isolate: decoding up to
+/// a megabyte of embedded JSON would otherwise block the UI for tens of ms.
+const _backgroundParseChars = 64 * 1024;
+
+/// Parses [text] once into a list (the lazy [_pageRecords] would re-run the
+/// whole scan for every pass over it).
+Future<List<_PageVideoRecord>> _parsePage(
+  String text, {
+  required String sourceId,
+}) async {
+  if (text.length < _backgroundParseChars) {
+    return _pageRecords(text, sourceId: sourceId).toList();
+  }
+  return Isolate.run(() => _pageRecords(text, sourceId: sourceId).toList());
 }
 
 Iterable<_PageVideoRecord> _pageRecords(
@@ -210,7 +280,12 @@ _PageVideoRecord? _recordFromMap(
   final durationNumber = durationValue is num ? durationValue.round() : null;
   final streamUrl = _streamUrl(media);
   if (streamUrl == null) return null;
+  final owner = _firstValue(map, const ['author']);
+  final handle = owner is Map
+      ? _firstText(owner, const ['uniqueId', 'unique_id'])
+      : null;
   return _PageVideoRecord(
+    handle: handle?.trim().isNotEmpty == true ? handle!.trim() : null,
     id: id,
     title: _stripHtml(title).trim(),
     artist: author?.trim().isNotEmpty == true ? author!.trim() : sourceId,

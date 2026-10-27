@@ -1,0 +1,99 @@
+name: Full
+
+# The runs a pull request leaves out, on demand (Actions > Full > Run
+# workflow): everything CI runs, the analysis and tests on macOS and Windows,
+# the release builds of the three desktop platforms packaged as a release
+# packages them, and debug builds for Android and iOS. Nothing requires these
+# jobs to merge.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: check (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: ghcr.io/cirruslabs/flutter:3.44.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: make check
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make check
+
+  tests:
+    name: analyze and test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # Formatting is checked on Linux only: Windows checks files out with CRLF line endings.
+      - name: Analysis and tests
+        shell: bash
+        run: tools/check.sh analyze test
+
+  desktop:
+    name: release build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS universal
+            runner: macos-latest
+            platform: macos
+          - name: Linux x86_64
+            runner: ubuntu-22.04
+            platform: linux
+          - name: Windows x64
+            runner: windows-latest
+            platform: windows
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          linux-build: "true"
+      - name: Build the app
+        shell: bash
+        working-directory: apps/timbrebox_app
+        run: flutter build "${{ matrix.platform }}" --release
+      - name: Package it as a release would
+        shell: bash
+        run: |
+          version=$(sed -n 's/^version: *\([^+]*\).*/\1/p' apps/timbrebox_app/pubspec.yaml)
+          scripts/release/package-bundles.sh "$version" dist
+          ls -l dist
+
+  android:
+    name: android (debug build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: Build
+        working-directory: apps/timbrebox_app
+        run: |
+          # Gradle runs on the runner's preinstalled Java 17, which the app's build files target.
+          export JAVA_HOME="$JAVA_HOME_17_X64"
+          flutter build apk --debug
+
+  ios:
+    name: ios (simulator build)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - name: Build
+        working-directory: apps/timbrebox_app
+        run: flutter build ios --simulator --debug

@@ -14,6 +14,7 @@ import '../state/diagnostic_log.dart';
 import '../state/download_paths.dart';
 import 'playback_rate_control.dart';
 import 'settings_common.dart';
+import 'settings_plugins_section.dart';
 import 'settings_shortcuts_section.dart';
 import 'sleep_timer_control.dart';
 
@@ -26,199 +27,10 @@ class SettingsSectionContent extends StatelessWidget {
     SettingsSection.general => _GeneralSettings(controller: controller),
     SettingsSection.appearance => _AppearanceSettings(controller: controller),
     SettingsSection.sources => _SourceSettings(controller: controller),
-    SettingsSection.plugins => _PluginSettings(controller: controller),
+    SettingsSection.plugins => PluginSettings(controller: controller),
     SettingsSection.downloads => _DownloadSettings(controller: controller),
     SettingsSection.shortcuts => ShortcutsSettings(controller: controller),
   };
-}
-
-class _PluginSettings extends StatefulWidget {
-  const _PluginSettings({required this.controller});
-  final AppController controller;
-
-  @override
-  State<_PluginSettings> createState() => _PluginSettingsState();
-}
-
-class _PluginSettingsState extends State<_PluginSettings> {
-  final _urlController = TextEditingController();
-  var _installing = false;
-  var _updating = false;
-
-  @override
-  void dispose() {
-    _urlController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = widget.controller;
-    final plugins = controller.plugins;
-    return SettingsPanel(
-      title: AppStrings.t('plugin.title'),
-      detail: AppStrings.t('plugin.detail'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!controller.supportsPlugins)
-            Text(
-              AppStrings.t('plugin.unsupported'),
-              style: TextStyle(color: TimbreColors.muted, fontSize: 12),
-            )
-          else ...[
-            TextField(
-              controller: _urlController,
-              enabled: !_installing,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: AppStrings.t('plugin.urlHint'),
-                border: const OutlineInputBorder(),
-              ),
-              onSubmitted: (_) => _install(),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                FilledButton.icon(
-                  onPressed: _installing ? null : _install,
-                  icon: _installing
-                      ? const SizedBox(
-                          width: 15,
-                          height: 15,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.download_rounded, size: 17),
-                  label: Text(AppStrings.t(_installing ? 'plugin.installing' : 'plugin.install')),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: TimbreColors.gold,
-                    foregroundColor: const Color(0xff2b1e13),
-                  ),
-                ),
-                if (plugins.isNotEmpty) ...[
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: _updating ? null : _update,
-                    icon: _updating
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh_rounded, size: 16),
-                    label: Text(AppStrings.t(_updating ? 'plugin.checking' : 'plugin.checkUpdates')),
-                  ),
-                ],
-              ],
-            ),
-            GroupLabel(AppStrings.t('plugin.installed')),
-            if (plugins.isEmpty)
-              Text(
-                AppStrings.t('plugin.none'),
-                style: TextStyle(color: TimbreColors.muted, fontSize: 12),
-              )
-            else
-              for (final plugin in plugins)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  title: Text('${plugin.platform}  ·  v${plugin.version}'),
-                  subtitle: plugin.author == null
-                      ? null
-                      : Text(
-                          plugin.author!,
-                          style: TextStyle(
-                            color: TimbreColors.muted,
-                            fontSize: 11,
-                          ),
-                        ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Switch.adaptive(
-                        value: controller.sourceEnabled(plugin.id),
-                        onChanged: (enabled) =>
-                            controller.setSourceEnabled(plugin.id, enabled),
-                      ),
-                      IconButton(
-                        tooltip: AppStrings.t('plugin.uninstall'),
-                        iconSize: 18,
-                        onPressed: () => controller.removePlugin(plugin.id),
-                        icon: const Icon(Icons.delete_outline_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _install() async {
-    final url = _urlController.text.trim();
-    if (url.isEmpty) return;
-    final confirmed = await _confirmInstall(url);
-    if (!confirmed || !mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _installing = true);
-    try {
-      final count = await widget.controller.installPluginFromUrl(url);
-      _urlController.clear();
-      messenger.showSnackBar(SnackBar(
-        content: Text(AppStrings.t('plugin.installedCountFmt').replaceFirst('{n}', '$count')),
-      ));
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(AppStrings.t('plugin.installFailedFmt').replaceFirst('{e}', '$error')),
-      ));
-    } finally {
-      if (mounted) setState(() => _installing = false);
-    }
-  }
-
-  Future<void> _update() async {
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _updating = true);
-    try {
-      final count = await widget.controller.updatePlugins();
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(count > 0
-              ? AppStrings.t('plugin.updatedCountFmt').replaceFirst('{n}', '$count')
-              : AppStrings.t('plugin.upToDate')),
-        ),
-      );
-    } catch (error) {
-      messenger.showSnackBar(SnackBar(
-        content: Text(AppStrings.t('plugin.updateFailedFmt').replaceFirst('{e}', '$error')),
-      ));
-    } finally {
-      if (mounted) setState(() => _updating = false);
-    }
-  }
-
-  Future<bool> _confirmInstall(String url) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(AppStrings.t('plugin.confirmTitle')),
-        content: Text('${AppStrings.t('plugin.confirmBody')}\n\n$url'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(AppStrings.t('common.cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(AppStrings.t('plugin.confirmInstall'), style: TextStyle(color: TimbreColors.gold)),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
-  }
 }
 
 class _AppearanceSettings extends StatelessWidget {
@@ -250,7 +62,13 @@ class _AppearanceSettings extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => _pickSkin(context, controller),
               icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
-              label: Text(AppStrings.t(controller.hasSkin ? 'settings.changeBg' : 'settings.uploadBg')),
+              label: Text(
+                AppStrings.t(
+                  controller.hasSkin
+                      ? 'settings.changeBg'
+                      : 'settings.uploadBg',
+                ),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: TimbreColors.gold,
                 foregroundColor: const Color(0xff2b1e13),
@@ -278,9 +96,13 @@ class _AppearanceSettings extends StatelessWidget {
       final path = result?.files.single.path;
       if (path == null) return;
       await controller.setSkinFromFile(path);
-      messenger.showSnackBar(SnackBar(content: Text(AppStrings.t('settings.bgApplied'))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppStrings.t('settings.bgApplied'))),
+      );
     } catch (_) {
-      messenger.showSnackBar(SnackBar(content: Text(AppStrings.t('settings.bgReadFailed'))));
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppStrings.t('settings.bgReadFailed'))),
+      );
     }
   }
 }
@@ -392,7 +214,9 @@ class _GeneralSettings extends StatelessWidget {
           title: Text(AppStrings.t('settings.restoreSession')),
         ),
         GroupLabel(AppStrings.t('settings.playback')),
-        Text('${AppStrings.t('settings.volume')} ${(controller.volume * 100).round()}%'),
+        Text(
+          '${AppStrings.t('settings.volume')} ${(controller.volume * 100).round()}%',
+        ),
         Slider(value: controller.volume, onChanged: controller.setVolume),
         const SizedBox(height: 2),
         Text(
@@ -423,7 +247,9 @@ class _GeneralSettings extends StatelessWidget {
               for (final quality in QualityPreference.values)
                 DropdownMenuItem(
                   value: quality,
-                  child: Text('${AppStrings.t('settings.defaultQuality')}${quality.label}'),
+                  child: Text(
+                    '${AppStrings.t('settings.defaultQuality')}${quality.label}',
+                  ),
                 ),
             ],
           ),
@@ -444,6 +270,9 @@ class _GeneralSettings extends StatelessWidget {
           value: controller.reducedEffects,
           onChanged: controller.setReducedEffects,
           title: Text(AppStrings.t('settings.reducedEffects')),
+          subtitle: controller.softwareRendering
+              ? Text(AppStrings.t('settings.noGpuEffects'))
+              : null,
         ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
@@ -469,7 +298,8 @@ class _GeneralSettings extends StatelessWidget {
           title: Text(AppStrings.t('agent.localInterface')),
           subtitle: Text(AppStrings.t('agent.interfaceSubtitle')),
         ),
-        if (controller.agentControlEnabled) _AgentControlInfo(controller: controller),
+        if (controller.agentControlEnabled)
+          _AgentControlInfo(controller: controller),
       ],
     ),
   );
@@ -520,8 +350,14 @@ class _AgentControlInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = controller.agentControlAddress ?? AppStrings.t('agent.starting');
-    final example = '$address/status';
+    final error = controller.agentControlError;
+    final address =
+        error ??
+        controller.agentControlAddress ??
+        AppStrings.t('agent.starting');
+    final tokenPath = controller.agentControlTokenPath ?? '…';
+    final example =
+        'curl -H "X-TimbreBox-Token: \$(cat \'$tokenPath\')" "$address/status"';
     return Container(
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -534,9 +370,11 @@ class _AgentControlInfo extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _kv(AppStrings.t('agent.address'), address),
+          const SizedBox(height: 6),
+          _kv(AppStrings.t('agent.token'), tokenPath),
           const SizedBox(height: 8),
           Text(
-            '${AppStrings.t('agent.exampleLabel')}curl "$example"\n'
+            '${AppStrings.t('agent.exampleLabel')}$example\n'
             '${AppStrings.t('agent.endpointsLabel')}GET /status /queue /sources /lyric · '
             'POST /search?q= /play-ref?source=&item= /play /pause /toggle /next '
             '/previous /stop /seek?ms= /volume?level= /mode?loop= /quit',
@@ -640,32 +478,36 @@ class _DownloadSettingsState extends State<_DownloadSettings> {
           FutureBuilder<Directory>(
             future: _directory,
             builder: (context, snapshot) => _DirectoryTile(
-            path: snapshot.hasData ? snapshot.data!.path : AppStrings.t('download.resolving'),
-            ready: snapshot.hasData,
-          ),
-        ),
-        Divider(height: 22, color: TimbreColors.line),
-        Row(
-          children: [
-            Text(AppStrings.t('download.downloaded')),
-            const Spacer(),
-            Text(
-              AppStrings.t('count.tracksFmt').replaceFirst('{n}', '${controller.downloads.length}'),
-              style: TextStyle(color: TimbreColors.gold),
+              path: snapshot.hasData
+                  ? snapshot.data!.path
+                  : AppStrings.t('download.resolving'),
+              ready: snapshot.hasData,
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: controller.downloads.isEmpty
-                ? null
-                : () => _confirmClear(context, controller),
-            icon: const Icon(Icons.delete_outline_rounded, size: 16),
-            label: Text(AppStrings.t('download.clearLocal')),
           ),
-        ),
+          Divider(height: 22, color: TimbreColors.line),
+          Row(
+            children: [
+              Text(AppStrings.t('download.downloaded')),
+              const Spacer(),
+              Text(
+                AppStrings.t(
+                  'count.tracksFmt',
+                ).replaceFirst('{n}', '${controller.downloads.length}'),
+                style: TextStyle(color: TimbreColors.gold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: controller.downloads.isEmpty
+                  ? null
+                  : () => _confirmClear(context, controller),
+              icon: const Icon(Icons.delete_outline_rounded, size: 16),
+              label: Text(AppStrings.t('download.clearLocal')),
+            ),
+          ),
         ],
       ),
     );
@@ -766,7 +608,10 @@ void _confirmClear(BuildContext context, AppController controller) {
             controller.clearDownloads();
             Navigator.of(dialogContext).pop();
           },
-          child: Text(AppStrings.t('common.clear'), style: TextStyle(color: TimbreColors.gold)),
+          child: Text(
+            AppStrings.t('common.clear'),
+            style: TextStyle(color: TimbreColors.gold),
+          ),
         ),
       ],
     ),

@@ -1,55 +1,203 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
+import '../data/bounded_cache.dart';
 import '../data/catalog_source.dart';
 import '../data/stream_header_proxy.dart';
 import '../model/catalog_track.dart';
+import '../net/egress_policy.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
 import 'plugin_stream_url.dart';
 
-/// Exposes a loaded plugin as a first-class catalog source.
+/// Exposes a plugin as a first-class catalog source.
 ///
 /// It adapts the plugin's JS `search` / `getMediaSource` to TimbreBox's models.
 /// The original JS music item is retained per id because `getMediaSource` needs
 /// the full item (with plugin-private fields), not just the id. Streams that
 /// require request headers are routed through the loopback proxy so media_kit
 /// can play them.
-final class PluginCatalogSource implements CatalogSource {
+///
+/// The JS engine starts on the first call that needs it
+/// ([PluginCatalogSource.lazy]), so installed plugins cost nothing at launch
+/// and disabled ones never start; capabilities come from the functions
+/// recorded in the manifest, never from evaluating JS on a read.
+final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
+  /// Wraps an already loaded [runtime] (a fresh install).
   PluginCatalogSource({
-    required this.manifest,
+    required PluginManifest manifest,
     required PluginRuntime runtime,
     StreamHeaderProxy? proxy,
-  }) : _proxy = proxy ?? StreamHeaderProxy(),
+    EgressPolicy policy = const EgressPolicy(),
+  }) : this._(
+         manifest: manifest,
+         functions: exportedFunctions(runtime),
+         loadRuntime: () async => runtime,
+         proxy: proxy,
+         policy: policy,
+         idleTimeout: null,
+       );
+
+  /// Starts the plugin's runtime with [loadRuntime] on first use, and shuts
+  /// it down again after [idleTimeout] without a call (the next call starts
+  /// a fresh one).
+  PluginCatalogSource.lazy({
+    required PluginManifest manifest,
+    required Set<String> functions,
+    required Future<PluginRuntime> Function() loadRuntime,
+    StreamHeaderProxy? proxy,
+    EgressPolicy policy = const EgressPolicy(),
+    Duration idleTimeout = defaultIdleTimeout,
+  }) : this._(
+         manifest: manifest,
+         functions: functions,
+         loadRuntime: loadRuntime,
+         proxy: proxy,
+         policy: policy,
+         idleTimeout: idleTimeout,
+       );
+
+  PluginCatalogSource._({
+    required this.manifest,
+    required Set<String> functions,
+    required Future<PluginRuntime> Function() loadRuntime,
+    StreamHeaderProxy? proxy,
+    required EgressPolicy policy,
+    required Duration? idleTimeout,
+  }) : _functions = Set.unmodifiable(functions),
        // ignore: prefer_initializing_formals
-       _runtime = runtime;
+       _idleTimeout = idleTimeout,
+       // ignore: prefer_initializing_formals
+       _loadRuntime = loadRuntime,
+       _proxy = proxy ?? StreamHeaderProxy(policy: policy),
+       _ownsProxy = proxy == null,
+       // ignore: prefer_initializing_formals
+       _policy = policy;
+
+  /// The plugin functions TimbreBox calls; see [PluginManifest.functions].
+  static const knownFunctions = [
+    'search',
+    'getMediaSource',
+    'getLyric',
+    'getTopLists',
+    'getTopListDetail',
+  ];
+
+  /// Which of [knownFunctions] the plugin loaded in [runtime] exports.
+  static Set<String> exportedFunctions(PluginRuntime runtime) => {
+    for (final name in knownFunctions)
+      if (runtime.hasFunction(name)) name,
+  };
+
+  /// How long an engine may sit unused before it is shut down.
+  static const defaultIdleTimeout = Duration(minutes: 5);
 
   final PluginManifest manifest;
-  final PluginRuntime _runtime;
-  final StreamHeaderProxy _proxy;
-  final Map<String, Map<String, Object?>> _items = {};
-  final Map<String, Map<String, Object?>> _topListItems = {};
-  final Map<String, String> _artwork = {};
+  final Set<String> _functions;
+  final Future<PluginRuntime> Function() _loadRuntime;
+  Future<PluginRuntime>? _runtime;
+  var _disposed = false;
 
-  bool get hasTopLists => _runtime.hasFunction('getTopLists');
-  bool get hasLyric => _runtime.hasFunction('getLyric');
+  /// Null keeps the engine for the source's lifetime (a runtime handed to
+  /// the constructor cannot be started again once released).
+  final Duration? _idleTimeout;
+  Timer? _idleTimer;
+  var _activeCalls = 0;
+  final StreamHeaderProxy _proxy;
+
+  /// False when the proxy is shared (see [PluginRepository.streamProxy]):
+  /// a track still playing from it must outlive this source.
+  final bool _ownsProxy;
+
+  /// Checks the stream URL a plugin hands back before anything opens it.
+  final EgressPolicy _policy;
+  final _items = BoundedCache<String, Map<String, Object?>>();
+  final _topListItems = BoundedCache<String, Map<String, Object?>>();
+  final _artwork = BoundedCache<String, String>();
+
+  bool get hasTopLists => _functions.contains('getTopLists');
+  bool get hasLyric => _functions.contains('getLyric');
+
+  /// Whether the plugin's JS engine has been started.
+  bool get isStarted => _runtime != null;
 
   @override
-  SourceDescriptor get descriptor => SourceDescriptor(
+  late final SourceDescriptor descriptor = SourceDescriptor(
     id: manifest.id,
     name: manifest.platform,
     capabilities: [
-      if (_runtime.hasFunction('search')) SourceCapability.search,
-      if (_runtime.hasFunction('getMediaSource')) SourceCapability.streaming,
-      if (_runtime.hasFunction('getLyric')) SourceCapability.lyrics,
+      if (_functions.contains('search')) SourceCapability.search,
+      if (_functions.contains('getMediaSource')) SourceCapability.streaming,
+      if (_functions.contains('getLyric')) SourceCapability.lyrics,
     ],
   );
+
+  /// Calls a plugin function, starting the runtime first if needed.
+  Future<Object?> _call(String function, List<Object?> args) async {
+    _idleTimer?.cancel();
+    _activeCalls++;
+    try {
+      final runtime = await _started();
+      return await runtime.call(function, args);
+    } on PluginScriptTimeout {
+      // A script stopped mid-run may have left the engine in any state:
+      // the next call starts a fresh one.
+      if (_idleTimeout != null) _discardEngine();
+      rethrow;
+    } finally {
+      _activeCalls--;
+      _scheduleIdleStop();
+    }
+  }
+
+  void _scheduleIdleStop() {
+    final timeout = _idleTimeout;
+    if (timeout == null || _activeCalls > 0 || _disposed) return;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(timeout, _stopIdleEngine);
+  }
+
+  /// Releases an engine nobody has used for [_idleTimeout]; the metadata,
+  /// search items and charts stay, so the next call simply starts it again.
+  void _stopIdleEngine() {
+    if (_activeCalls == 0) _discardEngine();
+  }
+
+  void _discardEngine() {
+    final runtime = _runtime;
+    _runtime = null;
+    runtime?.then((engine) => engine.dispose(), onError: (_) {});
+  }
+
+  Future<PluginRuntime> _started() {
+    if (_disposed) throw StateError(AppStrings.t('plugin.src.disposed'));
+    return _runtime ??= _start();
+  }
+
+  Future<PluginRuntime> _start() async {
+    final PluginRuntime runtime;
+    try {
+      runtime = await _loadRuntime();
+    } catch (_) {
+      _runtime = null; // A failed start is retried on the next call.
+      rethrow;
+    }
+    // Disposed while the engine was starting: release it right away.
+    if (_disposed) {
+      runtime.dispose();
+      throw StateError(AppStrings.t('plugin.src.disposed'));
+    }
+    return runtime;
+  }
 
   @override
   Future<SearchPage> search(SearchRequest request) async {
     final Object? raw;
     try {
-      raw = await _runtime.call('search', [request.query, request.page, 'music']);
+      raw = await _call('search', [request.query, request.page, 'music']);
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.searchFailed').replaceFirst('{e}', '$error'),
@@ -80,9 +228,18 @@ final class PluginCatalogSource implements CatalogSource {
     sourceId: descriptor.id,
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
-    quality: AppStrings.t('plugin.src.qualityFmt').replaceFirst('{p}', manifest.platform),
+    quality: AppStrings.t(
+      'plugin.src.qualityFmt',
+    ).replaceFirst('{p}', manifest.platform),
     artworkUrl: _artwork[summary.ref.itemId],
+    resolveHint: pluginResolveHint(_items[summary.ref.itemId]),
   );
+
+  @override
+  void rememberHint(String itemId, Map<String, Object?> hint) {
+    final item = hint['item'];
+    if (item is Map) _items.putIfAbsent(itemId, () => Map.of(item.cast()));
+  }
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
@@ -103,9 +260,13 @@ final class PluginCatalogSource implements CatalogSource {
     Object? raw;
     try {
       for (final quality in const ['standard', 'high', 'super', 'low']) {
-        raw = await _runtime.call('getMediaSource', [item, quality]);
+        // A newer track was chosen: stop trying further qualities.
+        request.cancellation.throwIfCancelled();
+        raw = await _call('getMediaSource', [item, quality]);
         if (raw is Map && (raw['url']?.toString().isNotEmpty ?? false)) break;
       }
+    } on OperationCancelled {
+      rethrow;
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.resolveFailed').replaceFirst('{e}', '$error'),
@@ -121,7 +282,7 @@ final class PluginCatalogSource implements CatalogSource {
       );
     }
     final url = raw['url']?.toString();
-    final parsed = await checkedPluginStreamUri(url);
+    final parsed = await checkedPluginStreamUri(url, policy: _policy);
     final headers = <String, String>{};
     final rawHeaders = raw['headers'];
     if (rawHeaders is Map) {
@@ -133,19 +294,18 @@ final class PluginCatalogSource implements CatalogSource {
     if (userAgent != null && userAgent.isNotEmpty) {
       headers['User-Agent'] = userAgent;
     }
-    // Header-gated streams can't be opened by media_kit directly — relay them
-    // through the loopback proxy which injects the headers per hop.
-    if (headers.isNotEmpty) {
-      final local = await _proxy.publish(parsed, headers);
-      return ResolvedStream(uri: local, mimeType: _mimeType(url!));
-    }
-    return ResolvedStream(uri: parsed, mimeType: _mimeType(url!));
+    // Every plugin stream is relayed through the loopback proxy, headers or
+    // not: it injects the headers per hop, and its client vets each redirect
+    // hop against the egress policy, which libmpv opening the URL itself
+    // would not.
+    final local = await _proxy.publish(parsed, headers);
+    return ResolvedStream(uri: local, mimeType: _mimeType(url!));
   }
 
   /// Flattens the plugin's `getTopLists` groups into a single list of charts.
   Future<List<PluginTopListItem>> topLists() async {
     if (!hasTopLists) return const [];
-    final raw = await _runtime.call('getTopLists', const []);
+    final raw = await _call('getTopLists', const []);
     if (raw is! List) return const [];
     final items = <PluginTopListItem>[];
     for (final group in raw) {
@@ -175,10 +335,10 @@ final class PluginCatalogSource implements CatalogSource {
   /// Loads one chart's tracks via `getTopListDetail`.
   Future<List<TrackSummary>> topListDetail(String listId) async {
     final item = _topListItems[listId];
-    if (item == null || !_runtime.hasFunction('getTopListDetail')) {
+    if (item == null || !_functions.contains('getTopListDetail')) {
       return const [];
     }
-    final raw = await _runtime.call('getTopListDetail', [item, 1]);
+    final raw = await _call('getTopListDetail', [item, 1]);
     if (raw is! Map) return const [];
     final list = raw['musicList'] ?? raw['data'];
     if (list is! List) return const [];
@@ -194,7 +354,7 @@ final class PluginCatalogSource implements CatalogSource {
   Future<String?> lyric(String itemId) async {
     final item = _items[itemId];
     if (item == null || !hasLyric) return null;
-    final raw = await _runtime.call('getLyric', [item]);
+    final raw = await _call('getLyric', [item]);
     if (raw is! Map) return null;
     final value = raw['rawLrc'] ?? raw['lrc'] ?? raw['lyric'];
     final text = value?.toString();
@@ -235,8 +395,10 @@ final class PluginCatalogSource implements CatalogSource {
   }
 
   void dispose() {
-    _runtime.dispose();
-    _proxy.dispose();
+    _disposed = true;
+    _idleTimer?.cancel();
+    _runtime?.then((runtime) => runtime.dispose(), onError: (_) {});
+    if (_ownsProxy) _proxy.dispose();
   }
 }
 
@@ -256,3 +418,42 @@ class PluginTopListItem {
   final String title;
   final String? cover;
 }
+
+/// The largest plugin item kept as a resolve hint, in JSON characters.
+const _maxHintChars = 8 * 1024;
+
+/// Field names that may hold credentials a plugin put into its items.
+final _secretKey = RegExp(
+  'token|cookie|auth|secret|session|passw|sign|key',
+  caseSensitive: false,
+);
+
+/// [item] (what the plugin's `getMediaSource` gets back) as a resolve hint:
+/// without URLs (stream or artwork, which expire or are not needed) and
+/// without fields that look like credentials. Null when nothing remains or
+/// the item is too large to keep.
+Map<String, Object?>? pluginResolveHint(Map<String, Object?>? item) {
+  if (item == null) return null;
+  final kept = _withoutUrlsOrSecrets(item);
+  if (kept is! Map<String, Object?> || kept.isEmpty) return null;
+  final hint = {'item': kept};
+  return jsonEncode(hint).length > _maxHintChars ? null : hint;
+}
+
+Object? _withoutUrlsOrSecrets(Object? value) => switch (value) {
+  final Map<Object?, Object?> map => <String, Object?>{
+    for (final MapEntry(:key, :value) in map.entries)
+      if (!_secretKey.hasMatch('$key') && !'$key'.toLowerCase().contains('url'))
+        if (_withoutUrlsOrSecrets(value) case final kept? when !_isUrl(value))
+          '$key': kept,
+  },
+  final List<Object?> list => [
+    for (final entry in list)
+      if (!_isUrl(entry)) _withoutUrlsOrSecrets(entry),
+  ],
+  _ => value,
+};
+
+bool _isUrl(Object? value) =>
+    value is String &&
+    (value.startsWith('http://') || value.startsWith('https://'));

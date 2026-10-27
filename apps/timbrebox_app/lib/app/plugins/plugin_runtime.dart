@@ -6,6 +6,7 @@ import 'package:flutter_js/flutter_js.dart';
 import '../design/app_strings.dart';
 import 'plugin_http.dart';
 import 'plugin_shims.dart';
+import 'script_time_limit.dart';
 
 /// Runs one plugin's JavaScript in a sandboxed engine (QuickJS on
 /// Android/Windows/Linux, JavaScriptCore on Apple). The only capability crossing
@@ -15,9 +16,9 @@ import 'plugin_shims.dart';
 final class PluginRuntime {
   PluginRuntime({PluginHttpClient? http})
     : _http = http ?? PluginHttpClient(),
-      // `xhr: false` keeps flutter_js from installing its own fetch /
-      // XMLHttpRequest, which would bypass PluginHttpClient's egress policy.
-      _rt = getJavascriptRuntime(xhr: false);
+      // No fetch / XMLHttpRequest from flutter_js (they would bypass
+      // PluginHttpClient's egress policy), and a time limit on each run.
+      _rt = createTimeLimitedRuntime();
 
   final PluginHttpClient _http;
   final JavascriptRuntime _rt;
@@ -26,7 +27,7 @@ final class PluginRuntime {
 
   /// Loads a plugin module and exposes its `module.exports` as `__plugin`.
   Future<void> load(String pluginSource) async {
-    final shims = await PluginShims.bundle();
+    final shims = await PluginShims.forSource(pluginSource);
     _rt.onMessage('__hostHttp', (dynamic args) {
       _dispatchHttp(args);
       return '';
@@ -35,8 +36,8 @@ final class PluginRuntime {
       debugPrint('[plugin] $args');
       return '';
     });
-    _rt.evaluate(_prelude);
-    _rt.evaluate(shims);
+    _rt.evaluate(_localizedPrelude());
+    if (shims.isNotEmpty) _rt.evaluate(shims);
     _rt.evaluate('var module={exports:{}};var exports=module.exports;');
     _rt.evaluate(pluginSource);
     _rt.evaluate('globalThis.__plugin = module.exports;');
@@ -79,21 +80,41 @@ final class PluginRuntime {
         }
       })()
     ''';
+    final watch = Stopwatch()..start();
     final async = await _rt.evaluateAsync(code);
     _rt.executePendingJob();
+    // A run as long as the limit was cut off by the engine (JavaScriptCore
+    // reports no error for it, so the clock is what tells).
+    if (watch.elapsed >= pluginScriptTimeLimit) {
+      throw PluginScriptTimeout(AppStrings.t('plugin.runtime.timeout'));
+    }
+    if (async.isError) throw PluginRuntimeException(async.stringResult);
     final resolved = await _rt
         .handlePromise(async)
         .timeout(const Duration(seconds: 25));
     if (resolved.isError) {
       throw PluginRuntimeException(resolved.stringResult);
     }
-    final text = resolved.stringResult;
-    if (text.isEmpty) return null;
-    final envelope = jsonDecode(text);
+    final envelope = decodeCallEnvelope(resolved.stringResult);
     if (envelope is Map && envelope['ok'] == false) {
-      throw PluginRuntimeException('${envelope['error'] ?? AppStrings.t('plugin.runtime.execFailed')}');
+      throw PluginRuntimeException(
+        '${envelope['error'] ?? AppStrings.t('plugin.runtime.execFailed')}',
+      );
     }
     return envelope is Map ? envelope['value'] : null;
+  }
+
+  /// The `{ok, value | error}` envelope a call's promise settled with, or null.
+  /// QuickJS hands the envelope back as the JSON text the call returned;
+  /// JavaScriptCore (macOS, iOS) runs `JSON.stringify` over that text once
+  /// more, so the first decode yields a string to decode again.
+  @visibleForTesting
+  static Object? decodeCallEnvelope(String text) {
+    if (text.isEmpty) return null;
+    final decoded = jsonDecode(text);
+    return decoded is String && decoded.isNotEmpty
+        ? jsonDecode(decoded)
+        : decoded;
   }
 
   void _dispatchHttp(dynamic args) {
@@ -119,15 +140,36 @@ final class PluginRuntime {
 
   void _settle(Object? id, bool ok, Object? payload) {
     if (_disposed) return;
-    final payloadLiteral = jsonEncode(jsonEncode(payload));
-    _rt.evaluate('__resolveHost($id, $ok, $payloadLiteral);');
+    _rt.evaluate('__resolveHost($id, $ok, ${_jsLiteral(payload)});');
     _rt.executePendingJob();
   }
 
+  /// [value] as a JS data literal. JSON is plain data in JS syntax (no code),
+  /// so the body is escaped once and the sandbox skips a `JSON.parse` of a
+  /// second, doubly escaped copy. U+2028/U+2029 are escaped too: engines
+  /// before ES2019 read them as line breaks inside a string literal.
+  static String _jsLiteral(Object? value) => jsonEncode(
+    value,
+  ).replaceAll('\u2028', r'\u2028').replaceAll('\u2029', r'\u2029');
+
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     _rt.dispose();
+    _http.close();
   }
+
+  /// [_prelude] with its error messages in the app's language (as JS string
+  /// literals).
+  static String _localizedPrelude() => _prelude
+      .replaceAll(
+        '__MSG_NOT_LOADED__',
+        _jsLiteral(AppStrings.t('plugin.js.moduleNotLoaded')),
+      )
+      .replaceAll(
+        '__MSG_NOT_ALLOWED__',
+        _jsLiteral(AppStrings.t('plugin.js.moduleNotAllowed')),
+      );
 
   static const _prelude = r'''
     // HTTP must go through __hostHttp, never a built-in network API.
@@ -157,11 +199,10 @@ final class PluginRuntime {
         }));
       });
     }
-    globalThis.__resolveHost = function(id, ok, payloadJson) {
+    globalThis.__resolveHost = function(id, ok, payload) {
       var p = __pending[id];
       if (!p) return;
       delete __pending[id];
-      var payload = JSON.parse(payloadJson);
       if (ok) p.resolve(payload); else p.reject(new Error(payload && payload.message || 'request failed'));
     };
 
@@ -182,16 +223,21 @@ final class PluginRuntime {
     axios.post = function(url, data, config) { config = config || {}; config.url = url; config.data = data; config.method = 'POST'; return axios(config); };
     axios.default = axios;
 
+    // Only the libraries a plugin names are evaluated (see PluginShims).
+    function __shim(name, lib) {
+      if (lib === undefined) throw new Error(__MSG_NOT_LOADED__ + name);
+      return lib;
+    }
     function require(name) {
       switch (name) {
         case 'axios': return axios;
-        case 'crypto-js': return globalThis.__lib_cryptojs;
-        case 'he': return globalThis.__lib_he;
-        case 'dayjs': return globalThis.__lib_dayjs;
-        case 'qs': return globalThis.__lib_qs;
-        case 'cheerio': return globalThis.__lib_cheerio;
-        case 'big-integer': return globalThis.__lib_bigint;
-        default: throw new Error('插件请求了不允许的模块：' + name);
+        case 'crypto-js': return __shim(name, globalThis.__lib_cryptojs);
+        case 'he': return __shim(name, globalThis.__lib_he);
+        case 'dayjs': return __shim(name, globalThis.__lib_dayjs);
+        case 'qs': return __shim(name, globalThis.__lib_qs);
+        case 'cheerio': return __shim(name, globalThis.__lib_cheerio);
+        case 'big-integer': return __shim(name, globalThis.__lib_bigint);
+        default: throw new Error(__MSG_NOT_ALLOWED__ + name);
       }
     }
   ''';
@@ -202,4 +248,10 @@ class PluginRuntimeException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// The plugin ran past [pluginScriptTimeLimit] and was stopped; its engine
+/// should not be trusted for further calls.
+class PluginScriptTimeout extends PluginRuntimeException {
+  const PluginScriptTimeout(super.message);
 }

@@ -84,6 +84,133 @@ void main() {
       throwsStateError,
     );
   });
+
+  test(
+    'a failed load stops the previous track instead of leaving it playing',
+    () async {
+      final backend = _FakeAudioBackend();
+      final engine = NetworkPlayerEngine(
+        backend: backend,
+        resolver: _FailingAfterFirstResolver(
+          AudioSourceSpec.remote(Uri.parse('https://cdn.example.test/a.m4a')),
+        ),
+      );
+      await engine.load(candidate);
+      await engine.play();
+      backend.calls.clear();
+
+      await expectLater(engine.load(candidate), throwsA(isA<StateError>()));
+
+      expect(backend.calls, ['stop', 'releaseSource']);
+      await expectLater(engine.play(), throwsA(isA<StateError>()));
+      await engine.release();
+    },
+  );
+
+  test('opens the source at a start position when the backend can', () async {
+    final backend = _StartingAudioBackend();
+    final engine = NetworkPlayerEngine(
+      backend: backend,
+      resolver: _FixedResolver(
+        AudioSourceSpec.remote(Uri.parse('https://cdn.example.test/a.m4a')),
+      ),
+    );
+
+    await engine.loadFrom(candidate, const Duration(seconds: 42));
+
+    expect(backend.calls, contains('source from 0:00:42.000000'));
+    await engine.release();
+  });
+
+  group('loads', () {
+    StreamCandidate track(String id) => StreamCandidate(
+      ref: MediaRef(sourceId: 'plugin_x', itemId: id),
+      id: 'tb://plugin_x/$id',
+      label: 'high',
+    );
+
+    test('a newer play cancels a slow load instead of queueing', () async {
+      final backend = _FakeAudioBackend();
+      final resolver = _SlowResolver();
+      final engine = NetworkPlayerEngine(backend: backend, resolver: resolver);
+      addTearDown(engine.release);
+
+      final slow = expectLater(
+        engine.load(track('slow')),
+        throwsA(isA<OperationCancelled>()),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final watch = Stopwatch()..start();
+      await engine.load(track('fast'));
+
+      expect(watch.elapsed, lessThan(const Duration(seconds: 2)));
+      await slow;
+      expect(resolver.cancelled, ['slow']);
+      expect((backend.source! as RemoteAudioSource).uri.path, '/fast.m4a');
+      expect(backend.calls.where((call) => call == 'source'), hasLength(1));
+    });
+
+    test('pause answers while a track is still resolving', () async {
+      final backend = _FakeAudioBackend();
+      final resolver = _SlowResolver();
+      final engine = NetworkPlayerEngine(backend: backend, resolver: resolver);
+      addTearDown(engine.release);
+
+      final slow = expectLater(
+        engine.load(track('slow')),
+        throwsA(isA<OperationCancelled>()),
+      );
+      await engine.pause().timeout(const Duration(seconds: 2));
+      await engine.stop().timeout(const Duration(seconds: 2));
+
+      await slow;
+      expect(resolver.cancelled, ['slow']);
+      expect(backend.source, isNull);
+    });
+
+    test('a resolve that never ends gives up at the time cap', () async {
+      final resolver = _SlowResolver();
+      final engine = NetworkPlayerEngine(
+        backend: _FakeAudioBackend(),
+        resolver: resolver,
+        resolveTimeout: const Duration(milliseconds: 60),
+      );
+      addTearDown(engine.release);
+
+      await expectLater(
+        engine.load(track('slow')).timeout(const Duration(seconds: 2)),
+        throwsA(isA<SourceException>()),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(resolver.cancelled, ['slow']);
+    });
+  });
+}
+
+/// Takes 30 s to resolve `slow` (unless cancelled); anything else at once.
+class _SlowResolver implements PlayerSourceResolver {
+  final cancelled = <String>[];
+
+  @override
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  }) async {
+    final id = candidate.ref.itemId;
+    if (id == 'slow') {
+      final end = DateTime.now().add(const Duration(seconds: 30));
+      while (DateTime.now().isBefore(end)) {
+        if (cancellation?.isCancelled ?? false) {
+          cancelled.add(id);
+          throw const OperationCancelled();
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    }
+    return AudioSourceSpec.remote(
+      Uri.parse('https://cdn.example.test/$id.m4a'),
+    );
+  }
 }
 
 class _FixedResolver implements PlayerSourceResolver {
@@ -92,7 +219,10 @@ class _FixedResolver implements PlayerSourceResolver {
   final AudioSourceSpec source;
 
   @override
-  Future<AudioSourceSpec> resolve(StreamCandidate candidate) async => source;
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  }) async => source;
 }
 
 class _FakeAudioBackend implements AudioBackend {
@@ -133,5 +263,30 @@ class _FakeAudioBackend implements AudioBackend {
   Future<void> dispose() async {
     calls.add('dispose');
     await _completed.close();
+  }
+}
+
+class _FailingAfterFirstResolver implements PlayerSourceResolver {
+  _FailingAfterFirstResolver(this.source);
+
+  final AudioSourceSpec source;
+  var _calls = 0;
+
+  @override
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  }) async {
+    if (_calls++ > 0) throw StateError('stream unavailable');
+    return source;
+  }
+}
+
+class _StartingAudioBackend extends _FakeAudioBackend
+    implements StartPositionAudioBackend {
+  @override
+  Future<void> setSourceFrom(AudioSourceSpec value, Duration start) async {
+    source = value;
+    calls.add('source from $start');
   }
 }

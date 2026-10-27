@@ -78,19 +78,124 @@ void main() {
       await controller.dispose();
     },
   );
+
+  test(
+    'a superseded play never starts and never overwrites the newer state',
+    () async {
+      final engine = _GatedPlayerEngine();
+      final controller = PlayerController(engine);
+      const second = StreamCandidate(
+        ref: MediaRef(sourceId: 'youtube', itemId: 'track-2'),
+        id: 'stream-2',
+        label: 'Standard',
+      );
+
+      final first = controller.play(candidate);
+      await Future<void>.delayed(Duration.zero);
+      await controller.play(second);
+      engine.releaseFirstLoad();
+      await first;
+
+      expect(engine.calls, ['load stream-1', 'load stream-2', 'play']);
+      expect(controller.value.status, PlaybackStatus.playing);
+      expect(controller.value.candidate, second);
+      await controller.dispose();
+    },
+  );
+
+  test('resume refuses after a failed load so the caller reloads', () async {
+    final engine = _FakePlayerEngine(failLoad: true);
+    final controller = PlayerController(engine);
+
+    await controller.play(candidate);
+
+    expect(await controller.resume(), isFalse);
+    expect(engine.calls, ['load']);
+    await controller.dispose();
+  });
+
+  test(
+    'resume refuses after the track ended so the caller restarts it',
+    () async {
+      final engine = _CompletingPlayerEngine();
+      final controller = PlayerController(engine);
+      await controller.play(candidate);
+
+      engine.complete();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(await controller.resume(), isFalse);
+      await controller.dispose();
+    },
+  );
+
+  test('starts at a position when the engine can load from one', () async {
+    final engine = _StartingPlayerEngine();
+    final controller = PlayerController(engine);
+
+    await controller.play(candidate, startAt: const Duration(seconds: 42));
+
+    expect(engine.calls, ['load from 0:00:42.000000', 'play']);
+    await controller.dispose();
+  });
+
+  test('loads from the beginning on an engine without start support', () async {
+    final engine = _FakePlayerEngine();
+    final controller = PlayerController(engine);
+
+    await controller.play(candidate, startAt: const Duration(seconds: 42));
+
+    expect(engine.calls, ['load', 'play']);
+    await controller.dispose();
+  });
+
+  test('stopping during a load drops what that load ends with', () async {
+    final engine = _CancellableLoadEngine();
+    final controller = PlayerController(engine);
+
+    final playing = controller.play(candidate);
+    await Future<void>.delayed(Duration.zero);
+    await controller.stop();
+    engine.cancelLoad();
+    await playing;
+
+    expect(controller.value.status, PlaybackStatus.idle);
+    expect(controller.value.errorMessage, isNull);
+    expect(engine.calls, isNot(contains('play')));
+    await controller.dispose();
+  });
+
+  test('a source failure shows its own message', () async {
+    final controller = PlayerController(
+      _FakePlayerEngine(
+        loadError: const SourceException('Track expired', retryable: true),
+      ),
+    );
+
+    await controller.play(candidate);
+
+    expect(controller.value.errorMessage, 'Track expired');
+    await controller.dispose();
+  });
 }
 
 class _FakePlayerEngine implements PlayerEngine {
-  _FakePlayerEngine({this.failLoad = false, this.failPause = false});
+  _FakePlayerEngine({
+    this.failLoad = false,
+    this.failPause = false,
+    this.loadError,
+  });
 
   final bool failLoad;
   final bool failPause;
+  final Object? loadError;
   final List<String> calls = [];
 
   @override
   Future<void> load(StreamCandidate candidate) async {
     calls.add('load');
     if (failLoad) throw StateError('load failed');
+    if (loadError case final error?) throw error;
   }
 
   @override
@@ -138,5 +243,39 @@ class _CompletingPlayerEngine extends _FakePlayerEngine
   Future<void> release() async {
     await super.release();
     await _events.close();
+  }
+}
+
+class _GatedPlayerEngine extends _FakePlayerEngine {
+  final _firstLoad = Completer<void>();
+
+  void releaseFirstLoad() => _firstLoad.complete();
+
+  @override
+  Future<void> load(StreamCandidate candidate) async {
+    calls.add('load ${candidate.id}');
+    if (candidate.id == 'stream-1') await _firstLoad.future;
+  }
+}
+
+class _StartingPlayerEngine extends _FakePlayerEngine
+    implements StartPositionLoad {
+  @override
+  Future<void> loadFrom(StreamCandidate candidate, Duration start) async =>
+      calls.add('load from $start');
+}
+
+/// A load that ends only when cancelled, the way the network engine's does
+/// once a stop cancels it.
+class _CancellableLoadEngine extends _FakePlayerEngine {
+  final _cancelled = Completer<void>();
+
+  void cancelLoad() => _cancelled.complete();
+
+  @override
+  Future<void> load(StreamCandidate candidate) async {
+    calls.add('load');
+    await _cancelled.future;
+    throw const OperationCancelled();
   }
 }

@@ -1,5 +1,7 @@
 // TimbreBox one-shot CLI. Drives the running player's loopback control API
-// (127.0.0.1:8787-8796). Cross-platform Dart equivalent of tools/timbrebox-ctl.
+// (127.0.0.1:8787-8796), sending the per-run token from the app's user-only
+// control-token file (or TIMBREBOX_TOKEN_FILE / TIMBREBOX_TOKEN).
+// Cross-platform Dart equivalent of tools/timbrebox-ctl.
 //
 //   timbrebox <command> [args] [--json]
 //   commands: status | search <q> | play-ref <source> <item> | play | pause
@@ -48,8 +50,16 @@ String? _pathFor(List<String> args) {
   final cmd = args.first;
   String q(int i) => Uri.encodeQueryComponent(args[i]);
   switch (cmd) {
-    case 'status' || 'queue' || 'sources' || 'lyric' || 'play' || 'pause' ||
-        'toggle' || 'next' || 'stop' || 'quit':
+    case 'status' ||
+        'queue' ||
+        'sources' ||
+        'lyric' ||
+        'play' ||
+        'pause' ||
+        'toggle' ||
+        'next' ||
+        'stop' ||
+        'quit':
       return '/$cmd';
     case 'prev':
       return '/previous';

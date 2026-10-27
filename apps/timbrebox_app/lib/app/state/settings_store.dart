@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
+import 'atomic_file.dart';
 
 /// Persists user preferences (volume, loop, quality, language, toggles) as a
 /// small JSON file so they survive restarts.
@@ -22,7 +23,7 @@ final class SettingsStore {
   Future<void> save(Map<String, Object?> data) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    await file.writeAsString(jsonEncode(data), flush: true);
+    await writeFileAtomically(file, jsonEncode(data));
   }
 
   Future<File> _file() async {

@@ -31,8 +31,10 @@ Future<void> _settle() => Future<void>.delayed(Duration.zero);
 void main() {
   test('create, add (dedup), remove, rename, delete', () {
     final store = _MemoryPlaylistStore();
-    final controller =
-        AppController(engine: TestPlayerEngine(), playlistStore: store);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      playlistStore: store,
+    );
     addTearDown(controller.dispose);
 
     final id = controller.createPlaylist('Chill');
@@ -81,16 +83,20 @@ void main() {
 
   test('playlists persist and restore', () async {
     final store = _MemoryPlaylistStore();
-    final first =
-        AppController(engine: TestPlayerEngine(), playlistStore: store);
+    final first = AppController(
+      engine: TestPlayerEngine(),
+      playlistStore: store,
+    );
     final id = first.createPlaylist('Road trip', seed: _track('x'));
     first.addToPlaylist(id, _track('y'));
     await _settle();
     expect(store.saved.single.tracks.map((t) => t.id), ['x', 'y']);
     first.dispose();
 
-    final second =
-        AppController(engine: TestPlayerEngine(), playlistStore: store);
+    final second = AppController(
+      engine: TestPlayerEngine(),
+      playlistStore: store,
+    );
     addTearDown(second.dispose);
     await _settle();
     expect(second.playlists.single.name, 'Road trip');

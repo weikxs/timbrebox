@@ -49,9 +49,8 @@ class MprisMediaControls implements SystemMediaControls {
         MPRISEventHandler(
           play: () async => _commands.add(MediaCommand.play),
           pause: () async => _commands.add(MediaCommand.pause),
-          playPause: () async => _commands.add(
-            _playing ? MediaCommand.pause : MediaCommand.play,
-          ),
+          playPause: () async =>
+              _commands.add(_playing ? MediaCommand.pause : MediaCommand.play),
           next: () async => _commands.add(MediaCommand.next),
           previous: () async => _commands.add(MediaCommand.previous),
           stop: () async => _commands.add(MediaCommand.stop),
@@ -100,8 +99,9 @@ class MprisMediaControls implements SystemMediaControls {
     final mpris = _mpris;
     if (mpris == null) return;
     try {
-      mpris.playbackStatus =
-          playing ? MPRISPlaybackStatus.playing : MPRISPlaybackStatus.paused;
+      mpris.playbackStatus = playing
+          ? MPRISPlaybackStatus.playing
+          : MPRISPlaybackStatus.paused;
       mpris.position = position;
     } catch (_) {
       // Ignore transient bus failures.

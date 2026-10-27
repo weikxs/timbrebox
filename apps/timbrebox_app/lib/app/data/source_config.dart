@@ -76,7 +76,10 @@ final class BuiltInSourceConfig {
 
   static const radioBrowser = SourceEndpoint(
     host: 'de1.api.radio-browser.info',
-    paths: {'search': '/json/stations/byname/{query}'},
+    paths: {
+      'search': '/json/stations/byname/{query}',
+      'station': '/json/stations/byuuid/{id}',
+    },
   );
 
   static const bilibili = SourceEndpoint(

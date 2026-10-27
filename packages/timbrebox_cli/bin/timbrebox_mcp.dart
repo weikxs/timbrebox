@@ -1,7 +1,9 @@
 // TimbreBox MCP server (stdio, JSON-RPC 2.0, newline-delimited).
 //
 // Bridges MCP tool calls to the running TimbreBox player's local loopback
-// control API. Point an MCP client (e.g. Claude Desktop) at:
+// control API, sending the per-run token from the app's user-only
+// control-token file (or TIMBREBOX_TOKEN_FILE / TIMBREBOX_TOKEN). Point an
+// MCP client (e.g. Claude Desktop) at:
 //   dart run timbrebox_cli:timbrebox_mcp
 import 'dart:convert';
 import 'dart:io';
@@ -11,10 +13,7 @@ import 'package:timbrebox_cli/timbrebox_cli.dart';
 final ControlApiClient _client = ControlApiClient();
 
 Future<void> main() async {
-  stdin
-      .transform(utf8.decoder)
-      .transform(const LineSplitter())
-      .listen(_onLine);
+  stdin.transform(utf8.decoder).transform(const LineSplitter()).listen(_onLine);
 }
 
 Future<void> _onLine(String line) async {
@@ -92,13 +91,17 @@ Future<void> _handleToolCall(Object? id, Object? params) async {
   final name = (params is Map ? params['name'] : null)?.toString();
   final rawArgs = params is Map ? params['arguments'] : null;
   final args = rawArgs is Map ? rawArgs : const {};
-  final base = await _client.discover();
-  if (base == null) {
-    _toolResult(id, 'TimbreBox is not running or Agent control is off.',
-        isError: true);
-    return;
-  }
   try {
+    // Discovery sends the run's token too, and says so when it is refused.
+    final base = await _client.discover();
+    if (base == null) {
+      _toolResult(
+        id,
+        'TimbreBox is not running or Agent control is off.',
+        isError: true,
+      );
+      return;
+    }
     _toolResult(id, await _runTool(base, name, args));
   } catch (error) {
     _toolResult(id, 'Error: $error', isError: true);
@@ -106,7 +109,10 @@ Future<void> _handleToolCall(Object? id, Object? params) async {
 }
 
 Future<String> _runTool(
-    String base, String? name, Map<Object?, Object?> args) async {
+  String base,
+  String? name,
+  Map<Object?, Object?> args,
+) async {
   String enc(Object? v) => Uri.encodeQueryComponent('$v');
   switch (name) {
     case 'play_music':
@@ -159,12 +165,16 @@ void _send(Map<String, Object?> message) => stdout.writeln(jsonEncode(message));
 void _reply(Object? id, Object? result) =>
     _send({'jsonrpc': '2.0', 'id': id, 'result': result});
 
-void _error(Object? id, int code, String message) =>
-    _send({'jsonrpc': '2.0', 'id': id, 'error': {'code': code, 'message': message}});
-
-void _toolResult(Object? id, String text, {bool isError = false}) => _reply(id, {
-  'content': [
-    {'type': 'text', 'text': text},
-  ],
-  if (isError) 'isError': true,
+void _error(Object? id, int code, String message) => _send({
+  'jsonrpc': '2.0',
+  'id': id,
+  'error': {'code': code, 'message': message},
 });
+
+void _toolResult(Object? id, String text, {bool isError = false}) =>
+    _reply(id, {
+      'content': [
+        {'type': 'text', 'text': text},
+      ],
+      if (isError) 'isError': true,
+    });

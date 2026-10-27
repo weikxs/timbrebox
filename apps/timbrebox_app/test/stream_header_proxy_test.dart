@@ -66,4 +66,39 @@ void main() {
     expect(body, 'audio-bytes');
     expect(upstreamPaths, ['/track.mp3']);
   });
+
+  test('publishes unguessable tokens instead of a counter', () async {
+    final proxy = StreamHeaderProxy();
+    addTearDown(proxy.dispose);
+    final first = await proxy.publish(Uri.parse('https://cdn.test/a'), {});
+    final second = await proxy.publish(Uri.parse('https://cdn.test/b'), {});
+
+    final tokens = [first.pathSegments.last, second.pathSegments.last];
+    for (final token in tokens) {
+      expect(token, matches(RegExp(r'^[0-9a-f]{32}$')));
+    }
+    expect(tokens.first, isNot(tokens.last));
+  });
+
+  test('refuses a request that names another host', () async {
+    final proxy = StreamHeaderProxy(
+      policy: EgressPolicy(
+        lookup: (_) async => [InternetAddress.loopbackIPv4],
+        isPublicAddress: (_) => true,
+      ),
+    );
+    addTearDown(proxy.dispose);
+    final local = await proxy.publish(
+      Uri.parse('http://cdn.test:${upstream.port}/track.mp3'),
+      const {},
+    );
+
+    final request = await player.getUrl(local);
+    request.headers.host = 'rebound.example';
+    final response = await request.close();
+    await response.drain<void>();
+
+    expect(response.statusCode, HttpStatus.forbidden);
+    expect(upstreamPaths, isEmpty);
+  });
 }

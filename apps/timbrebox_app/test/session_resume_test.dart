@@ -27,6 +27,9 @@ class _FakeSessionStore implements SessionStore {
   }
 
   @override
+  Future<void> savePosition(int positionMs) async {}
+
+  @override
   Future<void> clear() async => _restored = null;
 }
 
@@ -49,8 +52,10 @@ void main() {
         positionMs: 90000, // 1:30
       ),
     );
-    final controller =
-        AppController(engine: TestPlayerEngine(), sessionStore: store);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      sessionStore: store,
+    );
     addTearDown(controller.dispose);
 
     await Future<void>.delayed(Duration.zero); // let the async restore run

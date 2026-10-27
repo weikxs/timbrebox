@@ -9,14 +9,22 @@ import 'audio_source.dart';
 /// intentionally conservative and only handles already-resolved HTTPS URLs
 /// and local file URIs, which keeps the player independent from network code.
 abstract interface class PlayerSourceResolver {
-  Future<AudioSourceSpec> resolve(StreamCandidate candidate);
+  /// Resolves [candidate]; a resolver that does network work stops early
+  /// once [cancellation] is cancelled (a newer track was chosen).
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  });
 }
 
 final class DefaultPlayerSourceResolver implements PlayerSourceResolver {
   const DefaultPlayerSourceResolver();
 
   @override
-  Future<AudioSourceSpec> resolve(StreamCandidate candidate) async {
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  }) async {
     final input = candidate.id.trim();
     if (input.startsWith('file://')) {
       final uri = Uri.tryParse(input);

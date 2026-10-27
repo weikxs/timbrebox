@@ -6,6 +6,7 @@ import 'package:timbrebox_core/timbrebox_core.dart';
 import '../model/catalog_track.dart';
 import 'download_paths.dart';
 import '../design/app_strings.dart';
+import 'atomic_file.dart';
 
 /// One persisted local-music record. It holds only the metadata needed to
 /// rebuild a [CatalogTrack] and the on-disk path — never a source URL, header,
@@ -48,7 +49,8 @@ class DownloadedEntry {
         sourceId: sourceId,
         sourceName: value['sourceName']?.toString() ?? sourceId,
         duration: Duration(milliseconds: durationMs),
-        quality: value['quality']?.toString() ?? AppStrings.t('quality.localFile'),
+        quality:
+            value['quality']?.toString() ?? AppStrings.t('quality.localFile'),
         album: value['album']?.toString(),
         artworkUrl: value['artworkUrl']?.toString(),
       ),
@@ -115,7 +117,7 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
         if (_inside(directory, entry.path) case final path?)
           DownloadedEntry(track: entry.track, path: _baseName(path)).toJson(),
     ]);
-    await file.writeAsString(payload, flush: true);
+    await writeFileAtomically(file, payload);
   }
 
   /// The normalized path of [stored] if it names a file directly inside
@@ -124,7 +126,9 @@ final class FileDownloadIndexStore implements DownloadIndexStore {
   static String? _inside(Directory directory, String stored) {
     final base = _normalized(directory.absolute.path);
     final candidate = _normalized(
-      File(stored).isAbsolute ? stored : '$base${Platform.pathSeparator}$stored',
+      File(stored).isAbsolute
+          ? stored
+          : '$base${Platform.pathSeparator}$stored',
     );
     return File(candidate).parent.path == base ? candidate : null;
   }

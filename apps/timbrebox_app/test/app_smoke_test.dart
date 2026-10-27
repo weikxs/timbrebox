@@ -77,14 +77,17 @@ void main() {
 
     expect(find.text('“夜窗”'), findsOneWidget);
     expect(
-      find.descendant(of: find.byType(TrackList), matching: find.text('夜窗')),
+      find.descendant(
+        of: find.byType(SliverTrackList),
+        matching: find.text('夜窗'),
+      ),
       findsOneWidget,
     );
     expect(find.text('Timbre Study · Audius'), findsOneWidget);
     expect(find.text('Radio Browser'), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byType(TrackList),
+        of: find.byType(SliverTrackList),
         matching: find.text('Night Radio'),
       ),
       findsNothing,
@@ -95,13 +98,16 @@ void main() {
 
     expect(
       find.descendant(
-        of: find.byType(TrackList),
+        of: find.byType(SliverTrackList),
         matching: find.text('Night Radio'),
       ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: find.byType(TrackList), matching: find.text('夜窗')),
+      find.descendant(
+        of: find.byType(SliverTrackList),
+        matching: find.text('夜窗'),
+      ),
       findsNothing,
     );
   });

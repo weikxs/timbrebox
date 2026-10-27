@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import '../net/egress_policy.dart';
+import '../net/pooled_http.dart';
+import '../state/control_request_guard.dart';
 
 /// Loopback proxy that makes header-gated / range-limited remote audio playable
 /// by media_kit.
@@ -24,8 +27,13 @@ final class StreamHeaderProxy {
   final EgressPolicy policy;
 
   HttpServer? _server;
+
+  /// One upstream client for the proxy's lifetime, so window after window
+  /// (and seek after seek) reuses keep-alive connections. The policy is
+  /// attached to it, so every new connection and redirect hop is vetted.
+  HttpClient? _client;
   final _entries = <String, _ProxyTarget>{};
-  var _token = 0;
+  final _random = Random.secure();
 
   /// Max bytes fetched per upstream hop in chunked mode.
   static const _window = 1024 * 1024;
@@ -43,13 +51,20 @@ final class StreamHeaderProxy {
     bool chunked = false,
   }) async {
     final server = await _ensureStarted();
-    final token = '${_token++}';
+    final token = _newToken();
     _entries[token] = _ProxyTarget(upstream, headers, chunked);
     while (_entries.length > _maxEntries) {
       _entries.remove(_entries.keys.first); // insertion order = oldest first
     }
     return Uri.parse('http://127.0.0.1:${server.port}/s/$token');
   }
+
+  /// 128 random bits as hex: another local program cannot guess a published
+  /// stream's URL and pull it (with the plugin's headers) through the proxy.
+  String _newToken() => [
+    for (var i = 0; i < 16; i++)
+      _random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+  ].join();
 
   Future<HttpServer> _ensureStarted() async {
     final existing = _server;
@@ -60,6 +75,12 @@ final class StreamHeaderProxy {
   }
 
   Future<void> _handle(HttpRequest req) async {
+    final host = req.headers.value(HttpHeaders.hostHeader);
+    if (!isLoopbackHost(host, _server?.port ?? -1)) {
+      req.response.statusCode = HttpStatus.forbidden;
+      await req.response.close();
+      return;
+    }
     final token = req.uri.pathSegments.isEmpty ? '' : req.uri.pathSegments.last;
     final target = _entries[token];
     if (target == null) {
@@ -67,8 +88,7 @@ final class StreamHeaderProxy {
       await req.response.close();
       return;
     }
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 15);
-    policy.attach(client);
+    final client = _upstreamClient();
     try {
       if (target.chunked) {
         final total = _totalBytes(target.upstream);
@@ -86,11 +106,20 @@ final class StreamHeaderProxy {
         req.response.statusCode = HttpStatus.badGateway;
       } catch (_) {}
     } finally {
-      client.close(force: true);
       try {
         await req.response.close();
       } catch (_) {}
     }
+  }
+
+  HttpClient _upstreamClient() {
+    final existing = _client;
+    if (existing != null) return existing;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 15)
+      ..idleTimeout = pooledIdleTimeout;
+    policy.attach(client);
+    return _client = client;
   }
 
   /// Simple mode: forward one request to upstream with headers injected and the
@@ -127,9 +156,17 @@ final class StreamHeaderProxy {
     _Range range,
     int total,
   ) async {
+    // libmpv drops the connection on every seek; once it is gone, stop
+    // pulling windows instead of fetching the rest of the track for nobody.
+    var playerGone = false;
+    unawaited(
+      response.done.then<void>((_) {}, onError: (_) {}).whenComplete(() {
+        playerGone = true;
+      }),
+    );
     var cursor = range.start;
     var wroteHeaders = false;
-    while (cursor <= range.end) {
+    while (cursor <= range.end && !playerGone) {
       final windowEnd = (cursor + _window - 1) > range.end
           ? range.end
           : cursor + _window - 1;
@@ -148,8 +185,12 @@ final class StreamHeaderProxy {
         wroteHeaders = true;
       }
       await for (final chunk in upstreamResponse) {
+        if (playerGone) return; // Cancelling drops the upstream connection.
         response.add(chunk);
       }
+      // Backpressure: the next window is fetched only once this one has been
+      // handed to the player's socket (this throws if the player hung up).
+      await response.flush();
       cursor = windowEnd + 1;
     }
   }
@@ -160,8 +201,9 @@ final class StreamHeaderProxy {
     _Range range,
     int total,
   ) {
-    response.statusCode =
-        range.isPartial ? HttpStatus.partialContent : HttpStatus.ok;
+    response.statusCode = range.isPartial
+        ? HttpStatus.partialContent
+        : HttpStatus.ok;
     final contentType = upstream.headers.value(HttpHeaders.contentTypeHeader);
     if (contentType != null) {
       response.headers.set(HttpHeaders.contentTypeHeader, contentType);
@@ -196,13 +238,17 @@ final class StreamHeaderProxy {
     if (dash < 0) return _Range(0, lastByte, isPartial: false);
     final start = int.tryParse(spec.substring(0, dash)) ?? 0;
     final endText = spec.substring(dash + 1).trim();
-    final end = endText.isEmpty ? lastByte : (int.tryParse(endText) ?? lastByte);
+    final end = endText.isEmpty
+        ? lastByte
+        : (int.tryParse(endText) ?? lastByte);
     return _Range(start, end < start ? lastByte : end, isPartial: true);
   }
 
   Future<void> dispose() async {
     await _server?.close(force: true);
     _server = null;
+    _client?.close(force: true);
+    _client = null;
     _entries.clear();
   }
 }

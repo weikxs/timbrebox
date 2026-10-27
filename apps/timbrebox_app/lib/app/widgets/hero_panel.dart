@@ -1,12 +1,17 @@
+import 'dart:async';
+import 'dart:math';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../design/app_effects.dart';
 import '../design/app_strings.dart';
 import '../design/timbre_colors.dart';
 import '../model/catalog_track.dart';
 import '../state/app_controller.dart';
+import 'lyrics_view.dart';
 import 'mini_player.dart';
 import 'player_progress_bar.dart';
 import 'playlists_panel.dart';
@@ -195,7 +200,7 @@ class _NowPlayingDesk extends StatelessWidget {
                       const Spacer(),
                       if (controller.currentTrackHasLyric)
                         IconButton(
-                          onPressed: () => _showLyrics(context, controller),
+                          onPressed: () => showLyricsSheet(context, controller),
                           tooltip: AppStrings.t('player.lyrics'),
                           icon: const Icon(Icons.lyrics_outlined),
                           color: TimbreColors.muted,
@@ -210,7 +215,11 @@ class _NowPlayingDesk extends StatelessWidget {
                           onPressed: () {
                             if (track != null) controller.toggleFavorite(track);
                           },
-                          tooltip: AppStrings.t(favorite ? 'common.unfavorite' : 'player.favoriteThis'),
+                          tooltip: AppStrings.t(
+                            favorite
+                                ? 'common.unfavorite'
+                                : 'player.favoriteThis',
+                          ),
                           icon: Icon(
                             favorite
                                 ? Icons.favorite_rounded
@@ -266,7 +275,9 @@ class _QueueDesk extends StatelessWidget {
                     if (name == null || name.isEmpty) return;
                     controller.saveQueueAsPlaylist(name);
                     messenger.showSnackBar(
-                      SnackBar(content: Text(AppStrings.t('player.queueSaved'))),
+                      SnackBar(
+                        content: Text(AppStrings.t('player.queueSaved')),
+                      ),
                     );
                   },
                 ),
@@ -280,7 +291,9 @@ class _QueueDesk extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            AppStrings.t('player.inQueueFmt').replaceFirst('{n}', '${tracks.length}'),
+            AppStrings.t(
+              'player.inQueueFmt',
+            ).replaceFirst('{n}', '${tracks.length}'),
             style: TextStyle(color: TimbreColors.muted, fontSize: 11),
           ),
           const SizedBox(height: 12),
@@ -300,11 +313,28 @@ class _QueueDesk extends StatelessWidget {
           ),
           if (controller.playbackError != null) ...[
             const SizedBox(height: 8),
-            Text(
-              controller.playbackError!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: TimbreColors.gold, fontSize: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    controller.playbackError!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: TimbreColors.gold, fontSize: 10),
+                  ),
+                ),
+                // The way back when a saved track no longer resolves.
+                TextButton(
+                  onPressed: () {
+                    unawaited(controller.searchAgainForCurrent());
+                    onOpenSearch();
+                  },
+                  child: Text(
+                    AppStrings.t('player.searchAgain'),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -369,10 +399,7 @@ class _QueueRow extends StatelessWidget {
                     track.artist,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: TimbreColors.muted,
-                      fontSize: 10,
-                    ),
+                    style: TextStyle(color: TimbreColors.muted, fontSize: 10),
                   ),
                 ],
               ),
@@ -434,83 +461,9 @@ Widget _frost({required bool reduced, required Widget child}) => reduced
         child: child,
       );
 
-/// Opens a bottom sheet with the current track's lyric text (plugin-provided).
-void _showLyrics(BuildContext context, AppController controller) {
-  final title = controller.currentTrack?.title ?? AppStrings.t('player.lyrics');
-  // Resolve once — the sheet's builder runs every drag frame, so calling
-  // currentLyric() inside it would re-fetch continuously.
-  final lyricFuture = controller.currentLyric();
-  showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: TimbreColors.canvasRaised,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (sheetContext) => DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: .6,
-      maxChildSize: .9,
-      builder: (context, scrollController) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: FutureBuilder<String?>(
-          future: lyricFuture,
-          builder: (context, snapshot) {
-            final Widget body;
-            if (snapshot.connectionState != ConnectionState.done) {
-              body = const Center(child: CircularProgressIndicator());
-            } else if ((snapshot.data ?? '').trim().isEmpty) {
-              body = Center(
-                child: Text(
-                  AppStrings.t('player.noLyrics'),
-                  style: TextStyle(color: TimbreColors.muted),
-                ),
-              );
-            } else {
-              body = ListView(
-                controller: scrollController,
-                children: [
-                  Text(
-                    _stripLrcTimestamps(snapshot.data!),
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.7,
-                      color: TimbreColors.ink,
-                    ),
-                  ),
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 20,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Expanded(child: body),
-              ],
-            );
-          },
-        ),
-      ),
-    ),
-  );
-}
-
-/// Drops leading `[mm:ss.xx]` timestamps from LRC lyric lines for reading.
-String _stripLrcTimestamps(String raw) => raw
-    .split('\n')
-    .map((line) => line.replaceAll(RegExp(r'^(\[\d+:\d+(\.\d+)?\])+'), '').trim())
-    .where((line) => line.isNotEmpty)
-    .join('\n');
-
 /// The turntable halo behind the now-playing text. It spins while audio is
-/// playing and freezes in place when paused, like a real record deck.
+/// playing and freezes in place when paused, like a real record deck. It also
+/// stops while the app is not in the foreground.
 class _VinylHalo extends StatefulWidget {
   const _VinylHalo({required this.spinning});
 
@@ -520,46 +473,73 @@ class _VinylHalo extends StatefulWidget {
   State<_VinylHalo> createState() => _VinylHaloState();
 }
 
-class _VinylHaloState extends State<_VinylHalo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _spin = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 14),
-  );
+class _VinylHaloState extends State<_VinylHalo> {
+  /// One full turn of the record.
+  static const _period = Duration(seconds: 14);
 
-  bool get _shouldSpin => widget.spinning && !AppEffects.reduced;
+  /// About 6 frames a second: enough to read as a slow-turning record, and a
+  /// tenth of the frames a vsync-driven animation would make. Every frame
+  /// recomposites the whole window, frosted glass included.
+  static const _frameInterval = Duration(milliseconds: 167);
+
+  static final double _turnsPerFrame =
+      _frameInterval.inMicroseconds / _period.inMicroseconds;
+
+  /// The record's angle in turns; the painter repaints when it changes.
+  final ValueNotifier<double> _turns = ValueNotifier(0);
+  Timer? _ticker;
+  late final AppLifecycleListener _lifecycle;
+
+  bool get _foreground {
+    final state = SchedulerBinding.instance.lifecycleState;
+    return state == null || state == AppLifecycleState.resumed;
+  }
+
+  bool get _shouldSpin => widget.spinning && !AppEffects.reduced && _foreground;
 
   @override
   void initState() {
     super.initState();
-    if (_shouldSpin) _spin.repeat();
+    _lifecycle = AppLifecycleListener(onStateChange: (_) => _syncSpin());
+    _syncSpin();
   }
 
   @override
   void didUpdateWidget(covariant _VinylHalo oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_shouldSpin && !_spin.isAnimating) {
-      _spin.repeat();
-    } else if (!_shouldSpin && _spin.isAnimating) {
-      _spin.stop();
+    _syncSpin();
+  }
+
+  void _syncSpin() {
+    if (_shouldSpin && _ticker == null) {
+      _ticker = Timer.periodic(_frameInterval, (_) => _advance());
+    } else if (!_shouldSpin && _ticker != null) {
+      _ticker?.cancel();
+      _ticker = null;
     }
   }
 
+  void _advance() => _turns.value = (_turns.value + _turnsPerFrame) % 1;
+
   @override
   void dispose() {
-    _spin.dispose();
+    _ticker?.cancel();
+    _lifecycle.dispose();
+    _turns.dispose();
     super.dispose();
   }
 
+  // The painter repaints itself from [_turns] (no rebuild, no relayout of the
+  // panel), and the boundary keeps each frame from repainting the frosted
+  // panel around it.
   @override
   Widget build(BuildContext context) => IgnorePointer(
     child: Align(
       alignment: const Alignment(.85, -.24),
-      child: RotationTransition(
-        turns: _spin,
+      child: RepaintBoundary(
         child: CustomPaint(
           size: const Size.square(218),
-          painter: _VinylPainter(),
+          painter: _VinylPainter(_turns),
         ),
       ),
     ),
@@ -567,12 +547,42 @@ class _VinylHaloState extends State<_VinylHalo>
 }
 
 /// Paints the vinyl record: grooves, a rotating light glint that makes the
-/// spin visible, a gold centre label, and the spindle hole.
+/// spin visible, a gold centre label, and the spindle hole. The record is
+/// recorded once into a picture; each frame only draws it rotated by [turns].
 class _VinylPainter extends CustomPainter {
+  _VinylPainter(this.turns) : super(repaint: turns);
+
+  final ValueListenable<double> turns;
+
   static const _gold = Color(0xffe1b27b);
+
+  /// The recorded record and the size it was recorded at.
+  static (Size, Picture)? _record;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    canvas
+      ..save()
+      ..translate(center.dx, center.dy)
+      ..rotate(turns.value * 2 * pi)
+      ..translate(-center.dx, -center.dy)
+      ..drawPicture(_recordFor(size))
+      ..restore();
+  }
+
+  static Picture _recordFor(Size size) {
+    final cached = _record;
+    if (cached != null && cached.$1 == size) return cached.$2;
+    cached?.$2.dispose();
+    final recorder = PictureRecorder();
+    _drawRecord(Canvas(recorder), size);
+    final picture = recorder.endRecording();
+    _record = (size, picture);
+    return picture;
+  }
+
+  static void _drawRecord(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.width / 2;
 
@@ -628,7 +638,7 @@ class _VinylPainter extends CustomPainter {
   }
 
   /// Draws a music note glyph as the record's centre label art.
-  void _paintNote(Canvas canvas, Offset center, double labelRadius) {
+  static void _paintNote(Canvas canvas, Offset center, double labelRadius) {
     const note = Icons.music_note_rounded;
     final painter = TextPainter(
       text: TextSpan(
@@ -646,8 +656,9 @@ class _VinylPainter extends CustomPainter {
       canvas,
       center - Offset(painter.width / 2, painter.height / 2),
     );
+    painter.dispose();
   }
 
   @override
-  bool shouldRepaint(_VinylPainter oldDelegate) => false;
+  bool shouldRepaint(_VinylPainter oldDelegate) => oldDelegate.turns != turns;
 }

@@ -36,6 +36,25 @@ class _ShellPageState extends State<ShellPage> {
   late final AppController _controller = widget.controller;
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_showNotice);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_showNotice);
+    super.dispose();
+  }
+
+  /// Shows a one-off message from the controller (e.g. a failed save).
+  void _showNotice() {
+    final notice = _controller.takeNotice();
+    if (notice == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(notice)));
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
@@ -143,6 +162,10 @@ class _Background extends StatelessWidget {
               children: [
                 Image.file(
                   File(path),
+                  // Decode no larger than the display (a photo can be many
+                  // times that). The display, not the window, so resizing
+                  // the window does not decode the image again.
+                  cacheWidth: _displayLongestSide(context),
                   fit: BoxFit.cover,
                   excludeFromSemantics: true, // Decorative background.
                   errorBuilder: (_, _, _) => const SizedBox.shrink(),
@@ -161,4 +184,12 @@ class _Background extends StatelessWidget {
             ),
     );
   }
+}
+
+/// The display's longest side in physical pixels (null when unknown): wide
+/// enough to keep a cover-fitted background sharp in any window on it, while
+/// capping the memory of a large photo.
+int? _displayLongestSide(BuildContext context) {
+  final side = View.of(context).display.size.longestSide.round();
+  return side > 0 ? side : null;
 }

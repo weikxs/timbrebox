@@ -1,0 +1,26 @@
+# This file is written by TimbreBox's release workflow (scripts/release/homebrew-cask.sh). DO NOT EDIT.
+cask "timbrebox" do
+  version "@VERSION@"
+  sha256 "@SHA256@"
+
+  url "https://github.com/weikxs/timbrebox/releases/download/v#{version}/timbrebox_#{version}_darwin_universal.dmg"
+  name "TimbreBox"
+  desc "Lightweight music player for public music sources"
+  homepage "https://github.com/weikxs/timbrebox"
+
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: ">= :catalina"
+
+  app "TimbreBox.app"
+
+  # The app is not signed by Apple: without this, macOS refuses to open it the first time.
+  postflight do
+    system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{appdir}/TimbreBox.app"]
+  end
+
+  # No zap stanza: favorites, playlists, downloads and settings in the app's container are never removed by Homebrew.
+end

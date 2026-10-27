@@ -24,8 +24,18 @@ class PlayerProgressBar extends StatefulWidget {
 class _PlayerProgressBarState extends State<PlayerProgressBar> {
   double? _dragValue;
 
+  // Rebuilt by itself once per shown second; see
+  // [AppController.positionListenable]. The boundary keeps that repaint off
+  // the glass panel around it.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: ValueListenableBuilder<Duration>(
+      valueListenable: widget.controller.positionListenable,
+      builder: (context, _, _) => _buildBar(),
+    ),
+  );
+
+  Widget _buildBar() {
     final controller = widget.controller;
     final totalMs = controller.playbackDuration.inMilliseconds;
     final seekable = totalMs > 0 && controller.currentTrack != null;

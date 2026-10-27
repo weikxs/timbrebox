@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import '../model/playlist.dart';
+import 'atomic_file.dart';
 
 /// Persists user playlists (track metadata only) so they survive restarts.
 abstract interface class PlaylistStore {
@@ -20,9 +21,7 @@ final class FilePlaylistStore implements PlaylistStore {
     if (!await file.exists()) return const [];
     try {
       final list = jsonDecode(await file.readAsString()) as List? ?? const [];
-      return [
-        for (final entry in list) ?Playlist.fromJson(entry),
-      ];
+      return [for (final entry in list) ?Playlist.fromJson(entry)];
     } catch (_) {
       return const [];
     }
@@ -32,9 +31,9 @@ final class FilePlaylistStore implements PlaylistStore {
   Future<void> save(List<Playlist> playlists) async {
     final file = await _file();
     await file.parent.create(recursive: true);
-    await file.writeAsString(
+    await writeFileAtomically(
+      file,
       jsonEncode([for (final playlist in playlists) playlist.toJson()]),
-      flush: true,
     );
   }
 

@@ -47,7 +47,8 @@ class _PlayerRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              controller.currentTrack?.title ?? AppStrings.t('player.noTrackSelected'),
+              controller.currentTrack?.title ??
+                  AppStrings.t('player.noTrackSelected'),
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             Text(
@@ -69,7 +70,9 @@ class _PlayerRow extends StatelessWidget {
         ),
       IconButton(
         onPressed: controller.togglePlayback,
-        tooltip: AppStrings.t(controller.isPlaying ? 'player.pause' : 'player.play'),
+        tooltip: AppStrings.t(
+          controller.isPlaying ? 'player.pause' : 'player.play',
+        ),
         icon: Icon(
           controller.isPlaying
               ? Icons.pause_circle_filled
@@ -87,9 +90,14 @@ class _PlayerRow extends StatelessWidget {
         ),
       if (!compact) const SizedBox(width: 4),
       if (!compact)
-        Text(
-          '${controller.positionLabel}  /  ${controller.playbackDurationLabel}',
-          style: TextStyle(color: TimbreColors.muted, fontSize: 11),
+        RepaintBoundary(
+          child: ValueListenableBuilder<Duration>(
+            valueListenable: controller.positionListenable,
+            builder: (context, _, _) => Text(
+              '${controller.positionLabel}  /  ${controller.playbackDurationLabel}',
+              style: TextStyle(color: TimbreColors.muted, fontSize: 11),
+            ),
+          ),
         ),
     ],
   );

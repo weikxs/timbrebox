@@ -31,8 +31,10 @@ void main() {
   test('favorites are saved and restored across controllers', () async {
     final store = _MemoryFavoritesStore();
 
-    final first =
-        AppController(engine: TestPlayerEngine(), favoritesStore: store);
+    final first = AppController(
+      engine: TestPlayerEngine(),
+      favoritesStore: store,
+    );
     first.toggleFavorite(_track('alpha'));
     first.toggleFavorite(_track('bravo'));
     await _settle();
@@ -40,8 +42,10 @@ void main() {
     first.dispose();
 
     // A fresh controller with the same store rebuilds the favorites list.
-    final second =
-        AppController(engine: TestPlayerEngine(), favoritesStore: store);
+    final second = AppController(
+      engine: TestPlayerEngine(),
+      favoritesStore: store,
+    );
     await _settle();
     expect(second.favorites.map((t) => t.id), containsAll(['alpha', 'bravo']));
     second.dispose();
@@ -49,8 +53,10 @@ void main() {
 
   test('un-favoriting persists the removal', () async {
     final store = _MemoryFavoritesStore();
-    final controller =
-        AppController(engine: TestPlayerEngine(), favoritesStore: store);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      favoritesStore: store,
+    );
     addTearDown(controller.dispose);
 
     final track = _track('alpha');

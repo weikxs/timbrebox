@@ -122,15 +122,29 @@ class _DownloadingSection extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         for (final track in active)
-          _DownloadRow(
-            track: track,
-            status: AppStrings.t('download.inProgress'),
-            busy: true,
+          ValueListenableBuilder<Map<String, double>>(
+            valueListenable: controller.downloadProgressListenable,
+            builder: (context, progress, _) {
+              final fraction = progress[track.ref.toString()];
+              return _DownloadRow(
+                track: track,
+                status: fraction == null
+                    ? AppStrings.t('download.inProgress')
+                    : AppStrings.t(
+                        'download.progressFmt',
+                      ).replaceFirst('{p}', '${(fraction * 100).floor()}'),
+                busy: true,
+                progress: fraction,
+                onCancel: () => controller.cancelDownload(track),
+              );
+            },
           ),
         for (final track in failed)
           _DownloadRow(
             track: track,
-            status: controller.downloadErrorFor(track) ?? AppStrings.t('download.failed'),
+            status:
+                controller.downloadErrorFor(track) ??
+                AppStrings.t('download.failed'),
             busy: false,
             onRetry: () => controller.toggleDownload(track),
           ),
@@ -144,13 +158,19 @@ class _DownloadRow extends StatelessWidget {
     required this.track,
     required this.status,
     required this.busy,
+    this.progress,
     this.onRetry,
+    this.onCancel,
   });
 
   final CatalogTrack track;
   final String status;
   final bool busy;
+
+  /// 0..1 while the size is known; null shows an indeterminate spinner.
+  final double? progress;
   final VoidCallback? onRetry;
+  final VoidCallback? onCancel;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -167,7 +187,10 @@ class _DownloadRow extends StatelessWidget {
                 track.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -183,16 +206,25 @@ class _DownloadRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        if (busy)
+        if (busy) ...[
           SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(
+              value: progress,
               strokeWidth: 2,
               color: TimbreColors.gold,
             ),
-          )
-        else if (onRetry != null)
+          ),
+          if (onCancel != null)
+            IconButton(
+              tooltip: AppStrings.t('download.cancel'),
+              iconSize: 18,
+              color: TimbreColors.muted,
+              onPressed: onCancel,
+              icon: const Icon(Icons.close_rounded),
+            ),
+        ] else if (onRetry != null)
           IconButton(
             tooltip: AppStrings.t('common.retry'),
             iconSize: 18,

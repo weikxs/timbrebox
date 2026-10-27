@@ -35,8 +35,10 @@ Future<void> _settle() => Future<void>.delayed(Duration.zero);
 void main() {
   test('pauses on disconnect and resumes on reconnect', () async {
     final monitor = _FakeRouteMonitor();
-    final controller =
-        AppController(engine: TestPlayerEngine(), routeMonitor: monitor);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      routeMonitor: monitor,
+    );
     addTearDown(controller.dispose);
     await controller.play(_track('alpha'));
     expect(controller.isPlaying, isTrue);
@@ -50,32 +52,38 @@ void main() {
     expect(controller.isPlaying, isTrue, reason: 'reconnect should resume');
   });
 
-  test('does not auto-resume playback the user paused after a disconnect',
-      () async {
-    final monitor = _FakeRouteMonitor();
-    final controller =
-        AppController(engine: TestPlayerEngine(), routeMonitor: monitor);
-    addTearDown(controller.dispose);
-    await controller.play(_track('alpha'));
+  test(
+    'does not auto-resume playback the user paused after a disconnect',
+    () async {
+      final monitor = _FakeRouteMonitor();
+      final controller = AppController(
+        engine: TestPlayerEngine(),
+        routeMonitor: monitor,
+      );
+      addTearDown(controller.dispose);
+      await controller.play(_track('alpha'));
 
-    monitor.emit(AudioRouteEvent.outputDisconnected);
-    await _settle();
-    expect(controller.isPlaying, isFalse);
+      monitor.emit(AudioRouteEvent.outputDisconnected);
+      await _settle();
+      expect(controller.isPlaying, isFalse);
 
-    // The user takes over: resume, then pause again — clears the auto flag.
-    await controller.togglePlayback(); // resume
-    await controller.togglePlayback(); // pause
-    expect(controller.isPlaying, isFalse);
+      // The user takes over: resume, then pause again — clears the auto flag.
+      await controller.togglePlayback(); // resume
+      await controller.togglePlayback(); // pause
+      expect(controller.isPlaying, isFalse);
 
-    monitor.emit(AudioRouteEvent.outputConnected);
-    await _settle();
-    expect(controller.isPlaying, isFalse, reason: 'must not fight the user');
-  });
+      monitor.emit(AudioRouteEvent.outputConnected);
+      await _settle();
+      expect(controller.isPlaying, isFalse, reason: 'must not fight the user');
+    },
+  );
 
   test('does not resume when nothing was playing at disconnect', () async {
     final monitor = _FakeRouteMonitor();
-    final controller =
-        AppController(engine: TestPlayerEngine(), routeMonitor: monitor);
+    final controller = AppController(
+      engine: TestPlayerEngine(),
+      routeMonitor: monitor,
+    );
     addTearDown(controller.dispose);
 
     monitor.emit(AudioRouteEvent.outputDisconnected);

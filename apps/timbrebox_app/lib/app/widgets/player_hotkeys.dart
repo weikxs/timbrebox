@@ -40,11 +40,16 @@ class PlayerHotkeys extends StatelessWidget {
     // Mobile relies on the on-screen controls and the OS media session; a
     // physical-keyboard binding only makes sense on desktop.
     if (!_isDesktop) return child;
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        for (final action in PlayerAction.values)
-          controller.shortcutFor(action).activator: () => _run(action),
-      },
+    // Rebinds when the user edits a shortcut without rebuilding [child].
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, focused) => CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          for (final action in PlayerAction.values)
+            controller.shortcutFor(action).activator: () => _run(action),
+        },
+        child: focused!,
+      ),
       child: Focus(autofocus: true, child: child),
     );
   }

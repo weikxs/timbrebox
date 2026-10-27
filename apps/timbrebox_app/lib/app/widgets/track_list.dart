@@ -47,6 +47,56 @@ class TrackList extends StatelessWidget {
   }
 }
 
+/// [TrackList] as a lazily built sliver, for long result lists inside a
+/// [CustomScrollView]: only the rows on screen are built. Every row has the
+/// same height, so the first one doubles as the extent prototype. The glass
+/// fill, edge and shadow match [GlassPanel]; a backdrop blur cannot wrap a
+/// sliver, so the frosting is left out here.
+class SliverTrackList extends StatelessWidget {
+  const SliverTrackList({
+    required this.tracks,
+    required this.controller,
+    this.emptyTitle,
+    this.emptyDetail,
+    super.key,
+  });
+
+  final List<CatalogTrack> tracks;
+  final AppController controller;
+  final String? emptyTitle;
+  final String? emptyDetail;
+
+  static const _radius = BorderRadius.all(Radius.circular(22));
+
+  @override
+  Widget build(BuildContext context) {
+    if (tracks.isEmpty) {
+      return SliverToBoxAdapter(
+        child: _EmptyState(
+          title: emptyTitle ?? AppStrings.t('track.emptyTitle'),
+          detail: emptyDetail ?? AppStrings.t('track.emptyDetail'),
+        ),
+      );
+    }
+    Widget row(CatalogTrack track) =>
+        _TrackRow(track: track, controller: controller, showQueueAction: true);
+    return DecoratedSliver(
+      decoration: glassShadowDecoration(_radius),
+      sliver: DecoratedSliver(
+        decoration: glassSurfaceDecoration(_radius),
+        sliver: SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          sliver: SliverPrototypeExtentList.builder(
+            prototypeItem: row(tracks.first),
+            itemCount: tracks.length,
+            itemBuilder: (context, index) => row(tracks[index]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrackRow extends StatelessWidget {
   const _TrackRow({
     required this.track,
@@ -64,8 +114,9 @@ class _TrackRow extends StatelessWidget {
     final loading = controller.isLoadingTrack(track);
     return Semantics(
       button: true,
-      label: AppStrings.t(loading ? 'track.resolvingFmt' : 'track.playFmt')
-          .replaceFirst('{name}', track.title),
+      label: AppStrings.t(
+        loading ? 'track.resolvingFmt' : 'track.playFmt',
+      ).replaceFirst('{name}', track.title),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: loading ? null : () => controller.play(track),
@@ -109,10 +160,7 @@ class _TrackRow extends StatelessWidget {
                     Text(
                       '${track.artist} · ${track.sourceName}',
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: TimbreColors.muted,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: TimbreColors.muted, fontSize: 11),
                     ),
                   ],
                 ),
@@ -128,7 +176,11 @@ class _TrackRow extends StatelessWidget {
               ),
               IconButton(
                 onPressed: () => controller.toggleFavorite(track),
-                tooltip: AppStrings.t(controller.isFavorite(track) ? 'common.unfavorite' : 'common.favorite'),
+                tooltip: AppStrings.t(
+                  controller.isFavorite(track)
+                      ? 'common.unfavorite'
+                      : 'common.favorite',
+                ),
                 iconSize: 18,
                 icon: Icon(
                   controller.isFavorite(track)
@@ -147,15 +199,16 @@ class _TrackRow extends StatelessWidget {
                   iconSize: 18,
                   icon: const Icon(Icons.queue_music_rounded),
                 ),
+              // While downloading, the same button cancels.
               IconButton(
-                onPressed: controller.isDownloading(track)
-                    ? null
-                    : () => controller.toggleDownload(track),
-                tooltip: AppStrings.t(controller.isDownloading(track)
-                    ? 'download.downloading'
-                    : controller.isDownloaded(track)
-                    ? 'download.remove'
-                    : 'download.toLocal'),
+                onPressed: () => controller.toggleDownload(track),
+                tooltip: AppStrings.t(
+                  controller.isDownloading(track)
+                      ? 'download.cancel'
+                      : controller.isDownloaded(track)
+                      ? 'download.remove'
+                      : 'download.toLocal',
+                ),
                 iconSize: 18,
                 icon: controller.isDownloading(track)
                     ? const SizedBox(

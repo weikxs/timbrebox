@@ -1,3 +1,5 @@
+import 'app_strings_more.dart';
+
 /// Lightweight app-wide localization. `AppStrings.lang` is a global (like the
 /// active palette) set from the language preference; widgets read `AppStrings.t`
 /// at build time so switching language re-renders. Keys are dotted namespaces;
@@ -13,8 +15,11 @@ abstract final class AppStrings {
       : AppLang.zh;
 
   static String t(String key) {
-    final table = lang == AppLang.en ? _en : _zh;
-    return table[key] ?? _zh[key] ?? key;
+    final english = lang == AppLang.en;
+    return (english ? _en[key] ?? moreEnStrings[key] : null) ??
+        _zh[key] ??
+        moreZhStrings[key] ??
+        key;
   }
 
   static const _zh = <String, String>{
@@ -172,6 +177,7 @@ abstract final class AppStrings {
     'plugin.src.expired': '曲目信息已过期，请重新搜索。',
     'plugin.src.resolveFailed': '插件解析播放地址失败：{e}',
     'plugin.src.noUrl': '插件未返回可播放的地址。',
+    'plugin.src.disposed': '插件已移除或已更新。',
     'plugin.src.qualityFmt': '插件 · {p}',
     'plugin.runtime.execFailed': '插件执行失败',
     'stream.err.badLocalPath': '本地音频路径无法识别。',
@@ -236,7 +242,8 @@ abstract final class AppStrings {
     // plugins
     'plugin.title': '音源插件',
     'plugin.detail': '第三方插件是社区脚本，安装后可搜索/播放其提供的音源。仅安装你信任的来源。',
-    'plugin.unsupported': '当前平台暂不支持插件。',
+    'plugin.unsupported':
+        '出于安全考虑，移动版不会下载或运行插件代码。插件只在桌面版（Windows、macOS、Linux）可用。',
     'plugin.urlHint': '粘贴插件 .js 原始链接，或订阅 JSON 地址',
     'plugin.installing': '安装中…',
     'plugin.install': '安装',
@@ -294,6 +301,7 @@ abstract final class AppStrings {
     'settings.minutesFmt': '{m} 分钟',
     'settings.appearancePrivacy': '外观与隐私',
     'settings.reducedEffects': '减少视觉效果',
+    'settings.noGpuEffects': '未检测到 GPU，已默认关闭动效与毛玻璃以节省 CPU。',
     'settings.diagnosticLogging': '本地诊断日志',
     'settings.diagnosticSubtitle': '默认关闭；仅用于导出本地排障信息。',
     'settings.viewDiagnostics': '查看诊断日志',
@@ -305,7 +313,8 @@ abstract final class AppStrings {
 
     // agent control
     'agent.localInterface': '本机控制接口',
-    'agent.interfaceSubtitle': '默认开启：在本机（仅回环，无需令牌）开放 HTTP 接口，供本地 agent/脚本控制播放器。',
+    'agent.interfaceSubtitle':
+        '默认开启：在本机（仅回环）开放 HTTP 接口，供本地 agent/脚本控制播放器。每个请求都要带上本次运行的令牌（只有你的账户能读取的令牌文件）。',
     'agent.starting': '正在启动…',
     'agent.address': '地址',
     'agent.token': '令牌',
@@ -413,7 +422,8 @@ abstract final class AppStrings {
     'common.delete': 'Delete',
     'common.play': 'Play',
     'library.emptyFavoritesTitle': 'No favorites yet',
-    'library.emptyFavoritesDetail': 'Tap the heart on any track to keep it here.',
+    'library.emptyFavoritesDetail':
+        'Tap the heart on any track to keep it here.',
     'library.localDetail':
         'Downloaded audio is stored on this device and plays straight from local files after a restart — no source request.',
     'library.emptyLocalTitle': 'No local music yet',
@@ -457,7 +467,8 @@ abstract final class AppStrings {
 
     // search
     'search.noSourcesTitle': 'No search sources available',
-    'search.noSourcesDetail': 'Enable at least one built-in source in Settings.',
+    'search.noSourcesDetail':
+        'Enable at least one built-in source in Settings.',
     'search.sourceLabel': 'Music sources',
     'search.startTitle': 'Start from a source',
     'search.recent': 'Recent searches',
@@ -470,29 +481,37 @@ abstract final class AppStrings {
     'theme.dark': 'Dark',
     'theme.system': 'System',
     'theme.black': 'Black',
-    'plugin.err.emptySubscription': 'The subscription has no installable plugins.',
+    'plugin.err.emptySubscription':
+        'The subscription has no installable plugins.',
     'plugin.err.subscriptionAllFailed':
         'All plugins in the subscription failed to install: {e}',
     'plugin.err.scriptLoad': 'The plugin script failed to load: {e}',
-    'plugin.err.missingPlatform': 'Not a valid plugin (missing the platform field).',
+    'plugin.err.missingPlatform':
+        'Not a valid plugin (missing the platform field).',
     'plugin.err.missingSearch':
         'The plugin has no search capability and cannot be a source.',
     'plugin.err.invalidUrl': 'Enter a valid https URL.',
     'plugin.err.downloadHttp': 'Download failed: HTTP {code}',
     'plugin.err.tooLarge': 'The plugin file is too large.',
-    'plugin.err.network': 'Network unavailable — check your connection and retry.',
+    'plugin.err.network':
+        'Network unavailable — check your connection and retry.',
     'plugin.err.timeout': 'Download timed out, try again later.',
     'plugin.http.invalidUrl': 'The plugin requested an invalid URL.',
-    'plugin.http.redirectMissing': 'The plugin request redirect is missing a target.',
-    'plugin.http.tooManyRedirects': 'The plugin request was redirected too many times.',
+    'plugin.http.redirectMissing':
+        'The plugin request redirect is missing a target.',
+    'plugin.http.tooManyRedirects':
+        'The plugin request was redirected too many times.',
     'plugin.http.tooLarge': 'The plugin response exceeds the size limit.',
     'net.blockedScheme': 'Blocked for safety: the {s} scheme is not allowed.',
     'net.blockedHost': 'Blocked for safety: {h} is a local or private address.',
     'plugin.src.searchFailed': 'Plugin search failed: {e}',
-    'plugin.src.refMismatch': 'The media reference does not match the resolver.',
+    'plugin.src.refMismatch':
+        'The media reference does not match the resolver.',
     'plugin.src.expired': 'Track info expired — search again.',
-    'plugin.src.resolveFailed': 'The plugin failed to resolve a playback URL: {e}',
+    'plugin.src.resolveFailed':
+        'The plugin failed to resolve a playback URL: {e}',
     'plugin.src.noUrl': 'The plugin returned no playable URL.',
+    'plugin.src.disposed': 'The plugin was removed or updated.',
     'plugin.src.qualityFmt': 'Plugin · {p}',
     'plugin.runtime.execFailed': 'Plugin execution failed',
     'stream.err.badLocalPath': 'The local audio path is unrecognized.',
@@ -502,14 +521,16 @@ abstract final class AppStrings {
     'download.errTooLarge': 'The download exceeds the size limit.',
     'download.errScheme': 'This source cannot be downloaded.',
     'quality.localFile': 'Local file',
-    'source.errUnavailable': 'The source is temporarily unavailable (HTTP {code}).',
+    'source.errUnavailable':
+        'The source is temporarily unavailable (HTTP {code}).',
     'source.errTooLarge': 'The source response is too large.',
     'source.errTimeout': 'The source response timed out.',
     'source.errNetwork': 'Network unavailable.',
     'source.errLoadMore': 'Failed to load more, try again later.',
     'source.errUnavailableRetry':
         'The source is temporarily unavailable, try again later.',
-    'source.errRespTooLarge': 'The source response is too large; stopped reading.',
+    'source.errRespTooLarge':
+        'The source response is too large; stopped reading.',
     'source.errRespTimeout': 'The source response timed out, try again later.',
     'source.errNetworkRetry':
         'Network unavailable — check your connection and retry.',
@@ -517,18 +538,22 @@ abstract final class AppStrings {
     'quality.publicStream': 'Public stream',
     'quality.liveRadio': 'Live radio',
     'quality.publicAudio': 'Public audio',
-    'plugin.err.unsupportedPlatform': 'Plugins are not supported on this platform.',
+    'plugin.err.unsupportedPlatform':
+        'Plugins are not supported on this platform.',
     'search.sourceDisabled': 'Source not enabled',
     'search.searchingFmt': 'Searching {name}…',
     'search.fromFmt': 'From {name}',
     'search.errorTitle': 'Search is unavailable',
     'search.pickSourceTitle': 'Pick an available source',
-    'search.pickSourceDetail': 'Once sources are enabled, results appear per source.',
+    'search.pickSourceDetail':
+        'Once sources are enabled, results appear per source.',
     'search.readyTitle': 'Ready to search',
-    'search.readyDetailFmt': 'Enter a keyword — {name} results appear on their own.',
+    'search.readyDetailFmt':
+        'Enter a keyword — {name} results appear on their own.',
     'search.sourceUnavailableFmt': '{name} is unavailable',
     'search.noMatchFmt': 'No matches on {name}',
-    'search.noMatchDetail': 'Try another keyword, or switch to a different source.',
+    'search.noMatchDetail':
+        'Try another keyword, or switch to a different source.',
     'search.allLoaded': 'All results loaded',
     'search.loadMore': 'Load more',
 
@@ -563,7 +588,9 @@ abstract final class AppStrings {
     'plugin.title': 'Source plugins',
     'plugin.detail':
         'Third-party plugins are community scripts; once installed they let you search and play the sources they provide. Only install sources you trust.',
-    'plugin.unsupported': 'Plugins are not supported on this platform yet.',
+    'plugin.unsupported':
+        'For safety, mobile builds never download or run plugin code. '
+        'Plugins are available on the desktop app (Windows, macOS, Linux).',
     'plugin.urlHint': 'Paste a plugin .js raw link, or a subscription JSON URL',
     'plugin.installing': 'Installing…',
     'plugin.install': 'Install',
@@ -583,15 +610,23 @@ abstract final class AppStrings {
     'plugin.confirmInstall': 'I trust it, install',
 
     // settings bodies
-    'settings.detail.general': 'Language, playback, appearance and privacy preferences.',
-    'settings.detail.appearance': 'Change the theme skin: upload an image as the background.',
-    'settings.detail.sources': 'Built-in sources ready to use; disable any as you like.',
-    'settings.detail.plugins': 'Paste a GitHub URL to install third-party source plugins.',
-    'settings.detail.downloads': 'View the local-music folder; open or clear downloads.',
+    'settings.detail.general':
+        'Language, playback, appearance and privacy preferences.',
+    'settings.detail.appearance':
+        'Change the theme skin: upload an image as the background.',
+    'settings.detail.sources':
+        'Built-in sources ready to use; disable any as you like.',
+    'settings.detail.plugins':
+        'Paste a GitHub URL to install third-party source plugins.',
+    'settings.detail.downloads':
+        'View the local-music folder; open or clear downloads.',
     'settings.shortcuts': 'Shortcuts',
-    'settings.detail.shortcuts': 'View and customize the desktop playback shortcuts.',
-    'settings.shortcutsHint': 'Click a key, then press a modifier combo (e.g. ⌘ / Ctrl + key); Esc cancels.',
-    'settings.shortcutDesktopOnly': 'Keyboard shortcuts are available on desktop only (Windows / macOS / Linux).',
+    'settings.detail.shortcuts':
+        'View and customize the desktop playback shortcuts.',
+    'settings.shortcutsHint':
+        'Click a key, then press a modifier combo (e.g. ⌘ / Ctrl + key); Esc cancels.',
+    'settings.shortcutDesktopOnly':
+        'Keyboard shortcuts are available on desktop only (Windows / macOS / Linux).',
     'settings.shortcutReset': 'Reset to defaults',
     'settings.shortcutPress': 'Press a combo…',
     'shortcut.playPause': 'Play / Pause',
@@ -608,7 +643,8 @@ abstract final class AppStrings {
     'settings.uploadBg': 'Upload background image',
     'settings.usingCustomBg': 'Using a custom background',
     'settings.bgApplied': 'Custom background applied',
-    'settings.bgReadFailed': 'Could not read the selected image, please try again.',
+    'settings.bgReadFailed':
+        'Could not read the selected image, please try again.',
     'settings.language': 'Interface language',
     'settings.restoreSession': 'Restore last session on launch',
     'settings.playback': 'Playback',
@@ -623,6 +659,8 @@ abstract final class AppStrings {
     'settings.minutesFmt': '{m} min',
     'settings.appearancePrivacy': 'Appearance & privacy',
     'settings.reducedEffects': 'Reduce visual effects',
+    'settings.noGpuEffects':
+        'No GPU found: spin and frosted glass are off by default to save CPU.',
     'settings.diagnosticLogging': 'Local diagnostic logging',
     'settings.diagnosticSubtitle':
         'Off by default; only for exporting local troubleshooting info.',
@@ -631,12 +669,13 @@ abstract final class AppStrings {
     'settings.diagnosticsTitle': 'Diagnostic log',
     'settings.noLogs': 'No logs yet.',
     'settings.builtinSources': 'Built-in sources',
-    'settings.sourcesDetail': 'Disabled sources are excluded from search and discovery.',
+    'settings.sourcesDetail':
+        'Disabled sources are excluded from search and discovery.',
 
     // agent control
     'agent.localInterface': 'Local control interface',
     'agent.interfaceSubtitle':
-        'On by default: exposes a local HTTP interface (loopback only, no token) for local agents/scripts to control the player.',
+        'On by default: exposes a local HTTP interface (loopback only) for local agents/scripts to control the player. Every request must carry this run\'s token, from a file only your account can read.',
     'agent.starting': 'Starting…',
     'agent.address': 'Address',
     'agent.token': 'Token',
@@ -646,7 +685,8 @@ abstract final class AppStrings {
 
     // source descriptions
     'source.audiusDetail': 'Public on-demand music · HTTPS · No account',
-    'source.radioDetail': 'Public radio directory & live streams · HTTP(S) · No account',
+    'source.radioDetail':
+        'Public radio directory & live streams · HTTP(S) · No account',
     'source.builtinDetail': 'Built-in source',
 
     // loop modes

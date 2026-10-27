@@ -33,8 +33,8 @@ class ShortcutBinding {
   final bool alt;
   final bool meta;
 
-  LogicalKeyboardKey get key => LogicalKeyboardKey.findKeyByKeyId(keyId) ??
-      LogicalKeyboardKey(keyId);
+  LogicalKeyboardKey get key =>
+      LogicalKeyboardKey.findKeyByKeyId(keyId) ?? LogicalKeyboardKey(keyId);
 
   SingleActivator get activator => SingleActivator(
     key,
@@ -142,14 +142,16 @@ Map<PlayerAction, ShortcutBinding> defaultShortcuts() {
     PlayerAction.volumeUp: combo(LogicalKeyboardKey.arrowUp),
     PlayerAction.volumeDown: combo(LogicalKeyboardKey.arrowDown),
     PlayerAction.nextTrack: combo(LogicalKeyboardKey.arrowRight, shift: true),
-    PlayerAction.previousTrack: combo(LogicalKeyboardKey.arrowLeft, shift: true),
+    PlayerAction.previousTrack: combo(
+      LogicalKeyboardKey.arrowLeft,
+      shift: true,
+    ),
   };
 }
 
 /// Serializes the whole binding map for [SettingsStore].
-Map<String, Object?> shortcutsToJson(Map<PlayerAction, ShortcutBinding> map) => {
-  for (final entry in map.entries) entry.key.name: entry.value.toJson(),
-};
+Map<String, Object?> shortcutsToJson(Map<PlayerAction, ShortcutBinding> map) =>
+    {for (final entry in map.entries) entry.key.name: entry.value.toJson()};
 
 /// Rebuilds a binding map from stored JSON, filling any gap with the default.
 Map<PlayerAction, ShortcutBinding> shortcutsFromJson(Object? json) {

@@ -15,7 +15,10 @@ final class CatalogPlayerSourceResolver implements PlayerSourceResolver {
   final StreamResolver _resolver;
 
   @override
-  Future<AudioSourceSpec> resolve(StreamCandidate candidate) async {
+  Future<AudioSourceSpec> resolve(
+    StreamCandidate candidate, {
+    CancellationToken? cancellation,
+  }) async {
     final local = Uri.tryParse(candidate.id);
     if (local?.scheme == 'file') {
       return AudioSourceSpec.localFile(local!.toFilePath());
@@ -24,7 +27,7 @@ final class CatalogPlayerSourceResolver implements PlayerSourceResolver {
       StreamRequest(
         ref: candidate.ref,
         quality: candidate.label,
-        cancellation: CancellationToken(),
+        cancellation: cancellation ?? CancellationToken(),
       ),
     );
     if (stream.uri.scheme == 'file') {
@@ -39,8 +42,8 @@ final class CatalogPlayerSourceResolver implements PlayerSourceResolver {
       mimeType: stream.mimeType,
       // Loopback (the YouTube range-injecting proxy) and radio streams may be
       // plain http; loopback carries no MITM risk, radio has no https option.
-      allowInsecure: _isLoopback(stream.uri) ||
-          candidate.ref.sourceId == 'radio_browser',
+      allowInsecure:
+          _isLoopback(stream.uri) || candidate.ref.sourceId == 'radio_browser',
     );
   }
 
