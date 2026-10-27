@@ -31,3 +31,6 @@ docs/prd/
 
 # 内部开发/设计文档，仅本地不发布
 docs/internal/
+
+# Local privacy denylist (real identifiers checked by scripts/check-privacy.sh); never publish.
+.privacy-denylist
