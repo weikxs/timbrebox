@@ -1,0 +1,45 @@
+name: CI
+
+# One job per pull request, on Linux: static analysis, formatting and the
+# tests of every Dart package (tools/check.sh). A change to documentation
+# alone finishes in seconds without running them; a draft runs nothing.
+# Merging to main starts nothing, since the pull request was already tested.
+# Branch rules require this job, `check`.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The Flutter version is pinned so the formatter and the analyzer give the
+    # same answers here as on a developer's machine.
+    container: ghcr.io/cirruslabs/flutter:3.44.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: What changed
+        id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          files=$(git diff --name-only "$BASE"...HEAD)
+          printf '%s\n' "$files"
+          docs='\.md$|^docs/|^LICENSE|^\.claude/'
+          if printf '%s\n' "$files" | grep -Ev "$docs" | grep -q .; then code=true; else code=false; fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = false ]; then echo "documentation only: nothing to test"; fi
+      - name: Analysis, formatting and tests
+        if: steps.diff.outputs.code == 'true'
+        run: tools/check.sh
