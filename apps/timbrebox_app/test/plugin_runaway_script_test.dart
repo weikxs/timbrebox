@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';
 
@@ -26,5 +28,7 @@ module.exports = {
       );
       expect(watch.elapsed, lessThan(const Duration(seconds: 10)));
     },
+    // The QuickJS build flutter_js bundles for Windows cannot be interrupted.
+    skip: Platform.isWindows ? 'no script time limit on Windows' : false,
   );
 }
