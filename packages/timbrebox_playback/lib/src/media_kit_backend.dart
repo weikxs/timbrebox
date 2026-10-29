@@ -222,7 +222,8 @@ final class MediaKitBackend
   }
 
   void _ensureLive() {
-    if (_disposed)
+    if (_disposed) {
       throw StateError(SourceStrings.t('stream.err.backendReleased'));
+    }
   }
 }
