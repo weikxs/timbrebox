@@ -8,7 +8,7 @@ import 'player_backend.dart';
 import 'position_sampler.dart';
 
 /// libmpv-backed audio backend (media_kit). mpv streams DASH/fragmented audio
-/// (YouTube) and remote URLs with request headers natively.
+/// and remote URLs with request headers natively.
 ///
 /// libmpv is loaded and started on the first source, not at launch: an idle
 /// app that has not played anything yet saves its ~50 MB (libmpv and its
@@ -62,8 +62,8 @@ final class MediaKitBackend
   /// (sized for video) - about 100 s of a 160 kbps stream, 10 s of lossless.
   /// While playing, an 8 MB cache sat full in memory. No video output, and
   /// video decoding stays off too: media_kit opens with `vid=no` until a
-  /// video view attaches, and none does, so Douyin / TikTok MP4s play their
-  /// audio track only.
+  /// video view attaches, and none does, so video files (an MP4 from a
+  /// plugin, say) play their audio track only.
   static const configuration = PlayerConfiguration(
     bufferSize: 2 * 1024 * 1024,
     vo: 'null',

@@ -5,10 +5,13 @@
 ## Project Goal
 
 For now we ship only the lightweight music-player loop for Windows, macOS, Linux,
-iOS, and Android, with just YouTube, Bilibili, Douyin, and TikTok as built-in
-sources at launch. Audius, Internet Archive, and Radio Browser come in a later
-phase; NetEase Cloud Music and QQ Music come later still. None may be presented
-as a shipped capability ahead of time.
+iOS, and Android. TimbreBox is a player: its built-in sources are open services
+with public APIs only (Audius, Internet Archive, Radio Browser). Video and
+streaming platforms are never built in and the project provides no plugins for
+them; users add sources with plugins at their own choice. Never add a built-in
+source, or code, that works around a platform's restrictions (risk control,
+anti-bot checks, page scraping, signing tricks) or unlocks paid content. Nothing
+may be presented as a shipped capability ahead of time.
 
 The detailed specs and design (scope source-of-truth, implementation boundaries,
 phase plan, source admission, etc.) live in the **local internal docs** under
@@ -85,9 +88,9 @@ local loopback control API (on by default; requests from web pages are refused, 
 The playback engine must decouple its directories by "platform" and "source":
 - `playback/`: platform audio backends, loopback proxy, resolver, source spec —
   **source-agnostic**.
-- `sources/<source>/`: one directory per source (`youtube` / `bilibili` /
-  `douyin_tiktok` / `audius` / `internet_archive` / `radio_browser`); shared HTTP
-  client, cookie jar, and parsing utilities go in `sources/_shared/`.
+- `sources/<source>/`: one directory per source (`audius` /
+  `internet_archive` / `radio_browser`); shared HTTP
+  client and parsing utilities go in `sources/_shared/`.
 - `catalog/`: source registry plus aggregated search / pagination / charts.
 - The online sources live in `packages/timbrebox_sources` and the playback
   backend in `packages/timbrebox_playback`, shared with other apps: keep them

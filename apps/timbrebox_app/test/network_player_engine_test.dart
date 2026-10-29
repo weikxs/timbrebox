@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 import 'package:timbrebox_playback/timbrebox_playback.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
+import 'package:timbrebox_app/app/design/app_strings.dart';
+import 'package:timbrebox_app/app/state/app_controller.dart';
+import 'package:timbrebox_app/app/state/catalog_player_source_resolver.dart';
 import 'package:timbrebox_app/app/state/network_player_engine.dart';
 import 'package:timbrebox_app/app/state/player_source_resolver.dart';
 
@@ -82,6 +86,37 @@ void main() {
       ),
       throwsStateError,
     );
+  });
+
+  test('a track saved from a retired source explains where it went', () async {
+    AppStrings.lang = AppLang.en;
+    addTearDown(() => AppStrings.lang = AppLang.zh);
+    final catalog = BuiltInMusicCatalog.standard();
+    final controller = AppController(
+      engine: NetworkPlayerEngine(
+        backend: _FakeAudioBackend(),
+        resolver: CatalogPlayerSourceResolver(catalog.streamResolver),
+      ),
+      catalog: catalog,
+    );
+    addTearDown(controller.dispose);
+    const saved = CatalogTrack(
+      id: 'demo-item',
+      title: 'Song',
+      artist: 'Artist',
+      sourceId: 'bilibili',
+      sourceName: 'Bilibili',
+      duration: Duration.zero,
+      quality: 'standard',
+    );
+
+    await controller.play(saved);
+
+    expect(
+      controller.playbackError,
+      contains('Bilibili is no longer built in'),
+    );
+    expect(controller.playbackError, contains('plugin'));
   });
 
   test(

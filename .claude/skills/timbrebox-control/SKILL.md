@@ -95,7 +95,7 @@ player refuses them as GET); reads are GET.
 | Show queue | `timbrebox-ctl queue` | `tb -s "$BASE/queue"` |
 | Play queue index | `timbrebox-ctl play-queue 2` | `tb -sG -X POST "$BASE/play-queue" --data-urlencode i=2` |
 | List sources | `timbrebox-ctl sources` | `tb -s "$BASE/sources"` |
-| Enable/disable a source | `timbrebox-ctl source youtube false` | `tb -sG -X POST "$BASE/source" --data-urlencode id=youtube --data-urlencode enabled=false` |
+| Enable/disable a source | `timbrebox-ctl source audius false` | `tb -sG -X POST "$BASE/source" --data-urlencode id=audius --data-urlencode enabled=false` |
 | Current lyric | `timbrebox-ctl lyric` | `tb -s "$BASE/lyric"` |
 | Quit the app | `timbrebox-ctl quit` | `tb -s -X POST "$BASE/quit"` |
 
@@ -120,8 +120,8 @@ Field names are exact — parse these, don't guess.
   "loop": "queue",
   "queueLength": 12,
   "track": {
-    "source": "youtube", "item": "abc123",
-    "title": "…", "artist": "…", "sourceName": "YouTube",
+    "source": "audius", "item": "abc123",
+    "title": "…", "artist": "…", "sourceName": "Audius",
     "durationMs": 213000
   }
 }
@@ -133,12 +133,12 @@ Field names are exact — parse these, don't guess.
 
 ```json
 { "query": "周杰伦",
-  "results": [ { "source": "youtube", "item": "abc123",
-                 "title": "…", "artist": "…", "sourceName": "YouTube" } ] }
+  "results": [ { "source": "audius", "item": "abc123",
+                 "title": "…", "artist": "…", "sourceName": "Audius" } ] }
 ```
 
 **`/queue`** → `{ "items": [ { source, item, title, artist, sourceName, durationMs } ] }`
-**`/sources`** → `{ "sources": [ { "id": "youtube", "name": "YouTube", "enabled": true } ] }`
+**`/sources`** → `{ "sources": [ { "id": "audius", "name": "Audius", "enabled": true } ] }`
 **`/lyric`** → `{ "lyric": "…" }` (or `{ "lyric": null }` when the source has none)
 **`/source`** → `{ "ok": true }`
 **`/play-ref`, `/play-queue`** → success: `{ "ok": true, …status }`; failure:
@@ -156,8 +156,8 @@ before reporting success.
 3. `timbrebox-ctl play-ref <source> <item>` → the response is the fresh status object.
 4. Confirm playback from that status (`playing: true`, the `track` fields).
 
-Search hits every enabled source, so results may span YouTube / Bilibili / Audius
-/ etc. If the user names a source, filter `results[]` by `source`, or disable the
+Search hits every enabled source, so results may span Audius / Internet
+Archive / plugin sources. If the user names a source, filter `results[]` by `source`, or disable the
 others first with `timbrebox-ctl source <id> false`.
 
 ## Notes

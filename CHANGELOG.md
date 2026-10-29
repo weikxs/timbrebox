@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error messages from the sources, the queue, the control API and the plugin sandbox follow the app's language.
 - The audio engine never starts youtube-dl or yt-dlp: TimbreBox resolves every stream itself.
 
+### Removed
+
+- YouTube, Bilibili, Douyin and TikTok are no longer built-in sources. TimbreBox is a player: it builds in only
+  open services with public APIs (Audius, Internet Archive, Radio Browser), and other sources are added with
+  plugins. Tracks saved from these sources stay in your library; playing one says that a plugin can add its
+  source back and offers **Search again**. The hot library's Chinese categories, which searched Bilibili, are
+  gone too. Mobile builds do not run plugins, so on Android and iOS only the three built-in sources remain.
+
 ### Fixed
 
 - Playback: a failed load stops the previous track, a superseded play never starts, and resume refuses after a
@@ -65,7 +73,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A plugin script stuck in a loop is stopped after three seconds instead of freezing the app.
 - Updating a plugin no longer stops the track it is playing.
 - Installing or updating a plugin writes its files safely, so a crash cannot leave a broken plugin behind.
-- Seeking in a YouTube track no longer downloads the rest of the track again in the background.
 - Quitting through the control API (`/quit`) saves the session and pending changes before the app exits.
 
 ### Security

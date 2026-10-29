@@ -47,14 +47,7 @@ final class SourceEndpoint {
 final class BuiltInSourceConfig {
   static const http = SourceHttpPolicy();
   static const pageSize = 30;
-  static const videoApiMaxResponseBytes = 4 * 1024 * 1024;
   static const appName = 'TimbreBox';
-
-  /// A current desktop-browser User-Agent. Some sources (e.g. Bilibili) reject
-  /// the default client UA at their edge/WAF, so those adapters send this.
-  static const browserUserAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-      '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
   static const audius = SourceEndpoint(
     host: 'api.audius.co',
@@ -80,27 +73,6 @@ final class BuiltInSourceConfig {
       'search': '/json/stations/byname/{query}',
       'station': '/json/stations/byuuid/{id}',
     },
-  );
-
-  static const bilibili = SourceEndpoint(
-    host: 'api.bilibili.com',
-    paths: {
-      'search': '/x/web-interface/search/type',
-      'view': '/x/web-interface/view',
-      'play': '/x/player/playurl',
-      'finger': '/x/frontend/finger/spi',
-    },
-  );
-  static const bilibiliReferer = 'https://www.bilibili.com/';
-
-  static const douyin = SourceEndpoint(
-    host: 'www.douyin.com',
-    paths: {'search': '/search/{query}', 'video': '/video/{id}'},
-  );
-
-  static const tiktok = SourceEndpoint(
-    host: 'www.tiktok.com',
-    paths: {'search': '/search', 'video': '/@{author}/video/{id}'},
   );
 
   const BuiltInSourceConfig._();

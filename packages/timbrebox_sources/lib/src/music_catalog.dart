@@ -11,11 +11,20 @@ import 'net/pooled_http.dart';
 import 'bounded_cache.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
-import 'video_source_adapters.dart';
-import 'youtube_catalog_source.dart';
 import 'source_strings.dart';
 
 part 'directory_catalog_sources.dart';
+
+/// Sources that were built in before and are now added with plugins only, by
+/// id, with the name shown to the user. Tracks saved from them stay in the
+/// library; playing one explains where the source went instead of reporting
+/// an unknown source.
+const retiredBuiltInSources = {
+  'youtube': 'YouTube',
+  'bilibili': 'Bilibili',
+  'douyin': 'Douyin',
+  'tiktok': 'TikTok',
+};
 
 /// App-facing catalog contract. It keeps source-specific HTTP details out of
 /// the UI and exposes the same search path on every supported platform.
@@ -100,17 +109,9 @@ class BuiltInMusicCatalog
     : _sources = {for (final source in sources) source.descriptor.id: source},
       _registry = SourceRegistry(sources);
 
+  /// The built-in sources: open directories with public APIs only. Video and
+  /// streaming platforms are not built in; a user adds them with a plugin.
   factory BuiltInMusicCatalog.standard() => BuiltInMusicCatalog([
-    YouTubeCatalogSource(),
-    BilibiliCatalogSource(),
-    DouyinCatalogSource(),
-    TikTokCatalogSource(),
-    AudiusCatalogSource(),
-    InternetArchiveCatalogSource(),
-    RadioBrowserCatalogSource(),
-  ]);
-
-  factory BuiltInMusicCatalog.v2() => BuiltInMusicCatalog([
     AudiusCatalogSource(),
     InternetArchiveCatalogSource(),
     RadioBrowserCatalogSource(),
@@ -429,6 +430,16 @@ class _CatalogStreamResolver implements StreamResolver {
   Future<ResolvedStream> resolve(StreamRequest request) {
     final source = _sources[request.ref.sourceId];
     if (source == null) {
+      final retired = retiredBuiltInSources[request.ref.sourceId];
+      if (retired != null) {
+        throw SourceException(
+          SourceStrings.t(
+            'source.err.retiredFmt',
+          ).replaceFirst('{id}', retired),
+          retryable: false,
+          code: 'source_retired',
+        );
+      }
       throw StateError(
         SourceStrings.t(
           'source.err.unregisteredFmt',

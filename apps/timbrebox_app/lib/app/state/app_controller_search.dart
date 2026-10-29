@@ -167,12 +167,11 @@ extension AppControllerSearch on AppController {
   }
 
   /// Loads a hot-library category's playlist on demand. A category is either an
-  /// Audius genre (real genre trending) or a Bilibili keyword (a Chinese
-  /// category via real B站 search). Cached after the first load.
+  /// Audius genre (real genre trending) or a plugin's chart. Cached after the
+  /// first load.
   Future<void> loadCategory(
     String key, {
     String? audiusGenre,
-    String? bilibiliQuery,
     PluginTopListItem? pluginTopList,
     bool force = false,
   }) async {
@@ -196,17 +195,6 @@ extension AppControllerSearch on AppController {
           audiusGenre,
           cancellation: cancellation,
         );
-      } else if (bilibiliQuery != null && catalog is PagedMusicCatalog) {
-        final group = await (catalog as PagedMusicCatalog).searchMore(
-          'bilibili',
-          bilibiliQuery,
-          page: 1,
-          cancellation: cancellation,
-        );
-        if (group.tracks.isEmpty && group.failure != null) {
-          throw SourceException(group.failure!.message, retryable: true);
-        }
-        tracks = group.tracks;
       }
       _categoryTracks[key] = tracks;
       for (final track in tracks) {

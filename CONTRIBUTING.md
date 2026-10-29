@@ -45,7 +45,7 @@ New sources implement the `CatalogSource` adapter contract rather than touching 
 [Conventional Commits 1.0](https://www.conventionalcommits.org/en/v1.0.0/), enforced by the `commit-msg` hook:
 
 ```text
-feat(search): page Bilibili results past the first page
+feat(search): page Internet Archive results past the first page
 fix(player): keep the position when a Bluetooth headset reconnects
 ```
 
