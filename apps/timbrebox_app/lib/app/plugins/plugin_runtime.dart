@@ -18,7 +18,7 @@ import 'script_time_limit.dart';
 ///
 /// The sandbox's JavaScript lives in `assets/plugin_runtime/`: the prelude
 /// (bridge, `env`, `process`, `require`), `URL` and an axios-compatible
-/// client, so plugins written for other players in the same format run as is.
+/// client, the globals and HTTP API plugins in this format rely on.
 final class PluginRuntime {
   PluginRuntime({PluginHttpClient? http, PluginEnvironment? environment})
     : _http = http ?? PluginHttpClient(),
