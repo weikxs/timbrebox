@@ -11,7 +11,7 @@ dependencies:
   audio_session: ^0.2.4
   file_picker: ^8.1.2
   flutter_js: ^0.8.0
-  crypto: ^3.0.6
+  crypto: ^3.0.8
   flutter:
     sdk: flutter
   media_kit: ^1.1.11
