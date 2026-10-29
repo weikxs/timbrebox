@@ -15,5 +15,3 @@ export 'src/net/pooled_http.dart';
 export 'src/source_config.dart';
 export 'src/source_strings.dart';
 export 'src/stream_header_proxy.dart';
-export 'src/video_source_adapters.dart';
-export 'src/youtube_catalog_source.dart';

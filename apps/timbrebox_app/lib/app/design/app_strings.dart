@@ -77,10 +77,8 @@ abstract final class AppStrings {
 
     // hot library
     'hot.plugin': '插件',
-    'hot.bilibili': '哔哩哔哩',
     'hot.subtitle': '选一个曲风，进入它的歌单',
     'hot.genresGroup': '曲风 · Audius',
-    'hot.chineseGroup': '华语 · 哔哩哔哩',
     'hot.pluginCharts': '插件榜单',
     'hot.publicTrending': '公开热门',
     'hot.loadingPlaylist': '正在加载歌单…',
@@ -93,12 +91,6 @@ abstract final class AppStrings {
     'hot.cat.classical': '古典',
     'hot.cat.ambient': '氛围',
     'hot.cat.soul': '灵魂',
-    'hot.cat.guofeng': '古风',
-    'hot.cat.cpop': '华语流行',
-    'hot.cat.cover': '翻唱',
-    'hot.cat.acg': 'ACG',
-    'hot.cat.folk': '民谣',
-    'hot.cat.guochao': '国风电音',
 
     // library / queue
     'library.favoritesDetail': '收藏与自建歌单已本地持久化，重启后保留。',
@@ -380,10 +372,8 @@ abstract final class AppStrings {
 
     // hot library
     'hot.plugin': 'Plugin',
-    'hot.bilibili': 'Bilibili',
     'hot.subtitle': 'Pick a genre to open its playlist',
     'hot.genresGroup': 'Genres · Audius',
-    'hot.chineseGroup': 'Chinese · Bilibili',
     'hot.pluginCharts': 'Plugin charts',
     'hot.publicTrending': 'Public trending',
     'hot.loadingPlaylist': 'Loading playlist…',
@@ -396,12 +386,6 @@ abstract final class AppStrings {
     'hot.cat.classical': 'Classical',
     'hot.cat.ambient': 'Ambient',
     'hot.cat.soul': 'Soul',
-    'hot.cat.guofeng': 'Guofeng',
-    'hot.cat.cpop': 'C-Pop',
-    'hot.cat.cover': 'Covers',
-    'hot.cat.acg': 'ACG',
-    'hot.cat.folk': 'Folk',
-    'hot.cat.guochao': 'Guochao EDM',
 
     // library / queue
     'library.favoritesDetail':

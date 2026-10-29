@@ -18,7 +18,7 @@
 
 ---
 
-TimbreBox is a lightweight, local-first music player. It runs on five platforms — **Windows, macOS, Linux, iOS, and Android** — from a single shared codebase, and aggregates public and open music sources (Audius, Internet Archive, Radio Browser) together with mainstream video-music platforms (YouTube, Bilibili, Douyin, TikTok) behind one uniform search-and-play surface. On top of the built-in sources, TimbreBox ships its own plugin system so you can add new sources by pasting a plugin URL.
+TimbreBox is a lightweight, local-first music player. It runs on five platforms — **Windows, macOS, Linux, iOS, and Android** — from a single shared codebase, and brings open music sources with public APIs (Audius, Internet Archive, Radio Browser) behind one uniform search-and-play surface. TimbreBox is a player: it builds in no video or streaming platform. Any other source is added by you, with a plugin, by pasting a plugin URL (see [Sources and plugins](#sources-and-plugins)).
 
 The product goal is honesty and calm: no sign-up wall, real (not promised) audio quality, and clear loading / error / empty states instead of fake data.
 
@@ -78,13 +78,11 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 
 | Source | ID | Notes |
 | --- | --- | --- |
-| YouTube | `youtube` | Resolves signed audio streams via a built-in stream resolver; served through a header-gated loopback proxy. |
-| Bilibili · 哔哩哔哩 | `bilibili` | Page-state adapter over the shared HTTP boundary. |
-| Douyin · 抖音 | `douyin` | Embedded page-state scraping adapter. |
-| TikTok | `tiktok` | Embedded page-state scraping adapter. |
 | Audius | `audius` | Open music network; also powers real trending in the hot library. |
 | Internet Archive | `internet_archive` | Public audio search (`mediatype:audio`), resolved at play time. |
 | Radio Browser | `radio_browser` | Global live-radio directory (discovery only, not part of song fan-out search). |
+
+Video and streaming platforms (YouTube, Bilibili, Douyin, TikTok and others) are not built in. Tracks you saved from them before stay in your library and explain, when played, that a plugin can add their source back.
 
 ### Search (infinite scroll)
 - Single-source and "all sources" search from one `MusicCatalog`.
@@ -150,7 +148,7 @@ flowchart TD
     SMC <--> APP
     APP --> ENGINE["NetworkPlayerEngine → native audio backend"]
     APP --> CATALOG["BuiltInMusicCatalog / SourceRegistry"]
-    CATALOG --> SRC["CatalogSource adapters (YouTube, Bilibili, Audius, …)"]
+    CATALOG --> SRC["CatalogSource adapters (Audius, Internet Archive, Radio Browser)"]
     CATALOG --> PLUG["PluginCatalogSource (TimbreBox plugins)"]
     SRC --> PROXY["StreamHeaderProxy (loopback, header-gated streams)"]
     PLUG --> PROXY
@@ -349,7 +347,7 @@ See [`AGENTS.md`](./AGENTS.md) and [`docs/DESIGN.md`](./docs/DESIGN.md). Core ru
 - **Immutable data** — UI renders immutable state; `PlaybackState` is projected immutably.
 - **Small, cohesive files** — a single file stays **≤ 800 lines**; split as it grows.
 - **DRY / KISS / YAGNI** — reuse before writing new code (Rule of Three); no dead, placeholder, mock, or hardcoded data — every value comes from a real source with honest loading/error/empty states.
-- **Hard boundaries** — no collecting source accounts, cookies, API keys, or device IDs; anonymous temp cookies are memory-only and cleared on exit; no DRM bypass; no unsigned plugins on mobile.
+- **Hard boundaries** — no collecting source accounts, cookies, API keys, or device IDs; no built-in source that works around a platform's restrictions; no DRM bypass; no unsigned plugins on mobile.
 - **Test target** — 80%+ coverage goal; parsing is tested against recorded fixtures; network integration tests are separately tagged.
 
 ### Commands
@@ -378,7 +376,7 @@ Legend: ✅ done · 🚧 in progress · 📋 planned
 - ✅ Native-engine playback, queue, seekable progress (hero + mini players)
 - ✅ Unified catalog + seven built-in source adapters normalized to `CatalogTrack`
 - ✅ Bounded-concurrency search with per-source failure surfacing
-- ✅ Waterfall pagination (real paging for Internet Archive, Radio Browser, Bilibili)
+- ✅ Waterfall pagination (real paging for Internet Archive and Radio Browser)
 - 🚧 Per-source five-platform / credential-free release acceptance; page-2+ for video sources
 
 **Downloads & library**
@@ -415,6 +413,13 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and th
 
 New sources should implement the `CatalogSource` adapter contract rather than touching UI or playback code.
 Notable changes are recorded in the [changelog](CHANGELOG.md).
+
+## Sources and plugins
+
+TimbreBox is a player. Its built-in sources are open services with public APIs only; it builds in no video or streaming platform, and it neither provides nor maintains plugins for one.
+
+- Plugins are written and published by third parties, and you choose which to install. A plugin, and any data it produces, has nothing to do with TimbreBox. Check a plugin before you install it, and use it within the law and the rules of the services it reaches.
+- TimbreBox does not encourage, and will not build in, anything that works around a platform's restrictions or unlocks paid content. Your own music library is always the safest source.
 
 ## Security policy
 

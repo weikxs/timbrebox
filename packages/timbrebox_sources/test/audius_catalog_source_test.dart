@@ -3,37 +3,62 @@ import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 void main() {
-  test(
-    'standard catalog registers the four video and three directory sources',
-    () {
-      final catalog = BuiltInMusicCatalog.standard();
-
-      expect(catalog.sources.map((source) => source.id), [
-        'youtube',
-        'bilibili',
-        'douyin',
-        'tiktok',
-        'audius',
-        'internet_archive',
-        'radio_browser',
-      ]);
-      expect(
-        catalog.sources.where(
-          (source) => source.supports(SourceCapability.search),
-        ),
-        hasLength(7),
-      );
-    },
-  );
-
-  test('v2 catalog keeps open directory sources out of v1 registration', () {
-    final catalog = BuiltInMusicCatalog.v2();
+  test('standard catalog registers only the open directory sources', () {
+    final catalog = BuiltInMusicCatalog.standard();
 
     expect(catalog.sources.map((source) => source.id), [
       'audius',
       'internet_archive',
       'radio_browser',
     ]);
+    expect(
+      catalog.sources.where(
+        (source) => source.supports(SourceCapability.search),
+      ),
+      hasLength(3),
+    );
+  });
+
+  group('a track saved from a source that is no longer built in', () {
+    tearDown(() => SourceStrings.english = false);
+
+    for (final id in ['youtube', 'bilibili', 'douyin', 'tiktok']) {
+      test('$id explains that a plugin can add it back', () {
+        SourceStrings.english = true;
+        final resolver = BuiltInMusicCatalog.standard().streamResolver;
+
+        expect(
+          () => resolver.resolve(
+            StreamRequest(
+              ref: MediaRef(sourceId: id, itemId: 'demo-item'),
+              quality: 'standard',
+              cancellation: CancellationToken(),
+            ),
+          ),
+          throwsA(
+            isA<SourceException>()
+                .having((e) => e.retryable, 'retryable', isFalse)
+                .having((e) => e.code, 'code', 'source_retired')
+                .having((e) => e.message, 'message', contains('plugin')),
+          ),
+        );
+      });
+    }
+
+    test('an unknown source still reports that it is not registered', () {
+      final resolver = BuiltInMusicCatalog.standard().streamResolver;
+
+      expect(
+        () => resolver.resolve(
+          StreamRequest(
+            ref: MediaRef(sourceId: 'demo_source', itemId: 'demo-item'),
+            quality: 'standard',
+            cancellation: CancellationToken(),
+          ),
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
   });
 
   test('maps public Audius search data to a safe playback candidate', () async {

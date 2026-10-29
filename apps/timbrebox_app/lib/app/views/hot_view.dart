@@ -15,14 +15,13 @@ const _magenta = Color(0xffc06bff);
 const _cyan = Color(0xff5cd0ff);
 
 /// A hot-library category = a playlist. It resolves either to an Audius genre
-/// (real genre trending) or a Bilibili keyword (real 华语 category via search).
+/// (real genre trending) or to a plugin's chart.
 class _Category {
   const _Category(
     this.key,
     this.label, {
     this.localized = false,
     this.audiusGenre,
-    this.bilibiliQuery,
     this.pluginRef,
     this.pluginSourceName,
     required this.gradient,
@@ -34,7 +33,6 @@ class _Category {
   final String label;
   final bool localized;
   final String? audiusGenre;
-  final String? bilibiliQuery;
   final PluginTopListItem? pluginRef;
   final String? pluginSourceName;
   final List<Color> gradient;
@@ -43,7 +41,7 @@ class _Category {
 
   String get source => pluginRef != null
       ? (pluginSourceName ?? AppStrings.t('hot.plugin'))
-      : (audiusGenre != null ? 'Audius' : AppStrings.t('hot.bilibili'));
+      : 'Audius';
 }
 
 const _pluginGradients = <List<Color>>[
@@ -125,54 +123,7 @@ const _audiusCategories = <_Category>[
   ),
 ];
 
-const _bilibiliCategories = <_Category>[
-  _Category(
-    'guofeng',
-    'hot.cat.guofeng',
-    localized: true,
-    bilibiliQuery: '古风音乐',
-    gradient: [Color(0xff642b73), Color(0xffc6426e)],
-  ),
-  _Category(
-    'cpop',
-    'hot.cat.cpop',
-    localized: true,
-    bilibiliQuery: '华语流行',
-    gradient: [Color(0xffff512f), Color(0xffdd2476)],
-  ),
-  _Category(
-    'cover',
-    'hot.cat.cover',
-    localized: true,
-    bilibiliQuery: '翻唱',
-    gradient: [Color(0xff11998e), Color(0xff38ef7d)],
-  ),
-  _Category(
-    'acg',
-    'hot.cat.acg',
-    localized: true,
-    bilibiliQuery: 'ACG 音乐',
-    gradient: [Color(0xff2193b0), Color(0xff6dd5ed)],
-  ),
-  _Category(
-    'folk',
-    'hot.cat.folk',
-    localized: true,
-    bilibiliQuery: '民谣',
-    gradient: [Color(0xfff12711), Color(0xfff5af19)],
-  ),
-  _Category(
-    'guochao',
-    'hot.cat.guochao',
-    localized: true,
-    bilibiliQuery: '国风电音',
-    gradient: [Color(0xff3a1c71), Color(0xffd76d77)],
-  ),
-];
-
 Color _sourceColor(String sourceId) => switch (sourceId) {
-  'youtube' => const Color(0xffff5470),
-  'bilibili' => const Color(0xff3fb6ff),
   'audius' => _magenta,
   'internet_archive' => const Color(0xfff5b041),
   'radio_browser' => const Color(0xff5ad07a),
@@ -206,7 +157,6 @@ class _HotViewState extends State<HotView> {
     widget.controller.loadCategory(
       category.key,
       audiusGenre: category.audiusGenre,
-      bilibiliQuery: category.bilibiliQuery,
       pluginTopList: category.pluginRef,
     );
   }
@@ -285,10 +235,6 @@ class _CategoryGrid extends StatelessWidget {
         _GroupLabel(AppStrings.t('hot.genresGroup'), color: _magenta),
         const SizedBox(height: 12),
         _Tiles(categories: _audiusCategories, onOpen: onOpen),
-        const SizedBox(height: 26),
-        _GroupLabel(AppStrings.t('hot.chineseGroup'), color: _cyan),
-        const SizedBox(height: 12),
-        _Tiles(categories: _bilibiliCategories, onOpen: onOpen),
         if (pluginCats.isNotEmpty ||
             controller.pluginTopListFailures.isNotEmpty) ...[
           const SizedBox(height: 26),
@@ -512,7 +458,6 @@ class _Playlist extends StatelessWidget {
             onRetry: () => controller.loadCategory(
               category.key,
               audiusGenre: category.audiusGenre,
-              bilibiliQuery: category.bilibiliQuery,
               pluginTopList: category.pluginRef,
               force: true,
             ),

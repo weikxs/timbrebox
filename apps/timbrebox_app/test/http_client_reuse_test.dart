@@ -67,16 +67,6 @@ void main() {
     expect(await client.read(local('/a'), CancellationToken()), '{"ok":true}');
   });
 
-  test('the source adapter client reuses its connection', () async {
-    final client = SourceHttpClient();
-
-    for (var index = 0; index < 3; index++) {
-      expect(await client.get(local('/a'), CancellationToken()), '{"ok":true}');
-    }
-
-    expect(connections, hasLength(1));
-  });
-
   test('a plugin reuses its connection and still vets every request', () async {
     final client = PluginHttpClient(policy: allowLoopback);
     addTearDown(client.close);

@@ -115,37 +115,6 @@ module.exports = {
     expect(stream.uri.host, '127.0.0.1'); // Relayed through the proxy.
   });
 
-  test('a TikTok clip resolves from its page after a restart', () async {
-    final requested = <Uri>[];
-    TikTokCatalogSource source() => TikTokCatalogSource(
-      http: SourceHttpClient.withReader((
-        uri,
-        body,
-        headers,
-        cancellation,
-      ) async {
-        requested.add(uri);
-        return '<script>{"itemStruct":{"id":"tt-1","desc":"Public clip",'
-            '"author":{"nickname":"Creator","uniqueId":"creator"},'
-            '"video":{"playAddr":"https://media.example/tt.mp4"}}}</script>';
-      }),
-    );
-
-    final before = source();
-    final summary = (await before.search(
-      SearchRequest(query: 'clip', cancellation: CancellationToken()),
-    )).items.single;
-    final saved = before.toCatalogTrack(summary);
-    requested.clear();
-
-    final after = source();
-    after.rememberHint(saved.id, saved.resolveHint!);
-    final stream = await after.resolve(request(saved.ref));
-
-    expect(stream.uri.toString(), 'https://media.example/tt.mp4');
-    expect(requested.single.path, '/@creator/video/tt-1');
-  });
-
   test('play hands a saved track\'s hint back to its source', () async {
     final catalog = _HintCatalog();
     final controller = AppController(

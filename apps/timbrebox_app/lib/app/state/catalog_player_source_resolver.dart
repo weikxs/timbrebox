@@ -7,8 +7,8 @@ import 'player_source_resolver.dart';
 ///
 /// The bridge creates an AudioSourceSpec only for the active load operation;
 /// stable media references remain in the catalog and library models. A source
-/// may resolve to a local `file://` URI (YouTube downloads its DASH audio to a
-/// temp file, which AVPlayer plays reliably); everything else is a remote URL.
+/// may resolve to a local `file://` URI (a downloaded track); everything else
+/// is a remote URL.
 final class CatalogPlayerSourceResolver implements PlayerSourceResolver {
   CatalogPlayerSourceResolver(this._resolver);
 
@@ -40,7 +40,7 @@ final class CatalogPlayerSourceResolver implements PlayerSourceResolver {
       stream.uri,
       headers: stream.headers,
       mimeType: stream.mimeType,
-      // Loopback (the YouTube range-injecting proxy) and radio streams may be
+      // Loopback (the header proxy for plugin streams) and radio streams may be
       // plain http; loopback carries no MITM risk, radio has no https option.
       allowInsecure:
           _isLoopback(stream.uri) || candidate.ref.sourceId == 'radio_browser',

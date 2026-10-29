@@ -8,7 +8,6 @@ environment:
 dependencies:
   timbrebox_core:
     path: ../timbrebox_core
-  youtube_explode_dart: ^2.3.6
 
 dev_dependencies:
   lints: ^6.0.0

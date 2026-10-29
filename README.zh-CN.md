@@ -18,7 +18,7 @@
 
 ---
 
-TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它用同一套共享代码运行在五个平台上——**Windows、macOS、Linux、iOS 和 Android**——并把公开、开放的音乐源（Audius、Internet Archive、Radio Browser）与主流视频音乐平台（YouTube、Bilibili、抖音、TikTok）聚合到统一的搜索与播放界面之下。在内置音源之上，TimbreBox 还提供了一套自有的插件系统，粘贴一个插件链接即可添加新音源。
+TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它用同一套共享代码运行在五个平台上——**Windows、macOS、Linux、iOS 和 Android**——并把有公开接口的开放音乐源（Audius、Internet Archive、Radio Browser）放到统一的搜索与播放界面之下。TimbreBox 是一个播放器，不内置任何视频或流媒体平台；其他音源由你自己通过插件添加，粘贴一个插件链接即可（见[关于音源与插件](#关于音源与插件)）。
 
 产品目标是诚实与平静：没有注册墙，提供真实（而非承诺）的音质，并以清晰的加载 / 错误 / 空状态代替假数据。
 
@@ -78,13 +78,11 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 
 | 音源 | ID | 说明 |
 | --- | --- | --- |
-| YouTube | `youtube` | 通过内置的流解析器解析带签名的音频流；经由带请求头校验的回环代理提供。 |
-| Bilibili · 哔哩哔哩 | `bilibili` | 基于共享 HTTP 边界的页面状态适配器。 |
-| Douyin · 抖音 | `douyin` | 内嵌页面状态抓取适配器。 |
-| TikTok | `tiktok` | 内嵌页面状态抓取适配器。 |
 | Audius | `audius` | 开放音乐网络；也为热门库提供真实的趋势数据。 |
 | Internet Archive | `internet_archive` | 公开音频搜索（`mediatype:audio`），在播放时解析。 |
 | Radio Browser | `radio_browser` | 全球实时电台目录（仅用于发现，不参与歌曲的多源并发搜索）。 |
+
+视频与流媒体平台（YouTube、哔哩哔哩、抖音、TikTok 等）不再内置。以前从这些平台收藏的歌仍然保留在曲库里；播放时会说明可以安装插件把对应音源加回来。
 
 ### 搜索（无限滚动）
 - 基于同一个 `MusicCatalog` 的单源搜索与“全部音源”搜索。
@@ -150,7 +148,7 @@ flowchart TD
     SMC <--> APP
     APP --> ENGINE["NetworkPlayerEngine → native audio backend"]
     APP --> CATALOG["BuiltInMusicCatalog / SourceRegistry"]
-    CATALOG --> SRC["CatalogSource adapters (YouTube, Bilibili, Audius, …)"]
+    CATALOG --> SRC["CatalogSource adapters (Audius, Internet Archive, Radio Browser)"]
     CATALOG --> PLUG["PluginCatalogSource (TimbreBox plugins)"]
     SRC --> PROXY["StreamHeaderProxy (loopback, header-gated streams)"]
     PLUG --> PROXY
@@ -346,7 +344,7 @@ TimbreBox 支持采用 TimbreBox 插件格式的第三方音源插件。一个�
 - **不可变数据**——UI 渲染不可变状态；`PlaybackState` 以不可变方式投影。
 - **小而内聚的文件**——单个文件保持在 **≤ 800 行**；随其增长即拆分。
 - **DRY / KISS / YAGNI**——先复用再写新代码（三次法则）；不允许死代码、占位、mock 或硬编码数据——每个值都来自真实音源，并配有诚实的加载/错误/空状态。
-- **硬边界**——不收集音源账户、Cookie、API key 或设备 ID；匿名临时 Cookie 仅存于内存并在退出时清除；不做 DRM 绕过；移动端不允许未签名插件。
+- **硬边界**——不收集音源账户、Cookie、API key 或设备 ID；不内置任何绕过平台限制的音源；不做 DRM 绕过；移动端不允许未签名插件。
 - **测试目标**——80%+ 覆盖率目标；解析针对录制的 fixture 进行测试；网络集成测试单独打标签。
 
 ### 命令
@@ -375,7 +373,7 @@ make package    # 同样的构建，按发布时的方式打包到 dist/
 - ✅ 原生引擎播放、队列、可拖动进度（主播放器 + 迷你播放器）
 - ✅ 统一目录 + 七个内置音源适配器，规范化为 `CatalogTrack`
 - ✅ 有界并发搜索，并单独呈现每个音源的失败
-- ✅ 瀑布流分页（Internet Archive、Radio Browser、Bilibili 的真实分页）
+- ✅ 瀑布流分页（Internet Archive、Radio Browser 的真实分页）
 - 🚧 各音源的五端 / 免凭据发布验收；视频音源的第 2 页及以后
 
 **下载与曲库**
@@ -412,6 +410,13 @@ make package    # 同样的构建，按发布时的方式打包到 dist/
 
 新增音源应实现 `CatalogSource` 适配器契约，而不是去改动 UI 或播放代码。
 重要变更记录在[更新日志](CHANGELOG.md)中。
+
+## 关于音源与插件
+
+TimbreBox 是一个播放器。内置音源只有提供公开接口的开放服务；不内置任何视频或流媒体平台，也不提供、不维护这类平台的插件。
+
+- 插件由第三方编写和发布，装哪个由你自己决定。插件及其产生的任何数据与 TimbreBox 无关。安装前请自行检查插件，并在法律和所访问服务的规则允许的范围内使用。
+- TimbreBox 不提倡、也不会内置任何绕过平台限制或解锁付费内容的功能。你自己的音乐库永远是最稳妥的音源。
 
 ## 安全策略
 

@@ -4,9 +4,11 @@
 
 ## 项目目标
 
-当前只交付 Windows、macOS、Linux、iOS、Android 的轻量音乐播放器闭环，
-首发内置来源只有 YouTube、哔哩哔哩、抖音和 TikTok。Audius、Internet Archive、
-Radio Browser 为后续阶段；网易云音乐与 QQ 音乐更晚，均不得提前作为已实现能力。
+当前只交付 Windows、macOS、Linux、iOS、Android 的轻量音乐播放器闭环。
+TimbreBox 是一个播放器：内置来源只有提供公开接口的开放服务（Audius、Internet Archive、
+Radio Browser）。视频与流媒体平台永不内置，项目也不提供这类平台的插件；用户自行用插件添加音源。
+不得新增任何绕过平台限制（风控、反机器人检查、抓取网页、签名技巧）或解锁付费内容的内置音源或代码。
+任何能力都不得提前作为已实现能力。
 
 详细规范与设计（范围真源、实现边界、阶段计划、来源准入等）在**本地内部文档**
 `docs/prd/` 与 `docs/internal/` 中，仅本地保留、不随仓库发布；开始任务前先读。
@@ -62,7 +64,7 @@ gstack 已为 Codex 安装。根据任务选择最小必要工作流：
 ### 目录标准（专业分层，按功能/领域而非按类型堆叠）
 播放引擎必须按「端」与「源」解耦分目录：
 - `playback/`：平台音频后端、loopback 代理、resolver、source spec —— **与具体来源无关**。
-- `sources/<source>/`：每个来源一个目录（`youtube` / `bilibili` / `douyin_tiktok` / `audius` / `internet_archive` / `radio_browser`）；跨源共享的 HTTP 客户端、cookie jar、解析工具放 `sources/_shared/`。
+- `sources/<source>/`：每个来源一个目录（`audius` / `internet_archive` / `radio_browser`）；跨源共享的 HTTP 客户端、解析工具放 `sources/_shared/`。
 - `catalog/`：来源注册（registry）与聚合搜索 / 分页 / 榜单。
 - 在线音源在 `packages/timbrebox_sources`，播放后端在 `packages/timbrebox_playback`，供其他 App 共享：不得引用 App 的界面和文字（它们的文字放在 `SourceStrings`）。
 - `state/` `views/` `widgets/` `model/` `design/` 各司其职，高内聚低耦合。
