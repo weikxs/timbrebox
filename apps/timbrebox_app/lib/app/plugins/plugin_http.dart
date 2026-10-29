@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -43,10 +44,36 @@ final class PluginHttpClient {
 
   /// Performs one request described by [request] (already JSON-decoded from the
   /// sandbox) and returns `{status, headers, data}` where `data` is the body
-  /// text. Throws on policy violation or transport error. Redirects are followed
+  /// text. Throws on policy violation or transport error, and
+  /// [PluginHttpTimeout] when the request's own `timeout` (milliseconds,
+  /// capped at the transport timeout) runs out first. Redirects are followed
   /// manually so each hop is re-validated against the egress policy (blocks
   /// redirect-to-internal SSRF).
   Future<Map<String, Object?>> send(Map<String, Object?> request) async {
+    final limit = _requestTimeout(request['timeout']);
+    if (limit == null) return _send(request, _timeout);
+    try {
+      return await _send(request, limit);
+    } on TimeoutException {
+      throw PluginHttpTimeout(
+        AppStrings.t(
+          'plugin.http.timeoutFmt',
+        ).replaceFirst('{ms}', '${limit.inMilliseconds}'),
+      );
+    }
+  }
+
+  /// The request's own timeout when it is shorter than the transport's.
+  static Duration? _requestTimeout(Object? value) {
+    final ms = value is num ? value.toInt() : 0;
+    if (ms <= 0 || ms >= _timeout.inMilliseconds) return null;
+    return Duration(milliseconds: ms);
+  }
+
+  Future<Map<String, Object?>> _send(
+    Map<String, Object?> request,
+    Duration timeout,
+  ) async {
     final rawUrl = (request['url'] as String?)?.trim() ?? '';
     final start = Uri.tryParse(rawUrl);
     if (start == null || !start.hasScheme) {
@@ -73,7 +100,7 @@ final class PluginHttpClient {
             utf8.encode(body is String ? body : jsonEncode(body)),
           );
         }
-        final response = await responseWithin(httpRequest, _timeout);
+        final response = await responseWithin(httpRequest, timeout);
         if (response.isRedirect && redirect >= _maxRedirects) {
           await response.drain<void>();
           throw PluginHttpException(
@@ -93,7 +120,7 @@ final class PluginHttpClient {
           body = null;
           continue;
         }
-        final bytes = await _readCapped(response);
+        final bytes = await _readCapped(response, timeout);
         return {
           'status': response.statusCode,
           'headers': _responseHeaders(response),
@@ -117,9 +144,12 @@ final class PluginHttpClient {
     }
   }
 
-  Future<Uint8List> _readCapped(HttpClientResponse response) async {
+  Future<Uint8List> _readCapped(
+    HttpClientResponse response,
+    Duration timeout,
+  ) async {
     final bytes = BytesBuilder(copy: false);
-    await for (final chunk in response.timeout(_timeout)) {
+    await for (final chunk in response.timeout(timeout)) {
       bytes.add(chunk);
       if (bytes.length > maxBytes) {
         throw PluginHttpException(AppStrings.t('plugin.http.tooLarge'));
@@ -150,4 +180,9 @@ class PluginHttpException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+/// The request's own `timeout` ran out (axios reports it as `ECONNABORTED`).
+class PluginHttpTimeout extends PluginHttpException {
+  const PluginHttpTimeout(super.message);
 }

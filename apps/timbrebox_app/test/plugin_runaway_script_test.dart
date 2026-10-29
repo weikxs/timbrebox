@@ -5,6 +5,8 @@ import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';
 /// script that never yields would freeze the whole app. The engine's time
 /// limit ends it instead.
 void main() {
+  // The plugin sandbox reads its scripts from the asset bundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
   test(
     'a script that never yields is stopped, not left to freeze the app',
     () async {

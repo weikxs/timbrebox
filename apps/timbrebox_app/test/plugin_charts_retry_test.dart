@@ -11,6 +11,8 @@ import 'support/test_player_engine.dart';
 /// A plugin whose charts fail once used to leave the hot library without
 /// them, with nothing to try again.
 void main() {
+  // The plugin sandbox reads its scripts from the asset bundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('failed plugin charts are named and can be loaded again', () async {
     final root = await Directory.systemTemp.createTemp('charts');
     addTearDown(() => root.delete(recursive: true));

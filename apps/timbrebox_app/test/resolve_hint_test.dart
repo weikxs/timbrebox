@@ -14,6 +14,8 @@ import 'support/test_player_engine.dart';
 /// keeps in memory after a search. Saved in favorites, a playlist or the
 /// session, they must still play after a restart.
 void main() {
+  // The plugin sandbox reads its scripts from the asset bundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
   StreamRequest request(MediaRef ref) => StreamRequest(
     ref: ref,
     quality: 'high',
