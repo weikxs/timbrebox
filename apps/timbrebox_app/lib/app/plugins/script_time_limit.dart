@@ -20,11 +20,11 @@ const pluginScriptTimeLimit = Duration(seconds: 3);
 
 /// A JS engine for one plugin, with [pluginScriptTimeLimit] enforced where
 /// the engine allows it: JavaScriptCore's execution time limit on Apple
-/// platforms, QuickJS's interrupt handler where the bundled QuickJS exports
-/// it (Linux; the Windows build does not). Without either the engine still
-/// works, unguarded.
+/// platforms (macOS, iOS), QuickJS's interrupt handler where the bundled
+/// QuickJS exports it (Linux and Android; the Windows build does not).
+/// Without either the engine still works, unguarded.
 JavascriptRuntime createTimeLimitedRuntime() {
-  if (Platform.isWindows || Platform.isLinux) {
+  if (Platform.isWindows || Platform.isLinux || Platform.isAndroid) {
     return _TimeLimitedQuickJs.create();
   }
   _usePollingTrapsOnce();
@@ -131,10 +131,7 @@ class _TimeLimitedQuickJs extends QuickJsRuntime2 {
 
   void _install(Pointer<Void> native) {
     try {
-      final library = Platform.isWindows
-          ? DynamicLibrary.open('quickjs_c_bridge.dll')
-          : DynamicLibrary.open('libquickjs_c_bridge_plugin.so');
-      library.lookupFunction<_SetInterruptNative, _SetInterrupt>(
+      _quickJsLibrary().lookupFunction<_SetInterruptNative, _SetInterrupt>(
         'JS_SetInterruptHandler',
       )(
         native,
@@ -145,6 +142,15 @@ class _TimeLimitedQuickJs extends QuickJsRuntime2 {
     } catch (error) {
       debugPrint('plugin time limit unavailable: $error');
     }
+  }
+
+  /// The QuickJS build flutter_js bundles on this platform.
+  static DynamicLibrary _quickJsLibrary() {
+    if (Platform.isWindows) return DynamicLibrary.open('quickjs_c_bridge.dll');
+    if (Platform.isAndroid) {
+      return DynamicLibrary.open('libfastdev_quickjs_runtime.so');
+    }
+    return DynamicLibrary.open('libquickjs_c_bridge_plugin.so');
   }
 
   T _limited<T>(T Function() run) {
