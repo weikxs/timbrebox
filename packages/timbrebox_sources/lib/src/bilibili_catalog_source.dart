@@ -98,7 +98,7 @@ final class BilibiliCatalogSource implements CatalogSource {
     final cid = _mapValue(firstPage, 'cid')?.toString();
     if (cid == null || cid.isEmpty) {
       throw SourceException(
-        AppStrings.t('source.bilibili.noPart'),
+        SourceStrings.t('source.bilibili.noPart'),
         retryable: false,
         code: 'source_stream_unavailable',
       );
@@ -124,7 +124,7 @@ final class BilibiliCatalogSource implements CatalogSource {
     final stream = Uri.tryParse(url?.toString() ?? '');
     if (stream == null || stream.scheme != 'https') {
       throw SourceException(
-        AppStrings.t('source.bilibili.noSecureStream'),
+        SourceStrings.t('source.bilibili.noSecureStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );

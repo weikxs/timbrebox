@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/state/position_sampler.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 
 /// libmpv's per-tick `time-pos` reports are replaced by a few reads a second,
 /// and none while paused.

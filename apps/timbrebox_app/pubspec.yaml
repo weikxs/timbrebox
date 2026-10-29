@@ -22,9 +22,12 @@ dependencies:
       url: https://github.com/alexmercerind/mpris_service.git
       ref: master
   path_provider: ^2.1.6
-  youtube_explode_dart: ^2.3.6
   timbrebox_core:
     path: ../../packages/timbrebox_core
+  timbrebox_playback:
+    path: ../../packages/timbrebox_playback
+  timbrebox_sources:
+    path: ../../packages/timbrebox_sources
 
 dev_dependencies:
   flutter_test:

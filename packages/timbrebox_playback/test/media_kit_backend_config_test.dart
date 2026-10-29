@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/state/media_kit_backend.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 
 /// libmpv's defaults in media_kit are sized for video: a 32 MB demuxer cache
 /// ahead and another 32 MB behind the playhead. Measured in Docker, the 8 MB

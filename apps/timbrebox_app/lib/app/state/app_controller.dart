@@ -5,8 +5,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
-import '../data/music_catalog.dart';
-import '../model/catalog_search.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import '../model/catalog_track.dart';
 import '../model/player_shortcut.dart';
 import '../model/playlist.dart';

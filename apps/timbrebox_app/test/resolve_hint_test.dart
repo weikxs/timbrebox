@@ -2,10 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
-import 'package:timbrebox_app/app/data/music_catalog.dart';
-import 'package:timbrebox_app/app/data/video_source_adapters.dart';
-import 'package:timbrebox_app/app/model/catalog_track.dart';
-import 'package:timbrebox_app/app/net/egress_policy.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'package:timbrebox_app/app/plugins/plugin_catalog_source.dart';
 import 'package:timbrebox_app/app/plugins/plugin_manifest.dart';
 import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';

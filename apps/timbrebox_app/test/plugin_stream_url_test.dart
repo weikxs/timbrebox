@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/net/egress_policy.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'package:timbrebox_app/app/plugins/plugin_stream_url.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 

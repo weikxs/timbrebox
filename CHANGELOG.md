@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The online sources and the playback backend moved into their own packages, `timbrebox_sources` and
+  `timbrebox_playback`, so other apps can share them. The app works as before.
 - Search shows each source's results as soon as that source answers, instead of waiting for the slowest one.
 - Much lighter while playing: the window no longer redraws on every position tick, the shown position moves once a
   second, the vinyl record turns at 6 frames a second and stops while the app is in the background, and the frosted

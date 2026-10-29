@@ -7,6 +7,8 @@ updates:
     directories:
       - /apps/timbrebox_app
       - /packages/timbrebox_core
+      - /packages/timbrebox_sources
+      - /packages/timbrebox_playback
       - /packages/timbrebox_cli
     schedule:
       interval: monthly

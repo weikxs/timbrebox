@@ -1,7 +1,7 @@
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
-import '../net/egress_policy.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 /// Parses the `url` a plugin's `getMediaSource` returned and checks it against
 /// [policy] before anything plays, proxies or downloads it: a plugin must not

@@ -5,15 +5,15 @@ import 'dart:typed_data';
 
 import 'package:timbrebox_core/timbrebox_core.dart';
 
-import '../model/catalog_search.dart';
-import '../model/catalog_track.dart';
-import '../net/pooled_http.dart';
+import 'catalog_search.dart';
+import 'catalog_track.dart';
+import 'net/pooled_http.dart';
 import 'bounded_cache.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
 import 'video_source_adapters.dart';
 import 'youtube_catalog_source.dart';
-import '../design/app_strings.dart';
+import 'source_strings.dart';
 
 part 'directory_catalog_sources.dart';
 
@@ -243,7 +243,7 @@ class BuiltInMusicCatalog
         status: SourceSearchStatus.failure,
         tracks: const [],
         failure: SourceFailure(
-          AppStrings.t(
+          SourceStrings.t(
             'source.err.unregisteredFmt',
           ).replaceFirst('{id}', sourceId),
           retryable: false,
@@ -301,7 +301,7 @@ class BuiltInMusicCatalog
         status: SourceSearchStatus.failure,
         tracks: const [],
         failure: SourceFailure(
-          AppStrings.t('source.errLoadMore'),
+          SourceStrings.t('source.errLoadMore'),
           retryable: true,
         ),
       );
@@ -354,17 +354,17 @@ class JsonHttpClient {
       return await _read(uri, cancellation);
     } on TimeoutException {
       throw SourceException(
-        AppStrings.t('source.errRespTimeout'),
+        SourceStrings.t('source.errRespTimeout'),
         retryable: true,
       );
     } on SocketException {
       throw SourceException(
-        AppStrings.t('source.errNetworkRetry'),
+        SourceStrings.t('source.errNetworkRetry'),
         retryable: true,
       );
     } on FormatException {
       throw SourceException(
-        AppStrings.t('source.errBadSearch'),
+        SourceStrings.t('source.errBadSearch'),
         retryable: true,
       );
     }
@@ -379,7 +379,7 @@ class JsonHttpClient {
       final response = await responseWithin(request, _policy.timeout);
       if (response.statusCode != HttpStatus.ok) {
         throw SourceException(
-          AppStrings.t('source.errUnavailableRetry'),
+          SourceStrings.t('source.errUnavailableRetry'),
           retryable: true,
         );
       }
@@ -389,7 +389,7 @@ class JsonHttpClient {
         bytes.add(chunk);
         if (bytes.length > _policy.maxResponseBytes) {
           throw SourceException(
-            AppStrings.t('source.errRespTooLarge'),
+            SourceStrings.t('source.errRespTooLarge'),
             retryable: true,
           );
         }
@@ -430,7 +430,7 @@ class _CatalogStreamResolver implements StreamResolver {
     final source = _sources[request.ref.sourceId];
     if (source == null) {
       throw StateError(
-        AppStrings.t(
+        SourceStrings.t(
           'source.err.unregisteredFmt',
         ).replaceFirst('{id}', request.ref.sourceId),
       );

@@ -3,8 +3,7 @@ import 'dart:async';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
-import 'audio_source.dart';
-import 'player_backend.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 import 'player_source_resolver.dart';
 
 /// Owns one native decoder and resolves a short-lived stream only on play.

@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/net/egress_policy.dart';
+import 'package:test/test.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 void main() {
   EgressPolicy resolvingTo(List<String> addresses) => EgressPolicy(

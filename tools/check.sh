@@ -12,7 +12,7 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-readonly PACKAGES=(packages/timbrebox_core packages/timbrebox_cli apps/timbrebox_app)
+readonly PACKAGES=(packages/timbrebox_core packages/timbrebox_sources packages/timbrebox_playback packages/timbrebox_cli apps/timbrebox_app)
 readonly ALL_STEPS=(analyze format test)
 
 steps=("$@")

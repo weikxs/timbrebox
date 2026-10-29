@@ -3,8 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import '../design/app_strings.dart';
-import '../net/egress_policy.dart';
-import '../net/pooled_http.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 /// The single privileged capability handed to plugins: HTTP. Every plugin
 /// network call flows through here, so egress policy (scheme, private-IP

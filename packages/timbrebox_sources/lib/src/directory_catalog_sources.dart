@@ -33,12 +33,12 @@ class AudiusCatalogSource implements CatalogSource {
     final body = await _readJson(uri, request.cancellation);
     final decoded = _decodeJson(
       body,
-      message: AppStrings.t('source.audius.badSearch'),
+      message: SourceStrings.t('source.audius.badSearch'),
     );
     final data = decoded is Map ? decoded['data'] : null;
     if (data is! List) {
       throw SourceException(
-        AppStrings.t('source.audius.badSearch'),
+        SourceStrings.t('source.audius.badSearch'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -62,12 +62,12 @@ class AudiusCatalogSource implements CatalogSource {
     final body = await _readJson(uri, cancellation);
     final decoded = _decodeJson(
       body,
-      message: AppStrings.t('source.audius.badChart'),
+      message: SourceStrings.t('source.audius.badChart'),
     );
     final data = decoded is Map ? decoded['data'] : null;
     if (data is! List) {
       throw SourceException(
-        AppStrings.t('source.audius.badChart'),
+        SourceStrings.t('source.audius.badChart'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -83,7 +83,7 @@ class AudiusCatalogSource implements CatalogSource {
     sourceId: descriptor.id,
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
-    quality: AppStrings.t('quality.publicStream'),
+    quality: SourceStrings.t('quality.publicStream'),
     artworkUrl: _artwork[summary.ref.itemId],
   );
 
@@ -91,7 +91,7 @@ class AudiusCatalogSource implements CatalogSource {
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError(AppStrings.t('source.err.refMismatch'));
+      throw StateError(SourceStrings.t('source.err.refMismatch'));
     }
     return ResolvedStream(
       uri: BuiltInSourceConfig.audius.uri(
@@ -164,11 +164,11 @@ class RadioBrowserCatalogSource implements CatalogSource {
     final body = await _readJson(uri, request.cancellation);
     final data = _decodeJson(
       body,
-      message: AppStrings.t('source.radio.badResponse'),
+      message: SourceStrings.t('source.radio.badResponse'),
     );
     if (data is! List) {
       throw SourceException(
-        AppStrings.t('source.radio.badResponse'),
+        SourceStrings.t('source.radio.badResponse'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -179,7 +179,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
   @override
   CatalogTrack toCatalogTrack(TrackSummary summary) {
     if (!_streams.containsKey(summary.ref.itemId)) {
-      throw StateError(AppStrings.t('source.radio.expired'));
+      throw StateError(SourceStrings.t('source.radio.expired'));
     }
     return CatalogTrack(
       id: summary.ref.itemId,
@@ -188,7 +188,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
       sourceId: descriptor.id,
       sourceName: descriptor.name,
       duration: Duration.zero,
-      quality: AppStrings.t('quality.liveRadio'),
+      quality: SourceStrings.t('quality.liveRadio'),
     );
   }
 
@@ -196,7 +196,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError(AppStrings.t('source.err.refMismatch'));
+      throw StateError(SourceStrings.t('source.err.refMismatch'));
     }
     // After a restart nothing was searched yet: look the station up by id.
     final value =
@@ -205,7 +205,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
     final uri = Uri.tryParse(value ?? '');
     if (uri == null || !{'https', 'http'}.contains(uri.scheme)) {
       throw SourceException(
-        AppStrings.t('source.radio.expired'),
+        SourceStrings.t('source.radio.expired'),
         retryable: true,
         code: 'media_reference_expired',
       );
@@ -225,7 +225,7 @@ class RadioBrowserCatalogSource implements CatalogSource {
     );
     final data = _decodeJson(
       await _readJson(uri, cancellation),
-      message: AppStrings.t('source.radio.badResponse'),
+      message: SourceStrings.t('source.radio.badResponse'),
     );
     if (data is! List) return null;
     for (final entry in data) {
@@ -306,13 +306,13 @@ class InternetArchiveCatalogSource implements CatalogSource {
     final body = await _readJson(uri, request.cancellation);
     final root = _decodeJson(
       body,
-      message: AppStrings.t('source.archive.badSearch'),
+      message: SourceStrings.t('source.archive.badSearch'),
     );
     final response = root is Map ? root['response'] : null;
     final docs = response is Map ? response['docs'] : null;
     if (docs is! List) {
       throw SourceException(
-        AppStrings.t('source.archive.badSearch'),
+        SourceStrings.t('source.archive.badSearch'),
         retryable: true,
         code: 'invalid_catalog_response',
       );
@@ -328,14 +328,14 @@ class InternetArchiveCatalogSource implements CatalogSource {
     sourceId: descriptor.id,
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
-    quality: AppStrings.t('quality.publicAudio'),
+    quality: SourceStrings.t('quality.publicAudio'),
   );
 
   @override
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != descriptor.id) {
-      throw StateError(AppStrings.t('source.err.refMismatch'));
+      throw StateError(SourceStrings.t('source.err.refMismatch'));
     }
     var fileName = _fileNames[request.ref.itemId];
     if (fileName == null) {
@@ -344,7 +344,7 @@ class InternetArchiveCatalogSource implements CatalogSource {
     }
     if (fileName == null || fileName.isEmpty) {
       throw SourceException(
-        AppStrings.t('source.archive.expired'),
+        SourceStrings.t('source.archive.expired'),
         retryable: true,
         code: 'media_reference_expired',
       );
@@ -409,12 +409,12 @@ class InternetArchiveCatalogSource implements CatalogSource {
     final body = await _readJson(uri, cancellation);
     final root = _decodeJson(
       body,
-      message: AppStrings.t('source.archive.badMetadata'),
+      message: SourceStrings.t('source.archive.badMetadata'),
     );
     final files = root is Map ? root['files'] : null;
     if (files is! List) {
       throw SourceException(
-        AppStrings.t('source.archive.noFiles'),
+        SourceStrings.t('source.archive.noFiles'),
         retryable: true,
         code: 'invalid_item_metadata',
       );
@@ -426,7 +426,7 @@ class InternetArchiveCatalogSource implements CatalogSource {
         .firstOrNull;
     if (candidate == null) {
       throw SourceException(
-        AppStrings.t('source.archive.noAudio'),
+        SourceStrings.t('source.archive.noAudio'),
         retryable: false,
         code: 'audio_file_unavailable',
       );

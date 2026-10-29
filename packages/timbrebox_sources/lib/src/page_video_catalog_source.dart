@@ -90,7 +90,7 @@ abstract base class _PageVideoCatalogSource
     final records = await _parsePage(text, sourceId: id);
     if (records.isEmpty) {
       throw SourceException(
-        AppStrings.t('source.video.noResults'),
+        SourceStrings.t('source.video.noResults'),
         retryable: true,
         code: 'source_no_public_results',
       );
@@ -158,7 +158,7 @@ abstract base class _PageVideoCatalogSource
   Future<ResolvedStream> resolve(StreamRequest request) async {
     request.cancellation.throwIfCancelled();
     if (request.ref.sourceId != id) {
-      throw StateError(AppStrings.t('source.err.refMismatch'));
+      throw StateError(SourceStrings.t('source.err.refMismatch'));
     }
     final record =
         _records[request.ref.itemId] ??
@@ -166,7 +166,7 @@ abstract base class _PageVideoCatalogSource
     final uri = Uri.tryParse(record?.streamUrl ?? '');
     if (uri == null || uri.scheme != 'https') {
       throw SourceException(
-        AppStrings.t('source.video.noStream'),
+        SourceStrings.t('source.video.noStream'),
         retryable: false,
         code: 'source_stream_unavailable',
       );

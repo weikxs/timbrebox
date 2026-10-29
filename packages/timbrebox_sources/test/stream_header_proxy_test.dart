@@ -1,8 +1,7 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/data/stream_header_proxy.dart';
-import 'package:timbrebox_app/app/net/egress_policy.dart';
+import 'package:test/test.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 void main() {
   late HttpServer upstream;

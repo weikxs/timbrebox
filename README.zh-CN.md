@@ -133,8 +133,10 @@ TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它�
 TimbreBox 是一个 monorepo，拆分为平台外壳与纯 Dart 领域核心，使 UI、播放与音源 HTTP 保持解耦——新增一个音源只需实现一个小小的适配器。
 
 ```
-apps/timbrebox_app        五端外壳（UI、状态、音源适配器、插件）
-packages/timbrebox_core   纯 Dart 领域核心（媒体引用、音源注册表、播放控制器、队列）
+apps/timbrebox_app           五端外壳（UI、状态、插件）
+packages/timbrebox_core      纯 Dart 领域核心（媒体引用、音源注册表、播放控制器、队列）
+packages/timbrebox_sources   在线音源、请求头代理、出网策略、LRC 歌词（纯 Dart，可共享）
+packages/timbrebox_playback  media_kit 播放后端（Flutter，可共享）
 packages/timbrebox_cli    无播放器的一次性 CLI 客户端（Agent 界面，开发中）
 ```
 
@@ -282,13 +284,14 @@ timbrebox/
 │       │       ├── views/             # home、hot、library、search
 │       │       ├── widgets/           # glass_panel、mini_player、track_list、…
 │       │       ├── state/             # AppController、engine、resolvers、stores
-│       │       ├── data/              # CatalogSource 适配器、StreamHeaderProxy、catalog
 │       │       ├── plugins/           # TimbreBox 插件运行时与仓库
 │       │       ├── design/            # app_themes、timbre_colors、app_effects
-│       │       └── model/             # CatalogTrack、CatalogSearch
+│       │       └── model/             # 偏好设置等只属于 App 的模型
 │       └── assets/plugin_shims/       # 插件沙箱内置的 JS 模块
 ├── packages/
 │   ├── timbrebox_core/                # 纯 Dart 核心：音源注册表、播放器、队列
+│   ├── timbrebox_sources/             # 在线音源、StreamHeaderProxy、出网策略、LRC
+│   ├── timbrebox_playback/            # media_kit 播放后端
 │   └── timbrebox_cli/                 # 一次性 CLI（Agent 界面）
 └── docs/                              # 设计系统、插件与控制 API 指南
 ```

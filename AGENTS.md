@@ -89,6 +89,9 @@ The playback engine must decouple its directories by "platform" and "source":
   `douyin_tiktok` / `audius` / `internet_archive` / `radio_browser`); shared HTTP
   client, cookie jar, and parsing utilities go in `sources/_shared/`.
 - `catalog/`: source registry plus aggregated search / pagination / charts.
+- The online sources live in `packages/timbrebox_sources` and the playback
+  backend in `packages/timbrebox_playback`, shared with other apps: keep them
+  free of app UI and app strings (their texts are in `SourceStrings`).
 - `state/` `views/` `widgets/` `model/` `design/` each keep a single
   responsibility — high cohesion, low coupling.
 

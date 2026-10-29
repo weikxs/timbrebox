@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:media_kit/media_kit.dart';
 
-import '../design/app_strings.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'audio_source.dart';
 import 'player_backend.dart';
 import 'position_sampler.dart';
@@ -222,6 +222,7 @@ final class MediaKitBackend
   }
 
   void _ensureLive() {
-    if (_disposed) throw StateError(AppStrings.t('stream.err.backendReleased'));
+    if (_disposed)
+      throw StateError(SourceStrings.t('stream.err.backendReleased'));
   }
 }

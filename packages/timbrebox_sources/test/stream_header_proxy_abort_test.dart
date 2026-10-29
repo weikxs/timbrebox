@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/data/stream_header_proxy.dart';
-import 'package:timbrebox_app/app/net/egress_policy.dart';
+import 'package:test/test.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 /// libmpv drops its connection whenever it seeks; a chunked (googlevideo)
 /// relay must then stop pulling windows from upstream.

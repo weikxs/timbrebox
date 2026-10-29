@@ -108,9 +108,10 @@ Enforced by `make privacy` (pre-commit hook and CI, on every pull request) and r
 
 ## 7. Code
 
-- **Layout:** the pure-Dart domain lives in `packages/timbrebox_core`, the command line and MCP server in
-  `packages/timbrebox_cli`, the Flutter app in `apps/timbrebox_app`. Inside the app, directories follow features
-  and sources, as described in [AGENTS.md](../../AGENTS.md).
+- **Layout:** the pure-Dart domain lives in `packages/timbrebox_core`, the online sources in
+  `packages/timbrebox_sources`, the playback backend in `packages/timbrebox_playback`, the command line and MCP
+  server in `packages/timbrebox_cli`, the Flutter app in `apps/timbrebox_app`. Inside the app, directories follow
+  features and sources, as described in [AGENTS.md](../../AGENTS.md).
 - **Size:** functions under 50 lines; a file stays under 800 lines — split it as it grows; nesting at most 4
   levels, prefer early returns.
 - **Analysis and formatting:** `dart format` and the analyzer with no issues (`make check`).
