@@ -176,6 +176,7 @@ abstract final class AppStrings {
     'plugin.http.redirectMissing': '插件请求重定向缺少目标地址。',
     'plugin.http.tooManyRedirects': '插件请求的重定向次数过多。',
     'plugin.http.tooLarge': '插件响应超过大小上限。',
+    'plugin.http.timeoutFmt': '插件请求超过 {ms} 毫秒未完成。',
     'plugin.src.searchFailed': '插件搜索失败：{e}',
     'plugin.src.refMismatch': '音源引用与解析器不匹配。',
     'plugin.src.expired': '曲目信息已过期，请重新搜索。',
@@ -485,6 +486,8 @@ abstract final class AppStrings {
     'plugin.http.tooManyRedirects':
         'The plugin request was redirected too many times.',
     'plugin.http.tooLarge': 'The plugin response exceeds the size limit.',
+    'plugin.http.timeoutFmt':
+        'The plugin request did not finish within {ms} ms.',
     'plugin.src.searchFailed': 'Plugin search failed: {e}',
     'plugin.src.refMismatch':
         'The media reference does not match the resolver.',

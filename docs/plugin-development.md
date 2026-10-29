@@ -49,10 +49,17 @@ Each installed plugin is loaded into its own **sandboxed JavaScript engine**:
 | macOS               | system engine      |
 | Android / iOS       | none — mobile builds never download or run plugin code |
 
-On load, TimbreBox evaluates, in order: a small **prelude** (`console`, an
-`axios`/`require` shim, and the host-HTTP bridge), the **bundled shim libraries**,
-a fresh `module`/`exports` pair, then your plugin source. `module.exports` is
-captured as `globalThis.__plugin`, and exported functions are invoked on demand.
+On load, TimbreBox evaluates, in order: a small **prelude** (`console`, `env`,
+`process`, `require` and the host-HTTP bridge), **`URL`/`URLSearchParams`**, an
+**axios-compatible client**, the **bundled shim libraries** your plugin names,
+a fresh `module`/`exports` pair, then your plugin source. What the module
+exported is captured as `globalThis.__plugin`: `module.exports`, or
+`module.exports.default` when a build from an ES module set `exports.default`
+(and left no `platform` on `module.exports` itself). Exported functions are
+invoked on demand.
+
+Plugins written in the same format for other players usually run unchanged:
+the globals and the axios behavior they rely on are provided (section 5).
 
 Function calls are **serialized** on the single runtime (search and resolve
 requests never interleave), each call is JSON-encoded in and out, and each call
@@ -116,7 +123,8 @@ Plugins are treated as **untrusted code**. The design assumptions:
 
 ## 3. Plugin Anatomy
 
-`module.exports` must be an object. Fields fall into three groups.
+`module.exports` (or `exports.default`, see above) must be an object. Fields
+fall into three groups.
 
 ### Required metadata
 
@@ -294,42 +302,67 @@ Only this **whitelist** resolves; any other `require('…')` throws
 
 You can `require('axios')` or rely on the global `axios` — both are the same shim.
 
-### The `axios` shim: config & response
+`require` is also available as `__plugin_require`, the name some plugin
+builds use; it resolves the same whitelist.
 
-Supported request forms:
+### Globals
+
+| Global | What it is |
+| ------ | ---------- |
+| `env` | Read-only: `env.appVersion` (TimbreBox's version, `dev` in local builds), `env.os` (`android`, `ios`, `macos`, `windows` or `linux`), `env.lang` (`zh-CN` or `en-US`), and `env.getUserVariables()`, which returns a fresh object each call (currently always `{}`, see section 8). |
+| `process` | Read-only: `process.platform` (same as `env.os`), `process.version` (same as `env.appVersion`), `process.env` (the `env` object). |
+| `URL`, `URLSearchParams` | Parse and build http(s) URLs, resolve a relative URL against a base, read and write the query. Hosts are kept as written (no IDNA conversion). |
+| `console` | `log`, `info`, `warn`, `error`, `debug`; objects are printed as JSON. |
+| `setTimeout`, `clearTimeout` | Provided by the engine. |
+
+### The axios-compatible client
+
+`axios` behaves like axios for what plugins use:
 
 ```js
-axios(config)                       // config: { url, method?, headers?, params?, data?, responseType? }
-axios(urlString)                    // shorthand for { url: urlString }
-axios.get(url, config?)             // sets method 'GET'
-axios.post(url, data, config?)      // sets method 'POST', body = data
+axios(config) / axios(url, config?) / axios.request(config)
+axios.get / delete / head / options (url, config?)
+axios.post / put / patch (url, data?, config?)
+const api = axios.create({ baseURL, headers, params, timeout });   // an instance
+axios.defaults.headers.common['X-Name'] = 'value';                  // every request
+axios.defaults.headers.get = { /* GET only */ };
+api.interceptors.request.use(fn); api.interceptors.response.use(fn, onError);
 ```
 
-- `params` (object) is merged into the URL query string.
-- `data` is sent as the body for non-GET/HEAD; strings are sent verbatim,
-  objects are JSON-stringified.
-- **Response shape** is `{ status, headers, data }`:
-  - `status` — HTTP status code (number).
-  - `headers` — response headers (object; multi-values joined by `, `).
-  - `data` — the body. By default the shim **auto JSON-parses** a string body;
-    set `responseType: 'text'` (or `'arraybuffer'` / `'blob'`) to keep it as raw
-    **text** (the bridge always delivers the body as UTF-8 text — there is no true
-    binary channel, so treat `arraybuffer`/`blob` as "give me the raw string").
+- **Config**: `url`, `method`, `baseURL`, `headers`, `params` (object or
+  `URLSearchParams`), `data`, `timeout` (ms, at most 20 000),
+  `responseType`, `validateStatus`, `transformRequest`, `transformResponse`.
+  Instance defaults and per-request config are merged as in axios.
+- **Body**: a string is sent as is; a `URLSearchParams` is sent form-encoded;
+  any other object is sent as JSON with `Content-Type: application/json` unless
+  you set a content type yourself.
+- **Response**: `{ data, status, statusText, headers, config }`. `data` is
+  JSON-parsed when it parses; set `responseType: 'text'` (or `'arraybuffer'` /
+  `'blob'`) to keep the raw text. The bridge carries text only, so binary
+  bodies arrive as a UTF-8 string.
+- **Errors**: as in axios, a status outside 2xx **rejects** with an error that
+  has `isAxiosError: true`, `code` (`ERR_BAD_REQUEST` / `ERR_BAD_RESPONSE`),
+  `message` (`Request failed with status code 404`) and `response`. Pass
+  `validateStatus: () => true` (or `null`) to resolve every status. A
+  `timeout` that runs out rejects with `code: 'ECONNABORTED'`; a refused or
+  failed request with `code: 'ERR_NETWORK'`.
+- **Headers you set are sent as they are**, `Cookie` included; nothing is
+  stored or added between requests.
 
 ```js
 const res = await axios.get('https://api.example.com/search', {
   params: { q: 'hello', page: 1 },
   headers: { 'User-Agent': 'TimbreBox' },
 });
-// res.status === 200
-// res.data is already a parsed object (auto JSON), or a string if not JSON.
+// res.status === 200; res.data is a parsed object, or a string if not JSON.
 ```
 
 ### What is NOT available
 
 - No `fs`, `path`, `os`, `child_process`, `net`, `http`/`https` (Node), `crypto`
   (Node's — use `crypto-js`), `buffer`, or any other Node builtin.
-- No `process`, no environment variables, no timers into native code.
+- No real `process` (only the read-only object above), no environment
+  variables, no timers into native code.
 - **No cookie jar persistence.** Each `axios` call is independent; `Set-Cookie`
   is not stored or replayed. If a source needs a session cookie, you must read it
   from a response header yourself and pass it back explicitly on the next
@@ -494,8 +527,10 @@ crashing the app.
 TimbreBox implements a **subset** of the plugin surface. The following are **not
 currently wired up** — exporting them has no effect:
 
-- **Login / auth flows:** cookie-based login, `userVariables`, and persistent
-  cookie jars are not supported. `Set-Cookie` is not stored between requests.
+- **Login / auth flows:** cookie-based login and persistent cookie jars are not
+  supported. `Set-Cookie` is not stored between requests. Declared
+  `userVariables` are not shown in Settings yet, so `env.getUserVariables()`
+  returns `{}`.
 - **Metadata functions:** `getMusicInfo`, `getAlbumInfo`, `getArtistWorks`,
   `getMusicSheetInfo`, `getRecommendSheetsByTag`, and any `import*`
   (`importMusicItem`, `importMusicSheet`) are **not called**.

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Plugins written in the same format for other players run unchanged in more cases: a plugin built as
+  `exports.default` loads; plugins get `env` (app version, system, language), `process`, `URL` and
+  `URLSearchParams`, and `require` is also available as `__plugin_require`.
+- The plugin `axios` covers what plugins use from axios: `axios.create`, `defaults`, interceptors, `put`,
+  `patch`, `delete`, `head`, `baseURL`, `timeout`, `validateStatus` and JSON request bodies.
 - Plugin lyrics are line-synced: the line playing is highlighted and kept in view, and tapping a line seeks there.
   A lyric without time stamps is still shown, with a note that it cannot follow playback.
 - Downloads show their progress as a percentage and can be stopped: tap the download button again, or the cancel
@@ -22,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- As in axios, a plugin request answered with a status outside 2xx now rejects, with the response attached
+  (`error.response`); plugins that want every status pass `validateStatus: () => true`.
 - The online sources and the playback backend moved into their own packages, `timbrebox_sources` and
   `timbrebox_playback`, so other apps can share them. The app works as before.
 - Search shows each source's results as soon as that source answers, instead of waiting for the slowest one.

@@ -50,7 +50,7 @@ app: ## Release build of the desktop app for this machine (macOS, Linux or Windo
 		Darwin) platform=macos ;; Linux) platform=linux ;; MINGW* | MSYS* | CYGWIN*) platform=windows ;; \
 		*) echo "app: unsupported system $$(uname -s)" >&2; exit 1 ;; \
 	esac; \
-	cd $(APP_DIR) && flutter build "$$platform" --release
+	cd $(APP_DIR) && flutter build "$$platform" --release --dart-define=APP_VERSION=$(VERSION)
 
 .PHONY: package
 package: app ## Build the app and package it as a release would, into dist/

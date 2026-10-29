@@ -47,10 +47,15 @@ module.exports = {
 | macOS           | 系统引擎        |
 | Android / iOS   | 无——移动版不会下载或运行插件代码 |
 
-加载时，TimbreBox 按顺序求值：一段小小的**前导（prelude）**（`console`、一个
-`axios`/`require` 垫片，以及宿主 HTTP 桥接）、**内置的 shim 库**、一对全新的
-`module`/`exports`，最后是你的插件源码。`module.exports` 会被捕获为
-`globalThis.__plugin`，导出的函数按需调用。
+加载时，TimbreBox 按顺序求值：一段小小的**前导（prelude）**（`console`、`env`、
+`process`、`require` 以及宿主 HTTP 桥接）、**`URL`/`URLSearchParams`**、一个**与 axios
+兼容的客户端**、插件用到的**内置 shim 库**、一对全新的 `module`/`exports`，最后是你的
+插件源码。模块导出的对象会被捕获为 `globalThis.__plugin`：通常是 `module.exports`；如果
+插件是从 ES 模块编译来的、设置了 `exports.default`（并且 `module.exports` 本身没有
+`platform`），则取 `module.exports.default`。导出的函数按需调用。
+
+为其他播放器编写的同格式插件通常可以直接运行：它们依赖的全局对象和 axios 行为都已提供
+（见第五节）。
 
 函数调用在这个单一运行时上是**串行化**的（search 与 resolve 请求绝不交错），
 每次调用的入参与返回值都以 JSON 编解码，且每次调用有 **25 秒超时**。引擎运行在应用的
@@ -101,7 +106,7 @@ promise（`__resolveHost`）。这是*唯一*一个跨越沙箱边界的能力�
 
 ## 三、插件结构
 
-`module.exports` 必须是一个对象。字段分为三组。
+`module.exports`（或 `exports.default`，见上文）必须是一个对象。字段分为三组。
 
 ### 必填元数据
 
@@ -268,41 +273,60 @@ async function getLyric(musicItem) {
 
 你可以 `require('axios')` 或直接使用全局的 `axios`——两者是同一个垫片。
 
-### `axios` 垫片：配置与响应
+`require` 也可以写成 `__plugin_require`（部分插件构建用的名字），两者的白名单完全相同。
 
-支持的请求形式：
+### 全局对象
+
+| 全局对象 | 说明 |
+| -------- | ---- |
+| `env` | 只读：`env.appVersion`（TimbreBox 版本，本地构建为 `dev`）、`env.os`（`android`、`ios`、`macos`、`windows` 或 `linux`）、`env.lang`（`zh-CN` 或 `en-US`），以及 `env.getUserVariables()`——每次调用都返回一个新对象（目前总是 `{}`，见第八节）。 |
+| `process` | 只读：`process.platform`（同 `env.os`）、`process.version`（同 `env.appVersion`）、`process.env`（即 `env`）。 |
+| `URL`、`URLSearchParams` | 解析和构造 http(s) 地址、按基准地址解析相对地址、读写查询参数。主机名按原样保留（不做 IDNA 转换）。 |
+| `console` | `log`、`info`、`warn`、`error`、`debug`；对象以 JSON 输出。 |
+| `setTimeout`、`clearTimeout` | 由引擎提供。 |
+
+### 与 axios 兼容的客户端
+
+插件常用的部分，`axios` 的行为与 axios 一致：
 
 ```js
-axios(config)                       // config: { url, method?, headers?, params?, data?, responseType? }
-axios(urlString)                    // { url: urlString } 的简写
-axios.get(url, config?)             // method 设为 'GET'
-axios.post(url, data, config?)      // method 设为 'POST'，body = data
+axios(config) / axios(url, config?) / axios.request(config)
+axios.get / delete / head / options (url, config?)
+axios.post / put / patch (url, data?, config?)
+const api = axios.create({ baseURL, headers, params, timeout });   // 一个实例
+axios.defaults.headers.common['X-Name'] = 'value';                  // 所有请求
+axios.defaults.headers.get = { /* 只用于 GET */ };
+api.interceptors.request.use(fn); api.interceptors.response.use(fn, onError);
 ```
 
-- `params`（对象）会被并入 URL 查询串。
-- `data` 作为非 GET/HEAD 请求的请求体发送；字符串按原样发送，对象会被 JSON 序列化。
-- **响应形状**为 `{ status, headers, data }`：
-  - `status` — HTTP 状态码（数字）。
-  - `headers` — 响应头（对象；多值以 `, ` 连接）。
-  - `data` — 响应体。默认情况下垫片会对字符串响应体**自动 JSON 解析**；设置
-    `responseType: 'text'`（或 `'arraybuffer'` / `'blob'`）可将其保留为原始**文本**
-    （桥接始终以 UTF-8 文本交付响应体——没有真正的二进制通道，因此把
-    `arraybuffer`/`blob` 理解为"给我原始字符串"）。
+- **配置**：`url`、`method`、`baseURL`、`headers`、`params`（对象或 `URLSearchParams`）、
+  `data`、`timeout`（毫秒，最多 20 000）、`responseType`、`validateStatus`、
+  `transformRequest`、`transformResponse`。实例默认值与单次请求的配置按 axios 的方式合并。
+- **请求体**：字符串原样发送；`URLSearchParams` 按表单编码发送；其他对象以 JSON 发送，
+  并带上 `Content-Type: application/json`（你自己设置了内容类型时除外）。
+- **响应**：`{ data, status, statusText, headers, config }`。`data` 能解析为 JSON 时会被
+  解析；设置 `responseType: 'text'`（或 `'arraybuffer'` / `'blob'`）可保留原始文本。桥接只
+  传输文本，所以二进制内容会以 UTF-8 字符串到达。
+- **错误**：与 axios 一致，2xx 以外的状态码会**被拒绝（reject）**，错误对象带有
+  `isAxiosError: true`、`code`（`ERR_BAD_REQUEST` / `ERR_BAD_RESPONSE`）、`message`
+  （`Request failed with status code 404`）和 `response`。传入 `validateStatus: () => true`
+  （或 `null`）可让所有状态码都正常返回。`timeout` 到期会以 `code: 'ECONNABORTED'` 拒绝；
+  请求被拒绝或失败则为 `code: 'ERR_NETWORK'`。
+- **你设置的请求头会原样发送**，包括 `Cookie`；请求之间不会存储或追加任何内容。
 
 ```js
 const res = await axios.get('https://api.example.com/search', {
   params: { q: 'hello', page: 1 },
   headers: { 'User-Agent': 'TimbreBox' },
 });
-// res.status === 200
-// res.data 已是被解析的对象（自动 JSON），若非 JSON 则为字符串。
+// res.status === 200；res.data 是解析后的对象，不是 JSON 时为字符串。
 ```
 
 ### 哪些是不可用的
 
 - 没有 `fs`、`path`、`os`、`child_process`、`net`、`http`/`https`（Node 的）、`crypto`
   （Node 的——请用 `crypto-js`）、`buffer`，或任何其他 Node 内置模块。
-- 没有 `process`、没有环境变量、没有指向原生代码的定时器。
+- 没有真正的 `process`（只有上面那个只读对象）、没有环境变量、没有指向原生代码的定时器。
 - **没有 cookie jar 持久化。** 每次 `axios` 调用彼此独立；`Set-Cookie` 不会被存储或
   重放。如果某个音源需要会话 Cookie，你必须自己从响应头读出它，并在下一个请求的
   `headers` 中显式传回。
@@ -458,8 +482,9 @@ module.exports = {
 TimbreBox 实现了插件接口的一个**子集**。以下这些**目前尚未接线**——导出它们不会有任何
 效果：
 
-- **登录 / 鉴权流程：** 基于 Cookie 的登录、`userVariables` 以及持久化 cookie jar 均不
-  支持。`Set-Cookie` 不会在请求之间被存储。
+- **登录 / 鉴权流程：** 基于 Cookie 的登录和持久化 cookie jar 均不支持。`Set-Cookie`
+  不会在请求之间被存储。插件声明的 `userVariables` 还不会显示在设置里，所以
+  `env.getUserVariables()` 返回 `{}`。
 - **元数据函数：** `getMusicInfo`、`getAlbumInfo`、`getArtistWorks`、
   `getMusicSheetInfo`、`getRecommendSheetsByTag`，以及任何 `import*`
   （`importMusicItem`、`importMusicSheet`）都**不会被调用**。
