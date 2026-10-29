@@ -93,6 +93,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Plugin sandbox on an Android emulator (QuickJS)
+        timeout-minutes: 20
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:
           JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
@@ -113,6 +114,7 @@ jobs:
         working-directory: apps/timbrebox_app
         run: flutter build ios --simulator --debug
       - name: Plugin sandbox on an iOS simulator (JavaScriptCore)
+        timeout-minutes: 20
         working-directory: apps/timbrebox_app
         run: |
           udid=$(xcrun simctl list devices available -j |
