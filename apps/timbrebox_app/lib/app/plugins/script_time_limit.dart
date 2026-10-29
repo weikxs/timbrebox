@@ -122,10 +122,18 @@ class _TimeLimitedQuickJs extends QuickJsRuntime2 {
   int? _address;
 
   static _TimeLimitedQuickJs create() {
-    final before = runtimeOpaques.keys.toSet();
+    final before = Map.of(runtimeOpaques);
     final runtime = _TimeLimitedQuickJs._()..enableHandlePromises();
-    final created = runtimeOpaques.keys.where((key) => !before.contains(key));
-    if (created.length == 1) runtime._install(created.single.cast());
+    // flutter_js keeps the entry of a closed engine, and a new engine can be
+    // given that engine's address: the new one is the key whose entry is new.
+    final created = runtimeOpaques.entries
+        .where((entry) => !identical(before[entry.key], entry.value))
+        .map((entry) => entry.key);
+    if (created.length == 1) {
+      runtime._install(created.single.cast());
+    } else {
+      debugPrint('plugin time limit unavailable: engine not found');
+    }
     return runtime;
   }
 
