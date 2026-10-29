@@ -64,6 +64,7 @@ gstack 已为 Codex 安装。根据任务选择最小必要工作流：
 - `playback/`：平台音频后端、loopback 代理、resolver、source spec —— **与具体来源无关**。
 - `sources/<source>/`：每个来源一个目录（`youtube` / `bilibili` / `douyin_tiktok` / `audius` / `internet_archive` / `radio_browser`）；跨源共享的 HTTP 客户端、cookie jar、解析工具放 `sources/_shared/`。
 - `catalog/`：来源注册（registry）与聚合搜索 / 分页 / 榜单。
+- 在线音源在 `packages/timbrebox_sources`，播放后端在 `packages/timbrebox_playback`，供其他 App 共享：不得引用 App 的界面和文字（它们的文字放在 `SourceStrings`）。
 - `state/` `views/` `widgets/` `model/` `design/` 各司其职，高内聚低耦合。
 
 ## 不可突破的边界

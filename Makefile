@@ -4,7 +4,7 @@
 APP_DIR := apps/timbrebox_app
 CLI_DIR := packages/timbrebox_cli
 # The Dart packages, formatted and checked by tools/check.sh.
-PACKAGES := packages/timbrebox_core $(CLI_DIR) $(APP_DIR)
+PACKAGES := packages/timbrebox_core packages/timbrebox_sources packages/timbrebox_playback $(CLI_DIR) $(APP_DIR)
 # The version of the app, without the build number (0.1.0+1 -> 0.1.0).
 VERSION := $(shell sed -n 's/^version: *\([^+]*\).*/\1/p' $(APP_DIR)/pubspec.yaml)
 

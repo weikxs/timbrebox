@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../design/app_strings.dart';
 import '../design/timbre_colors.dart';
-import '../model/lrc.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import '../state/app_controller.dart';
 
 /// A lyric that follows playback: the line playing now is highlighted and

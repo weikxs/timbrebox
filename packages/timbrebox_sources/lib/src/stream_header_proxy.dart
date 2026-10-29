@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
-import '../net/egress_policy.dart';
-import '../net/pooled_http.dart';
-import '../state/control_request_guard.dart';
+import 'net/egress_policy.dart';
+import 'net/pooled_http.dart';
+import 'net/loopback.dart';
 
 /// Loopback proxy that makes header-gated / range-limited remote audio playable
 /// by media_kit.

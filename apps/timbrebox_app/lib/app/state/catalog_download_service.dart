@@ -6,8 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
-import '../model/catalog_track.dart';
-import '../net/egress_policy.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'download_paths.dart';
 
 typedef DownloadDirectoryProvider = Future<Directory> Function();

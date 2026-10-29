@@ -13,6 +13,8 @@
 ///     link cannot trigger them.
 library;
 
+import 'package:timbrebox_sources/timbrebox_sources.dart' show isLoopbackHost;
+
 import 'control_token.dart';
 
 /// Endpoints that only read state. Every other endpoint needs POST.
@@ -49,11 +51,4 @@ ControlRejection? controlRequestRejection({
     return (status: 405, error: 'Use POST for $path');
   }
   return null;
-}
-
-/// Whether a request's `Host` header names the loopback server on [port]
-/// itself. Anything else reached us through a foreign name (DNS rebinding).
-bool isLoopbackHost(String? host, int port) {
-  final normalized = host?.toLowerCase();
-  return normalized == '127.0.0.1:$port' || normalized == 'localhost:$port';
 }

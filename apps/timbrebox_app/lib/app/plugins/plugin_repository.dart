@@ -6,9 +6,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../data/stream_header_proxy.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import '../design/app_strings.dart';
-import '../net/egress_policy.dart';
 import '../state/atomic_file.dart';
 import 'plugin_catalog_source.dart';
 import 'plugin_manifest.dart';

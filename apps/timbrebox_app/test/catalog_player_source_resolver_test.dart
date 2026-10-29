@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/state/audio_source.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 import 'package:timbrebox_app/app/state/catalog_player_source_resolver.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 

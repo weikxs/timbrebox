@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import '../design/app_strings.dart';
+import '../source_strings.dart';
 
 typedef HostLookup = Future<List<InternetAddress>> Function(String host);
 typedef AddressCheck = bool Function(InternetAddress address);
@@ -33,7 +33,7 @@ final class EgressPolicy {
         : scheme == 'https' || scheme == 'http';
     if (!schemeAllowed) {
       throw EgressDeniedException(
-        AppStrings.t('net.blockedScheme').replaceFirst('{s}', uri.scheme),
+        SourceStrings.t('net.blockedScheme').replaceFirst('{s}', uri.scheme),
       );
     }
     final host = _bareHost(uri.host);
@@ -84,7 +84,7 @@ final class EgressPolicy {
   }
 
   EgressDeniedException _deniedHost(String host) => EgressDeniedException(
-    AppStrings.t('net.blockedHost').replaceFirst('{h}', host),
+    SourceStrings.t('net.blockedHost').replaceFirst('{h}', host),
   );
 
   static String _bareHost(String host) {

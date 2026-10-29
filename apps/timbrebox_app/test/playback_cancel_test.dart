@@ -4,9 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
 import 'package:timbrebox_app/app/model/catalog_track.dart';
 import 'package:timbrebox_app/app/state/app_controller.dart';
-import 'package:timbrebox_app/app/state/audio_source.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 import 'package:timbrebox_app/app/state/network_player_engine.dart';
-import 'package:timbrebox_app/app/state/player_backend.dart';
 import 'package:timbrebox_app/app/state/player_source_resolver.dart';
 
 /// A plugin track can take many seconds to resolve. The play/pause button

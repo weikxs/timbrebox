@@ -1,6 +1,6 @@
 import 'package:timbrebox_core/timbrebox_core.dart';
 
-import 'audio_source.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 import 'player_source_resolver.dart';
 
 /// Bridges the platform-neutral resolver to the native audio backend.

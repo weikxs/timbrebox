@@ -133,8 +133,10 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 TimbreBox is a monorepo split into a platform shell and a pure-Dart domain core, so UI, playback, and source HTTP stay decoupled — a new source only implements a small adapter.
 
 ```
-apps/timbrebox_app        Five-platform shell (UI, state, source adapters, plugins)
-packages/timbrebox_core   Pure-Dart domain core (media refs, source registry, player controller, queue)
+apps/timbrebox_app           Five-platform shell (UI, state, plugins)
+packages/timbrebox_core      Pure-Dart domain core (media refs, source registry, player controller, queue)
+packages/timbrebox_sources   Online sources, header proxy, egress policy, LRC lyrics (pure Dart, shared)
+packages/timbrebox_playback  media_kit playback backend (Flutter, shared)
 packages/timbrebox_cli    Player-free one-shot CLI client (Agent surface, in progress)
 ```
 
@@ -285,13 +287,14 @@ timbrebox/
 │       │       ├── views/             # home, hot, library, search
 │       │       ├── widgets/           # glass_panel, mini_player, track_list, …
 │       │       ├── state/             # AppController, engine, resolvers, stores
-│       │       ├── data/              # CatalogSource adapters, StreamHeaderProxy, catalog
 │       │       ├── plugins/           # TimbreBox plugin runtime & repo
 │       │       ├── design/            # app_themes, timbre_colors, app_effects
-│       │       └── model/             # CatalogTrack, CatalogSearch
+│       │       └── model/             # Preferences and other app-only models
 │       └── assets/plugin_shims/       # Bundled JS modules for the plugin sandbox
 ├── packages/
 │   ├── timbrebox_core/                # Pure-Dart core: source registry, player, queue
+│   ├── timbrebox_sources/             # Online sources, StreamHeaderProxy, egress policy, LRC
+│   ├── timbrebox_playback/            # media_kit playback backend
 │   └── timbrebox_cli/                 # One-shot CLI (Agent surface)
 └── docs/                              # Design system, plugin & control-API guides
 ```

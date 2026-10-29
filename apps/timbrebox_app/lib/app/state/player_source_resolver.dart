@@ -1,7 +1,7 @@
 import 'package:timbrebox_core/timbrebox_core.dart';
 
 import '../design/app_strings.dart';
-import 'audio_source.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 
 /// Resolves a stable candidate into an ephemeral player input.
 ///

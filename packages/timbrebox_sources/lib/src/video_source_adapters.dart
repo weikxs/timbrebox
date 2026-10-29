@@ -6,12 +6,12 @@ import 'dart:typed_data';
 
 import 'package:timbrebox_core/timbrebox_core.dart';
 
-import '../model/catalog_track.dart';
+import 'catalog_track.dart';
 import 'bounded_cache.dart';
 import 'catalog_source.dart';
 import 'source_config.dart';
-import '../design/app_strings.dart';
-import '../net/pooled_http.dart';
+import 'source_strings.dart';
+import 'net/pooled_http.dart';
 
 part 'bilibili_catalog_source.dart';
 part 'page_video_catalog_source.dart';
@@ -130,9 +130,15 @@ final class SourceHttpClient {
         maxResponseBytes: maxResponseBytes,
       );
     } on TimeoutException {
-      throw SourceException(AppStrings.t('source.errTimeout'), retryable: true);
+      throw SourceException(
+        SourceStrings.t('source.errTimeout'),
+        retryable: true,
+      );
     } on SocketException {
-      throw SourceException(AppStrings.t('source.errNetwork'), retryable: true);
+      throw SourceException(
+        SourceStrings.t('source.errNetwork'),
+        retryable: true,
+      );
     }
   }
 
@@ -166,7 +172,7 @@ final class SourceHttpClient {
       cookies?.capture(response.headers);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw SourceException(
-          AppStrings.t(
+          SourceStrings.t(
             'source.errUnavailable',
           ).replaceFirst('{code}', '${response.statusCode}'),
           retryable: response.statusCode >= 500,
@@ -181,7 +187,7 @@ final class SourceHttpClient {
         bytes.add(chunk);
         if (bytes.length > (maxResponseBytes ?? _policy.maxResponseBytes)) {
           throw SourceException(
-            AppStrings.t('source.errTooLarge'),
+            SourceStrings.t('source.errTooLarge'),
             retryable: true,
           );
         }

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:timbrebox_core/timbrebox_core.dart';
-import 'package:timbrebox_app/app/data/music_catalog.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'package:timbrebox_app/app/design/app_strings.dart';
 import 'package:timbrebox_app/app/design/app_strings_more.dart';
 

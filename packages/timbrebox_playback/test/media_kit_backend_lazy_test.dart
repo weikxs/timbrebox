@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:timbrebox_app/app/state/audio_source.dart';
-import 'package:timbrebox_app/app/state/media_kit_backend.dart';
-import 'package:timbrebox_app/app/state/player_backend.dart';
+import 'package:timbrebox_playback/timbrebox_playback.dart';
 
 /// libmpv costs ~50 MB once started, so it starts on the first source only.
 void main() {

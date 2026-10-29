@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/data/music_catalog.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 import 'package:timbrebox_app/app/model/player_shortcut.dart';
 import 'package:timbrebox_app/app/state/app_controller.dart';
 import 'package:timbrebox_app/app/widgets/player_hotkeys.dart';

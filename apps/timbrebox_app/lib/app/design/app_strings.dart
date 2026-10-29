@@ -1,13 +1,26 @@
+import 'package:timbrebox_sources/timbrebox_sources.dart';
+
 import 'app_strings_more.dart';
 
 /// Lightweight app-wide localization. `AppStrings.lang` is a global (like the
 /// active palette) set from the language preference; widgets read `AppStrings.t`
 /// at build time so switching language re-renders. Keys are dotted namespaces;
 /// strings with dynamic parts use a `{token}` placeholder the caller replaces.
+///
+/// The texts of the shared packages (source errors, stream qualities) live in
+/// their `SourceStrings`; setting [lang] keeps those in the same language and
+/// [t] finds their keys too.
 enum AppLang { zh, en }
 
 abstract final class AppStrings {
-  static AppLang lang = AppLang.zh;
+  static AppLang _lang = AppLang.zh;
+
+  static AppLang get lang => _lang;
+
+  static set lang(AppLang value) {
+    _lang = value;
+    SourceStrings.english = value == AppLang.en;
+  }
 
   static AppLang fromName(String name) =>
       name.toLowerCase().contains('english') || name.toLowerCase() == 'en'
@@ -19,6 +32,7 @@ abstract final class AppStrings {
     return (english ? _en[key] ?? moreEnStrings[key] : null) ??
         _zh[key] ??
         moreZhStrings[key] ??
+        SourceStrings.lookup(key, english: english) ??
         key;
   }
 
@@ -170,8 +184,6 @@ abstract final class AppStrings {
     'plugin.http.redirectMissing': '插件请求重定向缺少目标地址。',
     'plugin.http.tooManyRedirects': '插件请求的重定向次数过多。',
     'plugin.http.tooLarge': '插件响应超过大小上限。',
-    'net.blockedScheme': '出于安全，不允许使用该协议：{s}',
-    'net.blockedHost': '出于安全，禁止访问本机或内网地址：{h}',
     'plugin.src.searchFailed': '插件搜索失败：{e}',
     'plugin.src.refMismatch': '音源引用与解析器不匹配。',
     'plugin.src.expired': '曲目信息已过期，请重新搜索。',
@@ -186,19 +198,6 @@ abstract final class AppStrings {
     'download.errTooLarge': '下载文件超过大小限制。',
     'download.errScheme': '该音源不支持下载。',
     'quality.localFile': '本地文件',
-    'source.errUnavailable': '来源暂时不可用（HTTP {code}）。',
-    'source.errTooLarge': '来源响应过大。',
-    'source.errTimeout': '来源响应超时。',
-    'source.errNetwork': '网络不可用。',
-    'source.errLoadMore': '加载更多失败，请稍后重试。',
-    'source.errUnavailableRetry': '音源暂时不可用，请稍后重试。',
-    'source.errRespTooLarge': '音源响应过大，已停止读取。',
-    'source.errRespTimeout': '音源响应超时，请稍后重试。',
-    'source.errNetworkRetry': '网络不可用，请检查连接后重试。',
-    'source.errBadSearch': '音源返回了无法识别的搜索结果。',
-    'quality.publicStream': '公开流',
-    'quality.liveRadio': '直播电台',
-    'quality.publicAudio': '公开音频',
     'plugin.err.unsupportedPlatform': '当前平台不支持插件。',
     'search.sourceDisabled': '音源未启用',
     'search.searchingFmt': '{name} 正在搜索…',
@@ -502,8 +501,6 @@ abstract final class AppStrings {
     'plugin.http.tooManyRedirects':
         'The plugin request was redirected too many times.',
     'plugin.http.tooLarge': 'The plugin response exceeds the size limit.',
-    'net.blockedScheme': 'Blocked for safety: the {s} scheme is not allowed.',
-    'net.blockedHost': 'Blocked for safety: {h} is a local or private address.',
     'plugin.src.searchFailed': 'Plugin search failed: {e}',
     'plugin.src.refMismatch':
         'The media reference does not match the resolver.',
@@ -521,23 +518,6 @@ abstract final class AppStrings {
     'download.errTooLarge': 'The download exceeds the size limit.',
     'download.errScheme': 'This source cannot be downloaded.',
     'quality.localFile': 'Local file',
-    'source.errUnavailable':
-        'The source is temporarily unavailable (HTTP {code}).',
-    'source.errTooLarge': 'The source response is too large.',
-    'source.errTimeout': 'The source response timed out.',
-    'source.errNetwork': 'Network unavailable.',
-    'source.errLoadMore': 'Failed to load more, try again later.',
-    'source.errUnavailableRetry':
-        'The source is temporarily unavailable, try again later.',
-    'source.errRespTooLarge':
-        'The source response is too large; stopped reading.',
-    'source.errRespTimeout': 'The source response timed out, try again later.',
-    'source.errNetworkRetry':
-        'Network unavailable — check your connection and retry.',
-    'source.errBadSearch': 'The source returned unrecognized search results.',
-    'quality.publicStream': 'Public stream',
-    'quality.liveRadio': 'Live radio',
-    'quality.publicAudio': 'Public audio',
     'plugin.err.unsupportedPlatform':
         'Plugins are not supported on this platform.',
     'search.sourceDisabled': 'Source not enabled',

@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:timbrebox_app/app/data/source_config.dart';
+import 'package:test/test.dart';
+import 'package:timbrebox_sources/timbrebox_sources.dart';
 
 void main() {
   group('SourceEndpoint.uri', () {
