@@ -313,7 +313,7 @@ TimbreBox supports third-party source plugins in the TimbreBox plugin format. A 
 
 Plugin authoring and the full sandbox/security model are documented in [`docs/plugin-development.md`](./docs/plugin-development.md).
 
-> Security: mobile builds never download or execute plugin code; third-party plugin execution is a desktop capability with an explicit consent step.
+> Security: on every platform a plugin runs in its own sandboxed engine with HTTP as its only capability, a time limit on each run, and an explicit consent step before install.
 
 ## Configuration & Permissions
 
@@ -347,7 +347,7 @@ See [`AGENTS.md`](./AGENTS.md) and [`docs/DESIGN.md`](./docs/DESIGN.md). Core ru
 - **Immutable data** — UI renders immutable state; `PlaybackState` is projected immutably.
 - **Small, cohesive files** — a single file stays **≤ 800 lines**; split as it grows.
 - **DRY / KISS / YAGNI** — reuse before writing new code (Rule of Three); no dead, placeholder, mock, or hardcoded data — every value comes from a real source with honest loading/error/empty states.
-- **Hard boundaries** — no collecting source accounts, cookies, API keys, or device IDs; no built-in source that works around a platform's restrictions; no DRM bypass; no unsigned plugins on mobile.
+- **Hard boundaries** — no collecting source accounts, cookies, API keys, or device IDs; no built-in source that works around a platform's restrictions; no DRM bypass; plugins run only inside the sandbox.
 - **Test target** — 80%+ coverage goal; parsing is tested against recorded fixtures; network integration tests are separately tagged.
 
 ### Commands
