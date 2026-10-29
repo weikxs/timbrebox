@@ -100,7 +100,8 @@ jobs:
       - name: Build the app
         shell: bash
         working-directory: apps/timbrebox_app
-        run: flutter build "${{ matrix.platform }}" --release
+        # Plugins read the version as env.appVersion.
+        run: flutter build "${{ matrix.platform }}" --release --dart-define=APP_VERSION=${{ needs.prepare.outputs.version }}
       - name: Package it under the release's file names
         shell: bash
         run: scripts/release/package-bundles.sh "${{ needs.prepare.outputs.version }}" dist

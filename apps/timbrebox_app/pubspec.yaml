@@ -39,4 +39,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/plugin_runtime/
     - assets/plugin_shims/

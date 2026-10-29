@@ -12,6 +12,12 @@ import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';
 /// Every plugin stream goes through the loopback proxy, so each redirect hop
 /// is checked by the proxy's egress policy before libmpv ever sees it.
 void main() {
+  // The plugin sandbox reads its scripts from the asset bundle.
+  TestWidgetsFlutterBinding.ensureInitialized();
+  // The test binding stubs HttpClient; these tests talk to loopback servers.
+  final stubbed = HttpOverrides.current;
+  setUpAll(() => HttpOverrides.global = null);
+  tearDownAll(() => HttpOverrides.global = stubbed);
   late HttpServer upstream;
   late List<String> upstreamPaths;
 
