@@ -149,6 +149,13 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     }
   }
 
+  /// Shuts the engine down so the next call starts a fresh one (the
+  /// plugin's settings changed). A runtime handed to the constructor cannot
+  /// be started again, so it is kept.
+  void restart() {
+    if (_idleTimeout != null) _discardEngine();
+  }
+
   void _scheduleIdleStop() {
     final timeout = _idleTimeout;
     if (timeout == null || _activeCalls > 0 || _disposed) return;
