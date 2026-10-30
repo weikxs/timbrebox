@@ -620,6 +620,7 @@ void _confirmClear(BuildContext context, AppController controller) {
 
 String _sourceDetail(String sourceId) => switch (sourceId) {
   'audius' => AppStrings.t('source.audiusDetail'),
+  'openverse' => AppStrings.t('source.openverseDetail'),
   'radio_browser' => AppStrings.t('source.radioDetail'),
   _ => AppStrings.t('source.builtinDetail'),
 };

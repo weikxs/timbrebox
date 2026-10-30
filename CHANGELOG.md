@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Openverse is built in: openly licensed music from Jamendo, Freesound, Wikimedia Commons and ccMixter, searched
+  without an account. Each track shows its licence (CC BY 4.0, CC0, public domain and so on); mature tracks and
+  audio not served over HTTPS are left out. A source that answers "too many requests" now says so.
 - Plugins run on Android and iOS too, in the same sandbox as on desktop: HTTP is their only capability, every
   request passes the egress checks, and a run of plugin code is stopped after three seconds (on every platform
   but Windows, whose bundled engine cannot be interrupted).

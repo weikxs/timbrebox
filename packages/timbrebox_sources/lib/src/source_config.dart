@@ -58,6 +58,11 @@ final class BuiltInSourceConfig {
     },
   );
 
+  static const openverse = SourceEndpoint(
+    host: 'api.openverse.org',
+    paths: {'search': '/v1/audio/', 'audio': '/v1/audio/{id}/'},
+  );
+
   static const archive = SourceEndpoint(
     host: 'archive.org',
     paths: {

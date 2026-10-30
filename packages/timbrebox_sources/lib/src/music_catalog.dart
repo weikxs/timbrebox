@@ -14,6 +14,7 @@ import 'source_config.dart';
 import 'source_strings.dart';
 
 part 'directory_catalog_sources.dart';
+part 'openverse_catalog_source.dart';
 
 /// Sources that were built in before and are now added with plugins only, by
 /// id, with the name shown to the user. Tracks saved from them stay in the
@@ -113,6 +114,7 @@ class BuiltInMusicCatalog
   /// streaming platforms are not built in; a user adds them with a plugin.
   factory BuiltInMusicCatalog.standard() => BuiltInMusicCatalog([
     AudiusCatalogSource(),
+    OpenverseCatalogSource(),
     InternetArchiveCatalogSource(),
     RadioBrowserCatalogSource(),
   ]);
@@ -378,6 +380,13 @@ class JsonHttpClient {
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.set(HttpHeaders.userAgentHeader, _policy.userAgent);
       final response = await responseWithin(request, _policy.timeout);
+      if (response.statusCode == HttpStatus.tooManyRequests) {
+        throw SourceException(
+          SourceStrings.t('source.errRateLimited'),
+          retryable: true,
+          code: 'rate_limited',
+        );
+      }
       if (response.statusCode != HttpStatus.ok) {
         throw SourceException(
           SourceStrings.t('source.errUnavailableRetry'),

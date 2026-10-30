@@ -27,7 +27,7 @@ TimbreBox is a music player that stays out of your way:
 - **Private.** Local first: your library, favorites and settings stay on your device, and TimbreBox sends no analytics or tracking.
 - **Everywhere.** Windows, macOS, Linux, iOS and Android from one shared codebase.
 
-It searches and plays open music sources with public APIs (Audius, Internet Archive, Radio Browser), and you can add more sources yourself with plugins (see [Sources and plugins](#sources-and-plugins)).
+It searches and plays open music sources with public APIs (Audius, Openverse, Internet Archive, Radio Browser), and you can add more sources yourself with plugins (see [Sources and plugins](#sources-and-plugins)).
 
 > **Language note.** The in-app UI is bilingual (中文 / English). Every doc ships an English file plus a `*.zh-CN.md` Simplified-Chinese sibling — this README ([README.zh-CN.md](README.zh-CN.md)), [`AGENTS.md`](./AGENTS.md), and the guides under [`docs/`](./docs).
 
@@ -86,6 +86,7 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 | Source | ID | Notes |
 | --- | --- | --- |
 | Audius | `audius` | Open music network; also powers real trending in the hot library. |
+| Openverse | `openverse` | Openly licensed music from Jamendo, Freesound, Wikimedia Commons and ccMixter; each track shows its licence (for example CC BY 4.0). No account; anonymous use allows 20 results a page, 12 pages deep and about 200 requests a day. |
 | Internet Archive | `internet_archive` | Public audio search (`mediatype:audio`), resolved at play time. |
 | Radio Browser | `radio_browser` | Global live-radio directory (discovery only, not part of song fan-out search). |
 
@@ -155,7 +156,7 @@ flowchart TD
     SMC <--> APP
     APP --> ENGINE["NetworkPlayerEngine → native audio backend"]
     APP --> CATALOG["BuiltInMusicCatalog / SourceRegistry"]
-    CATALOG --> SRC["CatalogSource adapters (Audius, Internet Archive, Radio Browser)"]
+    CATALOG --> SRC["CatalogSource adapters (Audius, Openverse, Internet Archive, Radio Browser)"]
     CATALOG --> PLUG["PluginCatalogSource (TimbreBox plugins)"]
     SRC --> PROXY["StreamHeaderProxy (loopback, header-gated streams)"]
     PLUG --> PROXY
