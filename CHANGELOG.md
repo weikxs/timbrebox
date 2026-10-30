@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Plugins can ask for settings: a plugin declares `userVariables` (a server address, an account, a password), Settings
+  shows a form for it, and the plugin reads the values with `env.getUserVariables()`. The values stay on the device in
+  a file only the user can read, reach that plugin alone, survive its updates, and are never uploaded or logged.
 - Updating a plugin is all or nothing: a new version that does not load leaves the installed one exactly as it was,
   a version that renames itself still replaces the plugin it updates (and keeps it on or off), and an update cut
   short is undone at the next launch. Each plugin that could not be updated is named with the reason.

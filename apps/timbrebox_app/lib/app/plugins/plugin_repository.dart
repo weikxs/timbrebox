@@ -8,8 +8,11 @@ import 'package:path_provider/path_provider.dart';
 
 import 'package:timbrebox_sources/timbrebox_sources.dart';
 import '../design/app_strings.dart';
+import '../native/libc.dart';
 import '../state/atomic_file.dart';
+import '../state/private_file.dart';
 import 'plugin_catalog_source.dart';
+import 'plugin_environment.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
 
@@ -28,10 +31,12 @@ final class PluginRepository {
   PluginRepository({
     this.policy = const EgressPolicy(),
     Future<Directory> Function()? pluginsDirectory,
-    PluginRuntime Function()? createRuntime,
+    PluginRuntime Function(PluginEnvironment environment)? createRuntime,
     @visibleForTesting Future<String> Function(Uri uri)? fetch,
     this.idleTimeout = PluginCatalogSource.defaultIdleTimeout,
-  }) : _createRuntime = createRuntime ?? PluginRuntime.new,
+  }) : _createRuntime =
+           createRuntime ??
+           ((environment) => PluginRuntime(environment: environment)),
        // ignore: prefer_initializing_formals
        _fetchOverride = fetch,
        // ignore: prefer_initializing_formals
@@ -56,12 +61,16 @@ final class PluginRepository {
 
   /// Where plugins are stored; defaults to `<appSupport>/plugins`.
   final Future<Directory> Function()? _pluginsDirectory;
-  final PluginRuntime Function() _createRuntime;
+
+  /// Starts an engine that tells the plugin about [PluginEnvironment].
+  final PluginRuntime Function(PluginEnvironment environment) _createRuntime;
 
   /// Replaces the download in tests; the https rule still applies.
   final Future<String> Function(Uri uri)? _fetchOverride;
 
   static const _maxBytes = 6 * 1024 * 1024;
+  static const _variablesFile = 'variables.json';
+  static const _maxValueLength = 2000;
   static const _staging = '.staging';
   static const _previous = '.previous';
 
@@ -137,7 +146,7 @@ final class PluginRepository {
     String? id,
     bool enabled = true,
   }) async {
-    final runtime = _createRuntime();
+    final runtime = _createRuntime(PluginEnvironment.current());
     try {
       await runtime.load(source);
     } catch (error) {
@@ -164,6 +173,7 @@ final class PluginRepository {
       sha256: sha256.convert(utf8.encode(source)).toString(),
       enabled: enabled,
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
+      variables: PluginVariable.listFrom(runtime.declaredVariables()),
     );
     runtime.dispose();
     final directory = await _store(manifest, source);
@@ -174,7 +184,10 @@ final class PluginRepository {
       PluginCatalogSource.lazy(
         manifest: manifest,
         functions: (manifest.functions ?? const []).toSet(),
-        loadRuntime: () async => _startRuntime(await script.readAsString()),
+        loadRuntime: () async => _startRuntime(
+          await script.readAsString(),
+          userVariables: await variables(manifest.id),
+        ),
         proxy: streamProxy,
         policy: policy,
         idleTimeout: idleTimeout,
@@ -263,6 +276,43 @@ final class PluginRepository {
     }
   }
 
+  /// The values the user entered for plugin [id]'s settings.
+  Future<Map<String, String>> variables(String id) async {
+    final file = File('${(await _pluginsDir()).path}/$id/$_variablesFile');
+    if (!await file.exists()) return const {};
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map) return const {};
+      return {
+        for (final entry in decoded.entries)
+          if (entry.key is String && entry.value is String)
+            entry.key as String: entry.value as String,
+      };
+    } on FormatException {
+      return const {};
+    }
+  }
+
+  /// Stores [values] for the plugin's declared settings only, readable by
+  /// the user alone. An empty value removes the setting.
+  Future<void> saveVariables(
+    PluginManifest manifest,
+    Map<String, String> values,
+  ) async {
+    final declared = {for (final variable in manifest.variables) variable.key};
+    final kept = <String, String>{
+      for (final entry in values.entries)
+        if (declared.contains(entry.key) && entry.value.trim().isNotEmpty)
+          entry.key: entry.value.length > _maxValueLength
+              ? entry.value.substring(0, _maxValueLength)
+              : entry.value,
+    };
+    await writePrivateFile(
+      File('${(await _pluginsDir()).path}/${manifest.id}/$_variablesFile'),
+      jsonEncode(kept),
+    );
+  }
+
   Future<void> setEnabled(String id, bool enabled) async {
     final file = File('${(await _pluginsDir()).path}/$id/manifest.json');
     if (!await file.exists()) return;
@@ -307,8 +357,13 @@ final class PluginRepository {
     return _lazySource(recorded, scriptFile);
   }
 
-  Future<PluginRuntime> _startRuntime(String script) async {
-    final runtime = _createRuntime();
+  Future<PluginRuntime> _startRuntime(
+    String script, {
+    Map<String, String> userVariables = const {},
+  }) async {
+    final runtime = _createRuntime(
+      PluginEnvironment.current(userVariables: userVariables),
+    );
     try {
       await runtime.load(script);
       return runtime;
@@ -331,7 +386,7 @@ final class PluginRepository {
       for (final entry in await dir.list().toList()) {
         final name = _nameOf(entry);
         if (entry is File && name != 'plugin.js' && name != 'manifest.json') {
-          await entry.copy('${staging.path}/$name');
+          await _copyKeepingMode(entry, '${staging.path}/$name');
         }
       }
     }
@@ -344,6 +399,21 @@ final class PluginRepository {
     await staging.rename(dir.path);
     if (await previous.exists()) await previous.delete(recursive: true);
     return dir;
+  }
+
+  /// Copies [file], keeping who may read it (the user's settings are
+  /// private).
+  static Future<void> _copyKeepingMode(File file, String target) async {
+    final mode = (await file.stat()).mode & 0x1ff;
+    if (Platform.isWindows) {
+      await file.copy(target);
+      return;
+    }
+    final copy = await File(target).create(exclusive: true);
+    if (!Libc.chmod(copy.path, mode)) {
+      throw FileSystemException('Could not keep the file mode', copy.path);
+    }
+    await copy.writeAsBytes(await file.readAsBytes(), flush: true);
   }
 
   Future<Directory> _pluginsDir() async {

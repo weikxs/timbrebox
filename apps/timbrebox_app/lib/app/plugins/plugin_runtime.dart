@@ -65,6 +65,21 @@ final class PluginRuntime {
     return value.isEmpty ? null : value;
   }
 
+  /// The plugin's declared `userVariables` as plain data (not yet checked),
+  /// or an empty list.
+  List<Object?> declaredVariables() {
+    final result = _rt.evaluate(
+      'JSON.stringify(Array.isArray(__plugin.userVariables) ? '
+      '__plugin.userVariables : [])',
+    );
+    try {
+      final decoded = decodeCallEnvelope(result.stringResult);
+      return decoded is List ? decoded : const [];
+    } on FormatException {
+      return const [];
+    }
+  }
+
   bool hasFunction(String name) =>
       _rt.evaluate('typeof __plugin.$name === "function"').stringResult ==
       'true';
