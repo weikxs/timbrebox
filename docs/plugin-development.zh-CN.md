@@ -125,6 +125,30 @@ promise（`__resolveHost`）。这是*唯一*一个跨越沙箱边界的能力�
 | -------- | ------ | --------------------------------------------------------------------------------- |
 | `srcUrl` | string | 规范的更新 URL。被"检查更新"用来重新拉取并比对。缺省时回退到安装时的 URL。          |
 | `author` | string | 在设置中显示于插件名下方。                                                          |
+| `userVariables` | array | 由用户填写的设置，见下文。 |
+
+#### 由用户填写的设置（`userVariables`）
+
+插件需要服务器地址、用户名或密码时，在这里声明，设置页会为它显示一个表单（插件旁边的
+调节按钮）：
+
+```js
+userVariables: [
+  { key: 'server', name: '服务器地址', hint: 'https://music.example' },
+  { key: 'user', name: '用户名' },
+  { key: 'password', name: '密码' },
+],
+```
+
+- `key`（必填）：字母、数字、`_`、`.` 或 `-`，最长 64 个字符；`name`：显示的名称（最长
+  60 个字符，缺省为 key）；`hint`：空输入框里的提示（最长 200 个字符）。最多 20 项，
+  格式不对的项会被忽略。
+- key 或名称里带有密码、令牌、密钥、token、secret、cookie、key 等字样的项，输入时会被
+  遮住。
+- 插件用 `env.getUserVariables()` 读取，得到一个字符串对象，只包含用户填过的 key。
+  请在用到时再读：修改设置会重启插件的引擎。
+- 这些值只保存在本机，存在只有用户本人可读的文件里（权限 0600；Windows 上是用户自己的
+  AppData 目录），只交给这个插件，不会上传，也不会写进日志；插件更新后仍然保留。
 
 ### 函数
 
@@ -276,7 +300,7 @@ async function getLyric(musicItem) {
 
 | 全局对象 | 说明 |
 | -------- | ---- |
-| `env` | 只读：`env.appVersion`（TimbreBox 版本，本地构建为 `dev`）、`env.os`（`android`、`ios`、`macos`、`windows` 或 `linux`）、`env.lang`（`zh-CN` 或 `en-US`），以及 `env.getUserVariables()`——每次调用都返回一个新对象（目前总是 `{}`，见第八节）。 |
+| `env` | 只读：`env.appVersion`（TimbreBox 版本，本地构建为 `dev`）、`env.os`（`android`、`ios`、`macos`、`windows` 或 `linux`）、`env.lang`（`zh-CN` 或 `en-US`），以及 `env.getUserVariables()`——每次调用都返回用户为这个插件填写的设置的一份新副本（见第三节的 `userVariables`）。 |
 | `process` | 只读：`process.platform`（同 `env.os`）、`process.version`（同 `env.appVersion`）、`process.env`（即 `env`）。 |
 | `URL`、`URLSearchParams` | 解析和构造 http(s) 地址、按基准地址解析相对地址、读写查询参数。主机名按原样保留（不做 IDNA 转换）。 |
 | `console` | `log`、`info`、`warn`、`error`、`debug`；对象以 JSON 输出。 |
@@ -488,8 +512,7 @@ TimbreBox 实现了插件接口的一个**子集**。以下这些**目前尚未�
 效果：
 
 - **登录 / 鉴权流程：** 基于 Cookie 的登录和持久化 cookie jar 均不支持。`Set-Cookie`
-  不会在请求之间被存储。插件声明的 `userVariables` 还不会显示在设置里，所以
-  `env.getUserVariables()` 返回 `{}`。
+  不会在请求之间被存储。插件可以改用 `userVariables` 请用户填写账号或令牌。
 - **元数据函数：** `getMusicInfo`、`getAlbumInfo`、`getArtistWorks`、
   `getMusicSheetInfo`、`getRecommendSheetsByTag`，以及任何 `import*`
   （`importMusicItem`、`importMusicSheet`）都**不会被调用**。

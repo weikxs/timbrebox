@@ -144,6 +144,33 @@ fall into three groups.
 | -------- | ------ | -------------------------------------------------------------------------------- |
 | `srcUrl` | string | Canonical update URL. Used by "检查更新" to re-fetch and diff. Falls back to the install URL if omitted. |
 | `author` | string | Displayed under the plugin name in Settings.                                     |
+| `userVariables` | array | Settings the user fills in, see below. |
+
+#### Settings the user fills in (`userVariables`)
+
+A plugin that needs a server address, an account name or a password declares
+them, and Settings shows a form for it (the tune button next to the plugin):
+
+```js
+userVariables: [
+  { key: 'server', name: 'Server address', hint: 'https://music.example' },
+  { key: 'user', name: 'User name' },
+  { key: 'password', name: 'Password' },
+],
+```
+
+- `key` (required): letters, digits, `_`, `.` or `-`, up to 64 characters;
+  `name`: the label (up to 60 characters, defaults to the key); `hint`: shown
+  in the empty field (up to 200 characters). At most 20 entries; malformed
+  ones are left out.
+- A field whose key or name mentions a password, token, secret, cookie or key
+  is hidden while typed.
+- The plugin reads the values with `env.getUserVariables()`, an object of
+  strings with only the keys the user filled in. Read it when you need it: a
+  change restarts the plugin's engine.
+- The values stay on the device, in a file only the user can read (mode 0600;
+  on Windows the user's own AppData folder), and reach this plugin only. They
+  are never uploaded or logged, and they survive updates of the plugin.
 
 ### Functions
 
@@ -305,7 +332,7 @@ You can `require('axios')` or rely on the global `axios` — both are the same s
 
 | Global | What it is |
 | ------ | ---------- |
-| `env` | Read-only: `env.appVersion` (TimbreBox's version, `dev` in local builds), `env.os` (`android`, `ios`, `macos`, `windows` or `linux`), `env.lang` (`zh-CN` or `en-US`), and `env.getUserVariables()`, which returns a fresh object each call (currently always `{}`, see section 8). |
+| `env` | Read-only: `env.appVersion` (TimbreBox's version, `dev` in local builds), `env.os` (`android`, `ios`, `macos`, `windows` or `linux`), `env.lang` (`zh-CN` or `en-US`), and `env.getUserVariables()`, which returns a fresh copy of the user's settings for the plugin each call (see `userVariables` in section 3). |
 | `process` | Read-only: `process.platform` (same as `env.os`), `process.version` (same as `env.appVersion`), `process.env` (the `env` object). |
 | `URL`, `URLSearchParams` | Parse and build http(s) URLs, resolve a relative URL against a base, read and write the query. Hosts are kept as written (no IDNA conversion). |
 | `console` | `log`, `info`, `warn`, `error`, `debug`; objects are printed as JSON. |
@@ -535,9 +562,8 @@ TimbreBox implements a **subset** of the plugin surface. The following are **not
 currently wired up** — exporting them has no effect:
 
 - **Login / auth flows:** cookie-based login and persistent cookie jars are not
-  supported. `Set-Cookie` is not stored between requests. Declared
-  `userVariables` are not shown in Settings yet, so `env.getUserVariables()`
-  returns `{}`.
+  supported. `Set-Cookie` is not stored between requests. A plugin can ask the
+  user for an account or a token with `userVariables` instead.
 - **Metadata functions:** `getMusicInfo`, `getAlbumInfo`, `getArtistWorks`,
   `getMusicSheetInfo`, `getRecommendSheetsByTag`, and any `import*`
   (`importMusicItem`, `importMusicSheet`) are **not called**.

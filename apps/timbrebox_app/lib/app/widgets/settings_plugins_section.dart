@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../design/app_strings.dart';
 import '../design/timbre_colors.dart';
 import '../state/app_controller.dart';
+import 'plugin_variables_dialog.dart';
 import 'settings_common.dart';
 
 /// Settings → Plugins: install from a URL, check for updates, switch
@@ -128,6 +129,17 @@ class _PluginSettingsState extends State<PluginSettings> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (plugin.variables.isNotEmpty)
+                        IconButton(
+                          tooltip: AppStrings.t('plugin.settings'),
+                          iconSize: 18,
+                          onPressed: () => showPluginVariablesDialog(
+                            context,
+                            controller,
+                            plugin,
+                          ),
+                          icon: const Icon(Icons.tune_rounded),
+                        ),
                       Switch.adaptive(
                         value: controller.sourceEnabled(plugin.id),
                         onChanged: (enabled) =>

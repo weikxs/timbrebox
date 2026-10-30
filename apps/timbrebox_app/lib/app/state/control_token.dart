@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:path_provider/path_provider.dart';
 
-import '../native/libc.dart';
+import 'private_file.dart';
 
 /// The request header that carries the control API token.
 const controlTokenHeader = 'X-TimbreBox-Token';
@@ -28,29 +28,12 @@ final class ControlTokenFile {
   /// Where the token is (or will be) written.
   Future<File> file() async => File('${(await _directory()).path}/$fileName');
 
-  /// Writes a fresh 256-bit token and returns it. The file is made private
-  /// while still empty, then filled and renamed into place, so the token is
-  /// never readable by others, even for a moment. Throws when the file
-  /// cannot be made private.
+  /// Writes a fresh 256-bit token and returns it. The token is never
+  /// readable by others, even for a moment (see [writePrivateFile]). Throws
+  /// when the file cannot be made private.
   Future<String> issue() async {
-    final target = await file();
-    await target.parent.create(recursive: true);
     final token = _hex(32);
-    final temporary = File('${target.path}.${_hex(6)}.tmp');
-    await temporary.create(exclusive: true);
-    try {
-      if (!Platform.isWindows && !Libc.chmod(temporary.path, _userOnly)) {
-        throw FileSystemException(
-          'Could not make the control token private',
-          temporary.path,
-        );
-      }
-      await temporary.writeAsString(token, flush: true);
-      await temporary.rename(target.path);
-    } catch (_) {
-      if (await temporary.exists()) await temporary.delete();
-      rethrow;
-    }
+    await writePrivateFile(await file(), token);
     return token;
   }
 
@@ -63,9 +46,6 @@ final class ControlTokenFile {
       // Best effort: the next start replaces it anyway.
     }
   }
-
-  /// rw------- (0600).
-  static const _userOnly = 0x180;
 
   String _hex(int bytes) => [
     for (var i = 0; i < bytes; i++)

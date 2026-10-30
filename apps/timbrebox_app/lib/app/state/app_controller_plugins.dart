@@ -172,6 +172,26 @@ extension AppControllerPlugins on AppController {
     return PluginUpdateReport(updated: updated, failed: failed);
   }
 
+  /// The live source of plugin [id], if it is installed.
+  PluginCatalogSource? pluginSource(String id) => _pluginSources[id];
+
+  /// The values the user entered for plugin [id]'s settings.
+  Future<Map<String, String>> pluginVariables(String id) async =>
+      await _pluginRepository?.variables(id) ?? const {};
+
+  /// Saves the user's settings for plugin [id]; its engine restarts so the
+  /// next call reads them.
+  Future<void> savePluginVariables(
+    String id,
+    Map<String, String> values,
+  ) async {
+    final source = _pluginSources[id];
+    final repository = _pluginRepository;
+    if (source == null || repository == null) return;
+    await repository.saveVariables(source.manifest, values);
+    source.restart();
+  }
+
   Future<void> removePlugin(String id) async {
     await _pluginRepository?.remove(id);
     final catalog = _catalog;

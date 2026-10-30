@@ -38,9 +38,9 @@ void main() {
 
   PluginRepository repository({Duration? idleTimeout}) => PluginRepository(
     pluginsDirectory: () async => root,
-    createRuntime: () {
+    createRuntime: (environment) {
       started++;
-      return PluginRuntime();
+      return PluginRuntime(environment: environment);
     },
     idleTimeout: idleTimeout ?? const Duration(minutes: 5),
   );
