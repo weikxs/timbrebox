@@ -41,11 +41,10 @@ module.exports = {
 
 每个已安装的插件都会被加载进它自己的**沙箱 JavaScript 引擎**：
 
-| 平台            | 运行时引擎      |
-| --------------- | --------------- |
-| Windows / Linux | 解释型引擎      |
-| macOS           | 系统引擎        |
-| Android / iOS   | 无——移动版不会下载或运行插件代码 |
+| 平台                      | 运行时引擎                  |
+| ------------------------- | --------------------------- |
+| Windows / Linux / Android | 解释型引擎（QuickJS）       |
+| macOS / iOS               | 系统引擎（JavaScriptCore）  |
 
 加载时，TimbreBox 按顺序求值：一段小小的**前导（prelude）**（`console`、`env`、
 `process`、`require` 以及宿主 HTTP 桥接）、**`URL`/`URLSearchParams`**、一个**与 axios
@@ -60,7 +59,7 @@ module.exports = {
 函数调用在这个单一运行时上是**串行化**的（search 与 resolve 请求绝不交错），
 每次调用的入参与返回值都以 JSON 编解码，且每次调用有 **25 秒超时**。引擎运行在应用的
 UI 线程上，所以一段不让出执行权的插件代码（比如 `while (true) {}`）会在**三秒后被终止**
-（Linux 与 macOS；Windows 上的引擎构建不提供这种终止），下次调用时引擎会重新启动。请用
+（Linux、Android、macOS 与 iOS；Windows 上的引擎构建不提供这种终止），下次调用时引擎会重新启动。请用
 await 等待网络请求，不要忙等。
 
 引擎在插件第一次被调用时才启动，而不是在应用启动时；**连续五分钟没有调用就会关闭**，下次

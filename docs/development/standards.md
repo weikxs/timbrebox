@@ -83,7 +83,7 @@ Enforced by `make privacy` (pre-commit hook and CI, on every pull request) and r
   only and is cleared on exit; it is never written to disk, logs or a database.
 - **Plugins:** a plugin's script runs in the sandboxed JavaScript engine with HTTP as its only capability; every
   request, redirect hop and stream it causes passes the egress checks, and every plugin stream goes through the
-  loopback proxy. Mobile builds never download or run plugin code. No dynamic `eval` of downloaded code outside
+  loopback proxy, on desktop and mobile alike. No dynamic `eval` of downloaded code outside
   the sandbox.
 - **Loopback services** (the control API and the stream proxy) listen on `127.0.0.1` only, check the `Host`
   header, refuse web pages, and use random per-run tokens; the control token file is readable by the user only.

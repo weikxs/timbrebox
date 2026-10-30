@@ -7,14 +7,17 @@ import 'package:timbrebox_app/app/widgets/settings_plugins_section.dart';
 
 import 'support/test_player_engine.dart';
 
-/// Mobile builds must never download or run plugin code.
+/// Plugins run on the five platforms TimbreBox ships for, each in its
+/// sandboxed engine; anything else gets the settings' explanation.
 void main() {
-  test('plugins run on desktop only', () {
-    expect(pluginsAllowedOn('android'), isFalse);
-    expect(pluginsAllowedOn('ios'), isFalse);
-    expect(pluginsAllowedOn('macos'), isTrue);
-    expect(pluginsAllowedOn('windows'), isTrue);
-    expect(pluginsAllowedOn('linux'), isTrue);
+  test('plugins run on desktop and mobile', () {
+    for (final os in ['android', 'ios', 'macos', 'windows', 'linux']) {
+      expect(pluginsAllowedOn(os), isTrue, reason: os);
+    }
+  });
+
+  test('a system TimbreBox does not ship for runs no plugins', () {
+    expect(pluginsAllowedOn('fuchsia'), isFalse);
   });
 
   testWidgets('without plugin support the settings say why', (tester) async {

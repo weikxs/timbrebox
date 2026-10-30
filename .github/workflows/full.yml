@@ -3,8 +3,9 @@ name: Full
 # The runs a pull request leaves out, on demand (Actions > Full > Run
 # workflow): everything CI runs, the analysis and tests on macOS and Windows,
 # the release builds of the three desktop platforms packaged as a release
-# packages them, and debug builds for Android and iOS. Nothing requires these
-# jobs to merge.
+# packages them, and debug builds for Android and iOS, which also run the
+# plugin sandbox's device test on an emulator and a simulator. Nothing
+# requires these jobs to merge.
 on:
   workflow_dispatch:
 
@@ -74,9 +75,9 @@ jobs:
           ls -l dist
 
   android:
-    name: android (debug build)
+    name: android (debug build, plugin sandbox on an emulator)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
@@ -86,14 +87,37 @@ jobs:
           # Gradle runs on the runner's preinstalled Java 17, which the app's build files target.
           export JAVA_HOME="$JAVA_HOME_17_X64"
           flutter build apk --debug
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Plugin sandbox on an Android emulator (QuickJS)
+        timeout-minutes: 20
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME_17_X64 }}
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          script: cd apps/timbrebox_app && flutter test integration_test/plugin_sandbox_test.dart -d emulator-5554
 
   ios:
-    name: ios (simulator build)
+    name: ios (simulator build, plugin sandbox on a simulator)
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
       - name: Build
         working-directory: apps/timbrebox_app
         run: flutter build ios --simulator --debug
+      - name: Plugin sandbox on an iOS simulator (JavaScriptCore)
+        timeout-minutes: 20
+        working-directory: apps/timbrebox_app
+        run: |
+          udid=$(xcrun simctl list devices available -j |
+            python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for r in d.values() for x in r if x["name"].startswith("iPhone")))')
+          xcrun simctl boot "$udid"
+          flutter test integration_test/plugin_sandbox_test.dart -d "$udid"

@@ -43,11 +43,10 @@ the functions and metadata fields TimbreBox understands (see below).
 
 Each installed plugin is loaded into its own **sandboxed JavaScript engine**:
 
-| Platform            | Runtime engine     |
-| ------------------- | ------------------ |
-| Windows / Linux     | interpreted engine |
-| macOS               | system engine      |
-| Android / iOS       | none — mobile builds never download or run plugin code |
+| Platform                | Runtime engine     |
+| ----------------------- | ------------------ |
+| Windows / Linux / Android | interpreted engine (QuickJS) |
+| macOS / iOS             | system engine (JavaScriptCore) |
 
 On load, TimbreBox evaluates, in order: a small **prelude** (`console`, `env`,
 `process`, `require` and the host-HTTP bridge), **`URL`/`URLSearchParams`**, an
@@ -65,8 +64,8 @@ Function calls are **serialized** on the single runtime (search and resolve
 requests never interleave), each call is JSON-encoded in and out, and each call
 has a **25-second timeout**. The engine runs on the app's UI thread, so a run of
 plugin code that does not yield — a `while (true) {}` — is **stopped after
-three seconds** (on Linux and macOS; the Windows engine build offers no such
-stop) and the engine is restarted on the next call. Await network requests
+three seconds** (on Linux, Android, macOS and iOS; the Windows engine build
+offers no such stop) and the engine is restarted on the next call. Await network requests
 instead of busy-waiting.
 
 The engine starts on the plugin's first call, not at launch, and is **shut

@@ -78,7 +78,7 @@ Released on `YYYY-MM-DD`.
 - **Your library stays on your computer.** Favorites, playlists, history, downloads and settings are saved in the
   app's own folder; the download index holds only file names inside the download folder.
 - **Plugins run in a sandbox.** A plugin's script gets HTTP and nothing else — no files, processes or sockets — and
-  every connection it makes is checked; mobile builds never download or run plugin code.
+  every connection it makes is checked, on desktop and mobile alike.
 - **Local control stays local.** The control API listens on `127.0.0.1` only, refuses web pages, and needs a
   per-run token from a file only your account can read.
 

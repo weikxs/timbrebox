@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Plugins run on Android and iOS too, in the same sandbox as on desktop: HTTP is their only capability, every
+  request passes the egress checks, and a run of plugin code is stopped after three seconds (on every platform
+  but Windows, whose bundled engine cannot be interrupted).
 - More plugins run as written: a plugin built as `exports.default` loads, and plugins get `env` (app
   version, system, language), `process`, `URL` and `URLSearchParams`.
 - The plugin `axios` covers what plugins use from axios: `axios.create`, `defaults`, interceptors, `put`,
@@ -55,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   open services with public APIs (Audius, Internet Archive, Radio Browser), and other sources are added with
   plugins. Tracks saved from these sources stay in your library; playing one says that a plugin can add its
   source back and offers **Search again**. The hot library's Chinese categories, which searched Bilibili, are
-  gone too. Mobile builds do not run plugins, so on Android and iOS only the three built-in sources remain.
+  gone too.
 
 ### Fixed
 

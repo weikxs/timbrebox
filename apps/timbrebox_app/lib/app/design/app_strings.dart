@@ -235,7 +235,7 @@ abstract final class AppStrings {
     'plugin.title': '音源插件',
     'plugin.detail': '第三方插件是社区脚本，安装后可搜索/播放其提供的音源。仅安装你信任的来源。',
     'plugin.unsupported':
-        '出于安全考虑，移动版不会下载或运行插件代码。插件只在桌面版（Windows、macOS、Linux）可用。',
+        '这个系统上不能运行插件。插件可在 Windows、macOS、Linux、iOS 和 Android 上使用。',
     'plugin.urlHint': '粘贴插件 .js 原始链接，或订阅 JSON 地址',
     'plugin.installing': '安装中…',
     'plugin.install': '安装',
@@ -556,8 +556,8 @@ abstract final class AppStrings {
     'plugin.detail':
         'Third-party plugins are community scripts; once installed they let you search and play the sources they provide. Only install sources you trust.',
     'plugin.unsupported':
-        'For safety, mobile builds never download or run plugin code. '
-        'Plugins are available on the desktop app (Windows, macOS, Linux).',
+        'Plugins cannot run on this system. They are available on Windows, '
+        'macOS, Linux, iOS and Android.',
     'plugin.urlHint': 'Paste a plugin .js raw link, or a subscription JSON URL',
     'plugin.installing': 'Installing…',
     'plugin.install': 'Install',
