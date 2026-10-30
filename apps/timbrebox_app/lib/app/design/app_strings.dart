@@ -316,6 +316,8 @@ abstract final class AppStrings {
 
     // source descriptions
     'source.audiusDetail': '公开点播音乐 · HTTPS · 无账户',
+    'source.openverseDetail':
+        '开放授权音乐（Jamendo、Freesound、维基共享资源、ccMixter）· HTTPS · 无账户',
     'source.radioDetail': '公开电台目录与直播 · HTTP(S) · 无账户',
     'source.builtinDetail': '内置来源',
 
@@ -652,6 +654,8 @@ abstract final class AppStrings {
 
     // source descriptions
     'source.audiusDetail': 'Public on-demand music · HTTPS · No account',
+    'source.openverseDetail':
+        'Openly licensed music (Jamendo, Freesound, Wikimedia Commons, ccMixter) · HTTPS · No account',
     'source.radioDetail':
         'Public radio directory & live streams · HTTP(S) · No account',
     'source.builtinDetail': 'Built-in source',

@@ -20,6 +20,7 @@ abstract final class SourceStrings {
     'net.blockedScheme': '出于安全，不允许使用该协议：{s}',
     'quality.liveRadio': '直播电台',
     'quality.publicAudio': '公开音频',
+    'quality.publicDomain': '公有领域',
     'quality.publicStream': '公开流',
     'source.archive.badMetadata': 'Internet Archive 返回了无法识别的条目元数据。',
     'source.archive.badSearch': 'Internet Archive 返回了无法识别的目录结果。',
@@ -34,9 +35,12 @@ abstract final class SourceStrings {
     'source.errBadSearch': '音源返回了无法识别的搜索结果。',
     'source.errLoadMore': '加载更多失败，请稍后重试。',
     'source.errNetworkRetry': '网络不可用，请检查连接后重试。',
+    'source.errRateLimited': '这个音源的请求太频繁了，请过一会儿再试。',
     'source.errRespTimeout': '音源响应超时，请稍后重试。',
     'source.errRespTooLarge': '音源响应过大，已停止读取。',
     'source.errUnavailableRetry': '音源暂时不可用，请稍后重试。',
+    'source.openverse.badResponse': 'Openverse 返回了无法识别的结果。',
+    'source.openverse.expired': '这首歌在 Openverse 上已经不能播放，请重新搜索。',
     'source.radio.badResponse': 'Radio Browser 返回了无法识别的目录结果。',
     'source.radio.expired': '电台流已经失效，请重新搜索。',
     'stream.err.backendReleased': '音频后端已经释放。',
@@ -47,6 +51,7 @@ abstract final class SourceStrings {
     'net.blockedScheme': 'Blocked for safety: the {s} scheme is not allowed.',
     'quality.liveRadio': 'Live radio',
     'quality.publicAudio': 'Public audio',
+    'quality.publicDomain': 'Public domain',
     'quality.publicStream': 'Public stream',
     'source.archive.badMetadata':
         'Internet Archive returned item metadata it could not read.',
@@ -68,11 +73,17 @@ abstract final class SourceStrings {
     'source.errLoadMore': 'Failed to load more, try again later.',
     'source.errNetworkRetry':
         'Network unavailable — check your connection and retry.',
+    'source.errRateLimited':
+        'Too many requests to this source — try again in a while.',
     'source.errRespTimeout': 'The source response timed out, try again later.',
     'source.errRespTooLarge':
         'The source response is too large; stopped reading.',
     'source.errUnavailableRetry':
         'The source is temporarily unavailable, try again later.',
+    'source.openverse.badResponse':
+        'Openverse returned results it could not read.',
+    'source.openverse.expired':
+        'This track can no longer be played from Openverse — search again.',
     'source.radio.badResponse':
         'Radio Browser returned a directory response it could not read.',
     'source.radio.expired':

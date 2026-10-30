@@ -27,7 +27,7 @@ TimbreBox（音色盒）是一个不打扰你的音乐播放器：
 - **私密。** 本地优先：曲库、收藏和设置都留在你的设备上，TimbreBox 不收集任何统计或跟踪数据。
 - **五端通用。** Windows、macOS、Linux、iOS 和 Android 共用同一套代码。
 
-它可以搜索和播放有公开接口的开放音乐源（Audius、Internet Archive、Radio Browser），你也可以通过插件自己添加更多音源（见[关于音源与插件](#关于音源与插件)）。
+它可以搜索和播放有公开接口的开放音乐源（Audius、Openverse、Internet Archive、Radio Browser），你也可以通过插件自己添加更多音源（见[关于音源与插件](#关于音源与插件)）。
 
 > **语言说明。** 应用内 UI 为双语（中文 / English）。每份文档都提供英文版加一个 `*.zh-CN.md` 简体中文对照——本 README（英文版 [README.md](README.md)）、[`AGENTS.md`](./AGENTS.zh-CN.md) 以及 [`docs/`](./docs) 下的各指南。
 
@@ -86,6 +86,7 @@ TimbreBox（音色盒）是一个不打扰你的音乐播放器：
 | 音源 | ID | 说明 |
 | --- | --- | --- |
 | Audius | `audius` | 开放音乐网络；也为热门库提供真实的趋势数据。 |
+| Openverse | `openverse` | 来自 Jamendo、Freesound、维基共享资源和 ccMixter 的开放授权音乐；每首歌都标出授权方式（例如 CC BY 4.0）。无需账户；匿名使用每页 20 条、最多 12 页、每天约 200 次请求。 |
 | Internet Archive | `internet_archive` | 公开音频搜索（`mediatype:audio`），在播放时解析。 |
 | Radio Browser | `radio_browser` | 全球实时电台目录（仅用于发现，不参与歌曲的多源并发搜索）。 |
 
@@ -155,7 +156,7 @@ flowchart TD
     SMC <--> APP
     APP --> ENGINE["NetworkPlayerEngine → native audio backend"]
     APP --> CATALOG["BuiltInMusicCatalog / SourceRegistry"]
-    CATALOG --> SRC["CatalogSource adapters (Audius, Internet Archive, Radio Browser)"]
+    CATALOG --> SRC["CatalogSource adapters (Audius, Openverse, Internet Archive, Radio Browser)"]
     CATALOG --> PLUG["PluginCatalogSource (TimbreBox plugins)"]
     SRC --> PROXY["StreamHeaderProxy (loopback, header-gated streams)"]
     PLUG --> PROXY

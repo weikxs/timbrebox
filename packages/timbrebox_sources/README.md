@@ -1,8 +1,8 @@
 # timbrebox_sources
 
 The online music sources of TimbreBox as a package other apps can depend on:
-the catalogs and stream resolvers of the open sources (Audius, Radio Browser,
-Internet Archive), the loopback header proxy, the network egress policy, LRC
+the catalogs and stream resolvers of the open sources (Audius, Openverse,
+Radio Browser, Internet Archive), the loopback header proxy, the network egress policy, LRC
 lyrics and the texts of their messages. Pure Dart with `dart:io`; no Flutter.
 
 Only open services with public APIs are built in. Video and streaming
