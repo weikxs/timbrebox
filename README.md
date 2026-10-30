@@ -313,7 +313,7 @@ TimbreBox supports third-party source plugins in the TimbreBox plugin format. A 
 
 Plugin authoring and the full sandbox/security model are documented in [`docs/plugin-development.md`](./docs/plugin-development.md).
 
-> Security: on every platform a plugin runs in its own sandboxed engine with HTTP as its only capability, a time limit on each run, and an explicit consent step before install.
+> Security: on every platform a plugin runs in its own sandboxed engine with HTTP as its only capability, a time limit on each run (not yet on Windows), and an explicit consent step before install.
 
 ## Configuration & Permissions
 
