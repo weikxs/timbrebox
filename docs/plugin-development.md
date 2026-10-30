@@ -58,8 +58,8 @@ exported is captured as `globalThis.__plugin`: `module.exports`, or
 (and left no `platform` on `module.exports` itself). Exported functions are
 invoked on demand.
 
-Plugins written in the same format for other players usually run unchanged:
-the globals and the axios behavior they rely on are provided (section 5).
+Plugins can rely on the usual globals and on axios behaving like axios
+(section 5), so most plugins in this format run as written.
 
 Function calls are **serialized** on the single runtime (search and resolve
 requests never interleave), each call is JSON-encoded in and out, and each call
@@ -301,9 +301,6 @@ Only this **whitelist** resolves; any other `require('…')` throws
 | `big-integer` | Arbitrary-precision integers (for signing schemes).                      |
 
 You can `require('axios')` or rely on the global `axios` — both are the same shim.
-
-`require` is also available as `__musicfree_require`, the name some plugin
-builds use; it resolves the same whitelist.
 
 ### Globals
 
