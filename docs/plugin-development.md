@@ -495,6 +495,17 @@ hash. If the content changed, it reinstalls (and re-reads metadata); if the hash
 matches, it's left untouched ("插件已是最新"). Plugins without a `srcUrl` are never
 auto-updated.
 
+An update replaces the installed plugin as a whole, or not at all:
+
+- The new version is loaded first. If it does not load (a script error, no
+  `platform`, no `search`), the installed version stays exactly as it was, and
+  the result names the plugin and the reason.
+- It replaces the plugin it updates even if it changes its `platform` name, and
+  keeps whether the plugin was switched on.
+- Files the app keeps beside the plugin are carried over.
+- If the app stops in the middle, the next launch puts the installed version
+  back.
+
 ### Enable / disable / uninstall
 
 - **Toggle switch** next to each plugin enables/disables it as a search source

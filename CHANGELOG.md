@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Updating a plugin is all or nothing: a new version that does not load leaves the installed one exactly as it was,
+  a version that renames itself still replaces the plugin it updates (and keeps it on or off), and an update cut
+  short is undone at the next launch. Each plugin that could not be updated is named with the reason.
 - The hot library has Chinese radio: the most voted working stations of mainland China, Taiwan and Hong Kong, and
   the top stations worldwide, from Radio Browser, one tap away without searching.
 - Openverse is built in: openly licensed music from Jamendo, Freesound, Wikimedia Commons and ccMixter, searched

@@ -205,7 +205,13 @@ class _PluginSettingsState extends State<PluginSettings> {
 
   /// "Up to date" only when every plugin was actually checked.
   static String _updateMessage(PluginUpdateReport report) {
-    final failed = report.failed.join(', ');
+    final failed = report.failed
+        .map(
+          (failure) => AppStrings.t('plugin.updateFailureFmt')
+              .replaceFirst('{name}', failure.name)
+              .replaceFirst('{reason}', failure.reason),
+        )
+        .join('；');
     if (report.failed.isEmpty) {
       return report.updated > 0
           ? AppStrings.t(

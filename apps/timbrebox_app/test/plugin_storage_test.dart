@@ -97,6 +97,7 @@ void main() {
     final report = await controller.updatePlugins();
 
     expect(report.updated, 0);
-    expect(report.failed, ['plugin_a']);
+    expect(report.failed.map((failure) => failure.name), ['plugin_a']);
+    expect(report.failed.single.reason, isNotEmpty);
   });
 }

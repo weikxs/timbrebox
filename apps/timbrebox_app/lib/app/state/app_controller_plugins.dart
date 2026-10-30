@@ -141,7 +141,7 @@ extension AppControllerPlugins on AppController {
     }
     final mutable = catalog as MutableMusicCatalog;
     var updated = 0;
-    final failed = <String>[];
+    final failed = <PluginUpdateFailure>[];
     for (final manifest in List.of(_plugins)) {
       try {
         final fresh = await repository.update(manifest);
@@ -154,7 +154,14 @@ extension AppControllerPlugins on AppController {
         updated++;
       } catch (error) {
         // A single failed update must not abort the rest.
-        failed.add(manifest.platform);
+        failed.add(
+          PluginUpdateFailure(
+            name: manifest.platform,
+            reason: error is PluginInstallException
+                ? error.message
+                : AppStrings.t('plugin.err.updateUnexpected'),
+          ),
+        );
         DiagnosticLog.record('plugin ${manifest.id} update failed: $error');
       }
     }
@@ -186,6 +193,17 @@ class PluginUpdateReport {
   /// How many plugins were replaced by a newer version.
   final int updated;
 
-  /// The names of plugins whose update could not be fetched or installed.
-  final List<String> failed;
+  /// The plugins whose update could not be fetched or installed, and why.
+  final List<PluginUpdateFailure> failed;
+}
+
+/// One plugin [AppControllerPlugins.updatePlugins] could not update.
+class PluginUpdateFailure {
+  const PluginUpdateFailure({required this.name, required this.reason});
+
+  /// The plugin's name.
+  final String name;
+
+  /// What went wrong, in words for the user.
+  final String reason;
 }
