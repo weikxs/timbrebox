@@ -8,6 +8,7 @@ void main() {
 
     expect(catalog.sources.map((source) => source.id), [
       'audius',
+      'openverse',
       'internet_archive',
       'radio_browser',
     ]);
@@ -15,7 +16,7 @@ void main() {
       catalog.sources.where(
         (source) => source.supports(SourceCapability.search),
       ),
-      hasLength(3),
+      hasLength(4),
     );
   });
 

@@ -125,6 +125,7 @@ const _audiusCategories = <_Category>[
 
 Color _sourceColor(String sourceId) => switch (sourceId) {
   'audius' => _magenta,
+  'openverse' => const Color(0xff2ec4b6),
   'internet_archive' => const Color(0xfff5b041),
   'radio_browser' => const Color(0xff5ad07a),
   _ => _indigo,
