@@ -10,11 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Plugins run on Android and iOS too, in the same sandbox as on desktop: HTTP is their only capability, every
-  request passes the egress checks, and a run of plugin code is stopped after three seconds (Android now has
-  that limit, as Linux and Apple platforms do).
-- Plugins written in the same format for other players run unchanged in more cases: a plugin built as
-  `exports.default` loads; plugins get `env` (app version, system, language), `process`, `URL` and
-  `URLSearchParams`, and `require` is also available as `__musicfree_require`.
+  request passes the egress checks, and a run of plugin code is stopped after three seconds (on every platform
+  but Windows, whose bundled engine cannot be interrupted).
+- More plugins run as written: a plugin built as `exports.default` loads, and plugins get `env` (app
+  version, system, language), `process`, `URL` and `URLSearchParams`.
 - The plugin `axios` covers what plugins use from axios: `axios.create`, `defaults`, interceptors, `put`,
   `patch`, `delete`, `head`, `baseURL`, `timeout`, `validateStatus` and JSON request bodies.
 - Plugin lyrics are line-synced: the line playing is highlighted and kept in view, and tapping a line seeks there.

@@ -6,8 +6,10 @@
 #   tools/check.sh                  analyze, format and test every package
 #   tools/check.sh analyze test     only these steps (analyze, format, test)
 #
-# On Linux the plugin tests load QuickJS from flutter_js's prebuilt x86_64
-# library; LIBQUICKJSC_TEST_PATH points there unless already set.
+# The plugin tests load QuickJS from the prebuilt library of the flutter_js
+# version the package resolved: on Linux LIBQUICKJSC_TEST_PATH points to it
+# unless already set; on Windows its folder goes on PATH, where the DLL is
+# looked up by name.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -55,13 +57,37 @@ format() {
   dart format --output=none --set-exit-if-changed "${dirs[@]}"
 }
 
+# The folder of the flutter_js this package resolved, from its package
+# config (file:///… on Linux and macOS, file:///C:/… on Windows).
+flutter_js_root() {
+  [[ -f .dart_tool/package_config.json ]] || return 0
+  sed -n 's#.*"rootUri": *"file://\([^"]*/flutter_js-[^"/]*\)/*".*#\1#p' \
+    .dart_tool/package_config.json | head -1
+}
+
+quickjs_for_tests() {
+  local root
+  root=$(flutter_js_root)
+  [[ -n "$root" ]] || return 0
+  case "$(uname -s)" in
+    Linux)
+      [[ -n "${LIBQUICKJSC_TEST_PATH:-}" ]] ||
+        export LIBQUICKJSC_TEST_PATH="$root/linux/shared/libquickjs_c_bridge_plugin.so"
+      ;;
+    MINGW* | MSYS* | CYGWIN*)
+      PATH="$(cygpath -u "${root#/}/windows/shared"):$PATH"
+      export PATH
+      ;;
+  esac
+}
+
 run_tests() {
-  if [[ "$(uname -s)" == Linux && -z "${LIBQUICKJSC_TEST_PATH:-}" ]]; then
-    local pub_cache="${PUB_CACHE:-$HOME/.pub-cache}" library
-    library=$(find "$pub_cache/hosted/pub.dev" -path '*flutter_js-*/linux/shared/libquickjs_c_bridge_plugin.so' | sort | tail -1)
-    [[ -n "$library" ]] && export LIBQUICKJSC_TEST_PATH="$library"
+  if is_flutter; then
+    quickjs_for_tests
+    flutter test --no-pub
+  else
+    dart test
   fi
-  if is_flutter; then flutter test --no-pub; else dart test; fi
 }
 
 for package in "${PACKAGES[@]}"; do

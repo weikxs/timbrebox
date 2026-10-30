@@ -53,8 +53,8 @@ module.exports = {
 插件是从 ES 模块编译来的、设置了 `exports.default`（并且 `module.exports` 本身没有
 `platform`），则取 `module.exports.default`。导出的函数按需调用。
 
-为其他播放器编写的同格式插件通常可以直接运行：它们依赖的全局对象和 axios 行为都已提供
-（见第五节）。
+插件可以使用常见的全局对象，`axios` 的行为也与 axios 一致（见第五节），所以大多数这种格式
+的插件可以直接运行。
 
 函数调用在这个单一运行时上是**串行化**的（search 与 resolve 请求绝不交错），
 每次调用的入参与返回值都以 JSON 编解码，且每次调用有 **25 秒超时**。引擎运行在应用的
@@ -271,8 +271,6 @@ async function getLyric(musicItem) {
 | `big-integer` | 任意精度整数（用于签名方案）。                                             |
 
 你可以 `require('axios')` 或直接使用全局的 `axios`——两者是同一个垫片。
-
-`require` 也可以写成 `__musicfree_require`（部分插件构建用的名字），两者的白名单完全相同。
 
 ### 全局对象
 

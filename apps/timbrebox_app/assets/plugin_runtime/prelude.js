@@ -83,9 +83,6 @@ function require(name) {
     default: throw new Error(__MSG_NOT_ALLOWED__ + name);
   }
 }
-// The name some plugin builds call require by.
-var __musicfree_require = require;
-
 // The plugin object a module exported: module.exports, or its `default`
 // when the plugin was compiled from an ES module (`exports.default = …`).
 function __exportOf(module) {

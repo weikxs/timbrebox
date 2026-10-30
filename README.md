@@ -2,7 +2,7 @@
 
 # TimbreBox
 
-**A lightweight, cross-platform music player that brings public music sources into one calm place — no account, no login flow.**
+**A free, open, simple and lightweight music player for Windows, macOS, Linux, iOS and Android.**
 
 <p>
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-3b3b3b">
@@ -18,9 +18,16 @@
 
 ---
 
-TimbreBox is a lightweight, local-first music player. It runs on five platforms — **Windows, macOS, Linux, iOS, and Android** — from a single shared codebase, and brings open music sources with public APIs (Audius, Internet Archive, Radio Browser) behind one uniform search-and-play surface. TimbreBox is a player: it builds in no video or streaming platform. Any other source is added by you, with a plugin, by pasting a plugin URL (see [Sources and plugins](#sources-and-plugins)).
+TimbreBox is a music player that stays out of your way:
 
-The product goal is honesty and calm: no sign-up wall, real (not promised) audio quality, and clear loading / error / empty states instead of fake data.
+- **Free.** No price, no subscription, no ads, no account to create.
+- **Open.** Every line of its source code is public: read it, build it and change it for any noncommercial use ([PolyForm Noncommercial](./LICENSE)).
+- **Simple.** Search, play, queue, lyrics. One window, one clear state for loading, errors and empty results; never fake data.
+- **Lightweight.** The audio engine starts on the first track, not at launch, and releases its resources after a pause.
+- **Private.** Local first: your library, favorites and settings stay on your device, and TimbreBox sends no analytics or tracking.
+- **Everywhere.** Windows, macOS, Linux, iOS and Android from one shared codebase.
+
+It searches and plays open music sources with public APIs (Audius, Internet Archive, Radio Browser), and you can add more sources yourself with plugins (see [Sources and plugins](#sources-and-plugins)).
 
 > **Language note.** The in-app UI is bilingual (中文 / English). Every doc ships an English file plus a `*.zh-CN.md` Simplified-Chinese sibling — this README ([README.zh-CN.md](README.zh-CN.md)), [`AGENTS.md`](./AGENTS.md), and the guides under [`docs/`](./docs).
 

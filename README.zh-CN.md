@@ -2,7 +2,7 @@
 
 # TimbreBox · 音色盒
 
-**一个轻量的五端音乐盒：把公开音乐源聚合到一处，即开即用，无需登录。**
+**免费、开源、简洁、轻便的音乐播放器，支持 Windows、macOS、Linux、iOS 和 Android。**
 
 <p>
   <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-3b3b3b">
@@ -18,9 +18,16 @@
 
 ---
 
-TimbreBox（音色盒）是一个轻量、本地优先的音乐播放器。它用同一套共享代码运行在五个平台上——**Windows、macOS、Linux、iOS 和 Android**——并把有公开接口的开放音乐源（Audius、Internet Archive、Radio Browser）放到统一的搜索与播放界面之下。TimbreBox 是一个播放器，不内置任何视频或流媒体平台；其他音源由你自己通过插件添加，粘贴一个插件链接即可（见[关于音源与插件](#关于音源与插件)）。
+TimbreBox（音色盒）是一个不打扰你的音乐播放器：
 
-产品目标是诚实与平静：没有注册墙，提供真实（而非承诺）的音质，并以清晰的加载 / 错误 / 空状态代替假数据。
+- **免费。** 不收费、不订阅、没有广告，也不用注册账号。
+- **开源。** 全部源代码公开：可以阅读、自己构建、修改，用于任何非商业用途（[PolyForm Noncommercial](./LICENSE) 许可证）。
+- **简洁。** 搜索、播放、队列、歌词。一个窗口；加载、出错、没有结果都有清楚的状态，从不显示假数据。
+- **轻便。** 音频引擎在播放第一首歌时才启动，而不是一打开就启动；暂停后会释放资源。
+- **私密。** 本地优先：曲库、收藏和设置都留在你的设备上，TimbreBox 不收集任何统计或跟踪数据。
+- **五端通用。** Windows、macOS、Linux、iOS 和 Android 共用同一套代码。
+
+它可以搜索和播放有公开接口的开放音乐源（Audius、Internet Archive、Radio Browser），你也可以通过插件自己添加更多音源（见[关于音源与插件](#关于音源与插件)）。
 
 > **语言说明。** 应用内 UI 为双语（中文 / English）。每份文档都提供英文版加一个 `*.zh-CN.md` 简体中文对照——本 README（英文版 [README.md](README.md)）、[`AGENTS.md`](./AGENTS.zh-CN.md) 以及 [`docs/`](./docs) 下的各指南。
 
