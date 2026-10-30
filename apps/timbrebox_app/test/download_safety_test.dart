@@ -64,7 +64,11 @@ void main() {
 
       final loaded = await store().load();
 
-      expect(loaded.single.path, file.path);
+      // Same file, whichever separator the platform joins paths with.
+      expect(
+        FileSystemEntity.identicalSync(loaded.single.path, file.path),
+        isTrue,
+      );
     });
 
     test('keeps a legacy absolute path that lies inside the library', () async {
@@ -73,7 +77,11 @@ void main() {
 
       final loaded = await store().load();
 
-      expect(loaded.single.path, file.path);
+      // Same file, whichever separator the platform joins paths with.
+      expect(
+        FileSystemEntity.identicalSync(loaded.single.path, file.path),
+        isTrue,
+      );
     });
 
     test('drops entries that point outside the library', () async {
