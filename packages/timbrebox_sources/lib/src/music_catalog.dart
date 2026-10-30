@@ -92,6 +92,13 @@ abstract interface class ChartMusicCatalog {
     String genre, {
     required CancellationToken cancellation,
   });
+
+  /// The most voted working radio stations of a region (an ISO 3166-1
+  /// country code), or worldwide without one.
+  Future<List<CatalogTrack>> topStations({
+    String? countryCode,
+    required CancellationToken cancellation,
+  });
 }
 
 typedef JsonReader =
@@ -332,6 +339,20 @@ class BuiltInMusicCatalog
       cancellation,
       genre: genre,
       limit: 12,
+    );
+    return [for (final summary in summaries) source.toCatalogTrack(summary)];
+  }
+
+  @override
+  Future<List<CatalogTrack>> topStations({
+    String? countryCode,
+    required CancellationToken cancellation,
+  }) async {
+    final source = _sources['radio_browser'];
+    if (source is! RadioBrowserCatalogSource) return const [];
+    final summaries = await source.topStations(
+      cancellation,
+      countryCode: countryCode,
     );
     return [for (final summary in summaries) source.toCatalogTrack(summary)];
   }

@@ -88,7 +88,7 @@ TimbreBox（音色盒）是一个不打扰你的音乐播放器：
 | Audius | `audius` | 开放音乐网络；也为热门库提供真实的趋势数据。 |
 | Openverse | `openverse` | 来自 Jamendo、Freesound、维基共享资源和 ccMixter 的开放授权音乐；每首歌都标出授权方式（例如 CC BY 4.0）。无需账户；匿名使用每页 20 条、最多 12 页、每天约 200 次请求。 |
 | Internet Archive | `internet_archive` | 公开音频搜索（`mediatype:audio`），在播放时解析。 |
-| Radio Browser | `radio_browser` | 全球实时电台目录（仅用于发现，不参与歌曲的多源并发搜索）。 |
+| Radio Browser | `radio_browser` | 全球实时电台目录（仅用于发现，不参与歌曲的多源并发搜索）；也为热门库的中文电台提供数据。 |
 
 视频与流媒体平台（YouTube、哔哩哔哩、抖音、TikTok 等）不再内置。以前从这些平台收藏的歌仍然保留在曲库里；播放时会说明可以安装插件把对应音源加回来。
 
@@ -100,6 +100,7 @@ TimbreBox（音色盒）是一个不打扰你的音乐播放器：
 
 ### 热门库（发现）
 - 由真实音源数据支撑的流派 / 趋势歌单（Audius 按流派的趋势数据）。
+- 中文电台：中国大陆、台湾、香港以及全球得票最多、当前可用的电台（Radio Browser）。
 - 当动态榜单不可用时，以静态、带版本的榜单定义作为优雅降级。
 - 插件提供的榜单通过 `getTopLists` / `getTopListDetail` 以 `PluginTopListItem` 呈现。
 

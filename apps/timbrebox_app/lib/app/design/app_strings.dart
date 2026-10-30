@@ -77,8 +77,13 @@ abstract final class AppStrings {
 
     // hot library
     'hot.plugin': '插件',
-    'hot.subtitle': '选一个曲风，进入它的歌单',
+    'hot.subtitle': '选一个曲风或电台，进入它的列表',
     'hot.genresGroup': '曲风 · Audius',
+    'hot.radioGroup': '中文电台 · Radio Browser',
+    'hot.radio.cn': '中国大陆',
+    'hot.radio.tw': '台湾',
+    'hot.radio.hk': '香港',
+    'hot.radio.world': '全球热门',
     'hot.pluginCharts': '插件榜单',
     'hot.publicTrending': '公开热门',
     'hot.loadingPlaylist': '正在加载歌单…',
@@ -375,8 +380,13 @@ abstract final class AppStrings {
 
     // hot library
     'hot.plugin': 'Plugin',
-    'hot.subtitle': 'Pick a genre to open its playlist',
+    'hot.subtitle': 'Pick a genre or a radio region to open its list',
     'hot.genresGroup': 'Genres · Audius',
+    'hot.radioGroup': 'Chinese radio · Radio Browser',
+    'hot.radio.cn': 'Mainland China',
+    'hot.radio.tw': 'Taiwan',
+    'hot.radio.hk': 'Hong Kong',
+    'hot.radio.world': 'Top worldwide',
     'hot.pluginCharts': 'Plugin charts',
     'hot.publicTrending': 'Public trending',
     'hot.loadingPlaylist': 'Loading playlist…',
