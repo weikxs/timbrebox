@@ -19,13 +19,21 @@ import 'plugin_runtime.dart';
 /// `manifest.json`. Installing fetches the raw `.js` from a GitHub URL, runs it
 /// once to read its metadata, then stores it. Loading rebuilds a
 /// [PluginCatalogSource] per stored plugin whose JS engine starts on first use.
+///
+/// A plugin is stored whole or not at all: the new version is written to
+/// `<id>.staging/`, the installed one is moved to `<id>.previous/`, and the
+/// staging directory takes its place. A launch after a crash in between
+/// finishes or undoes that move before loading.
 final class PluginRepository {
   PluginRepository({
     this.policy = const EgressPolicy(),
     Future<Directory> Function()? pluginsDirectory,
     PluginRuntime Function()? createRuntime,
+    @visibleForTesting Future<String> Function(Uri uri)? fetch,
     this.idleTimeout = PluginCatalogSource.defaultIdleTimeout,
   }) : _createRuntime = createRuntime ?? PluginRuntime.new,
+       // ignore: prefer_initializing_formals
+       _fetchOverride = fetch,
        // ignore: prefer_initializing_formals
        _pluginsDirectory = pluginsDirectory,
        streamProxy = StreamHeaderProxy(policy: policy);
@@ -50,7 +58,12 @@ final class PluginRepository {
   final Future<Directory> Function()? _pluginsDirectory;
   final PluginRuntime Function() _createRuntime;
 
+  /// Replaces the download in tests; the https rule still applies.
+  final Future<String> Function(Uri uri)? _fetchOverride;
+
   static const _maxBytes = 6 * 1024 * 1024;
+  static const _staging = '.staging';
+  static const _previous = '.previous';
 
   /// Installs from [rawUrl], which may be a single plugin `.js` OR a
   /// subscription JSON (`{desc, plugins:[{name,url,version}]}`) — returns every
@@ -90,6 +103,9 @@ final class PluginRepository {
 
   /// Re-fetches a plugin from its `srcUrl` and reinstalls only when the content
   /// changed (SHA differs). Returns the fresh source, or null if up to date.
+  /// The new version replaces the installed plugin even when it names itself
+  /// differently, and keeps whether it was switched on; one that does not
+  /// load leaves the installed version untouched.
   Future<PluginCatalogSource?> update(PluginManifest manifest) async {
     final src = manifest.srcUrl;
     if (src == null || src.isEmpty) return null;
@@ -97,14 +113,30 @@ final class PluginRepository {
     if (sha256.convert(utf8.encode(content)).toString() == manifest.sha256) {
       return null; // Unchanged.
     }
-    return installSource(content, _normalize(src));
+    final installed = await _storedManifest(manifest.id) ?? manifest;
+    return _install(
+      content,
+      _normalize(src),
+      id: installed.id,
+      enabled: installed.enabled,
+    );
   }
 
   /// Validates a plugin [source], stores it, and returns its catalog source.
   /// The engine that read the metadata is released; like a stored plugin,
   /// the source starts a fresh one on first use.
   @visibleForTesting
-  Future<PluginCatalogSource> installSource(String source, Uri origin) async {
+  Future<PluginCatalogSource> installSource(String source, Uri origin) =>
+      _install(source, origin);
+
+  /// Installs [source] under [id] (by default the id its platform name
+  /// gives).
+  Future<PluginCatalogSource> _install(
+    String source,
+    Uri origin, {
+    String? id,
+    bool enabled = true,
+  }) async {
     final runtime = _createRuntime();
     try {
       await runtime.load(source);
@@ -124,12 +156,13 @@ final class PluginRepository {
       throw PluginInstallException(AppStrings.t('plugin.err.missingSearch'));
     }
     final manifest = PluginManifest(
-      id: PluginManifest.idFor(platform),
+      id: id ?? PluginManifest.idFor(platform),
       platform: platform,
       version: runtime.meta('version') ?? '0.0.0',
       author: runtime.meta('author'),
       srcUrl: runtime.meta('srcUrl') ?? origin.toString(),
       sha256: sha256.convert(utf8.encode(source)).toString(),
+      enabled: enabled,
       functions: PluginCatalogSource.exportedFunctions(runtime).toList(),
     );
     runtime.dispose();
@@ -175,14 +208,15 @@ final class PluginRepository {
     _skipped.clear();
     final directory = await _pluginsDir();
     if (!await directory.exists()) return const [];
+    await _finishInterruptedStores(directory);
     final sources = <PluginCatalogSource>[];
     for (final entry in await directory.list().toList()) {
-      if (entry is! Directory) continue;
+      if (entry is! Directory || _nameOf(entry).contains('.')) continue;
       final source = await _loadOne(entry);
       if (source != null) {
         sources.add(source);
       } else {
-        _skipped.add(entry.uri.pathSegments.where((s) => s.isNotEmpty).last);
+        _skipped.add(_nameOf(entry));
       }
     }
     _skipped.sort();
@@ -192,6 +226,41 @@ final class PluginRepository {
   Future<void> remove(String id) async {
     final dir = Directory('${(await _pluginsDir()).path}/$id');
     if (await dir.exists()) await dir.delete(recursive: true);
+  }
+
+  /// Undoes a store a crash cut short: an installed version moved aside is
+  /// put back when its replacement never moved in, and leftovers go.
+  Future<void> _finishInterruptedStores(Directory directory) async {
+    for (final entry in await directory.list().toList()) {
+      if (entry is! Directory) continue;
+      final name = _nameOf(entry);
+      if (name.endsWith(_staging)) {
+        await entry.delete(recursive: true);
+      } else if (name.endsWith(_previous)) {
+        final id = name.substring(0, name.length - _previous.length);
+        final installed = Directory('${directory.path}/$id');
+        if (await installed.exists()) {
+          await entry.delete(recursive: true);
+        } else {
+          await entry.rename(installed.path);
+        }
+      }
+    }
+  }
+
+  static String _nameOf(FileSystemEntity entry) =>
+      entry.uri.pathSegments.lastWhere((segment) => segment.isNotEmpty);
+
+  Future<PluginManifest?> _storedManifest(String id) async {
+    final file = File('${(await _pluginsDir()).path}/$id/manifest.json');
+    if (!await file.exists()) return null;
+    try {
+      return PluginManifest.fromJson(
+        jsonDecode(await file.readAsString()) as Map<String, Object?>,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> setEnabled(String id, bool enabled) async {
@@ -249,16 +318,31 @@ final class PluginRepository {
     }
   }
 
+  /// Writes the plugin to a staging directory, along with the other files
+  /// the installed version keeps beside it, then swaps it in.
   Future<Directory> _store(PluginManifest manifest, String source) async {
-    final dir = Directory('${(await _pluginsDir()).path}/${manifest.id}');
-    await dir.create(recursive: true);
-    // Each file is replaced in one step, so a crash mid-install leaves the
-    // previous version readable instead of a truncated script or manifest.
-    await writeFileAtomically(File('${dir.path}/plugin.js'), source);
-    await writeFileAtomically(
-      File('${dir.path}/manifest.json'),
-      jsonEncode(manifest.toJson()),
-    );
+    final root = (await _pluginsDir()).path;
+    final dir = Directory('$root/${manifest.id}');
+    final staging = Directory('${dir.path}$_staging');
+    final previous = Directory('${dir.path}$_previous');
+    if (await staging.exists()) await staging.delete(recursive: true);
+    await staging.create(recursive: true);
+    if (await dir.exists()) {
+      for (final entry in await dir.list().toList()) {
+        final name = _nameOf(entry);
+        if (entry is File && name != 'plugin.js' && name != 'manifest.json') {
+          await entry.copy('${staging.path}/$name');
+        }
+      }
+    }
+    await File('${staging.path}/plugin.js').writeAsString(source, flush: true);
+    await File(
+      '${staging.path}/manifest.json',
+    ).writeAsString(jsonEncode(manifest.toJson()), flush: true);
+    if (await previous.exists()) await previous.delete(recursive: true);
+    if (await dir.exists()) await dir.rename(previous.path);
+    await staging.rename(dir.path);
+    if (await previous.exists()) await previous.delete(recursive: true);
     return dir;
   }
 
@@ -283,6 +367,8 @@ final class PluginRepository {
     if (uri.scheme != 'https') {
       throw PluginInstallException(AppStrings.t('plugin.err.invalidUrl'));
     }
+    final override = _fetchOverride;
+    if (override != null) return override(uri);
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 20);
     policy.attach(client, httpsOnly: true);
