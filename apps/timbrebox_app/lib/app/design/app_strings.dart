@@ -254,6 +254,8 @@ abstract final class AppStrings {
     'plugin.updatedCountFmt': '更新了 {n} 个插件',
     'plugin.upToDate': '插件已是最新',
     'plugin.updateFailedFmt': '检查更新失败：{e}',
+    'plugin.updateFailureFmt': '{name}（{reason}）',
+    'plugin.err.updateUnexpected': '更新时出现意外错误，原版本保持不变',
     'plugin.confirmTitle': '安装第三方插件',
     'plugin.confirmBody': '插件是社区提供的脚本，会以你的名义发起网络请求来搜索和获取音频。请仅安装你信任的来源。',
     'plugin.confirmInstall': '我信任，安装',
@@ -583,6 +585,9 @@ abstract final class AppStrings {
     'plugin.updatedCountFmt': 'Updated {n} plugin(s)',
     'plugin.upToDate': 'Plugins are up to date',
     'plugin.updateFailedFmt': 'Update check failed: {e}',
+    'plugin.updateFailureFmt': '{name} ({reason})',
+    'plugin.err.updateUnexpected':
+        'An unexpected error stopped the update; the installed version is kept',
     'plugin.confirmTitle': 'Install third-party plugin',
     'plugin.confirmBody':
         'Plugins are community scripts that make network requests on your behalf to search for and fetch audio. Only install sources you trust.',
