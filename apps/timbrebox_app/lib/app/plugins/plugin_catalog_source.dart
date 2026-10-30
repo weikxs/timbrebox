@@ -46,6 +46,7 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
     EgressPolicy policy = const EgressPolicy(),
+    Future<Set<String>> Function()? lanHosts,
     Duration idleTimeout = defaultIdleTimeout,
   }) : this._(
          manifest: manifest,
@@ -53,6 +54,7 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
          loadRuntime: loadRuntime,
          proxy: proxy,
          policy: policy,
+         lanHosts: lanHosts,
          idleTimeout: idleTimeout,
        );
 
@@ -62,8 +64,10 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     required Future<PluginRuntime> Function() loadRuntime,
     StreamHeaderProxy? proxy,
     required EgressPolicy policy,
+    Future<Set<String>> Function()? lanHosts,
     required Duration? idleTimeout,
   }) : _functions = Set.unmodifiable(functions),
+       _lanHosts = lanHosts ?? _noLanHosts,
        // ignore: prefer_initializing_formals
        _idleTimeout = idleTimeout,
        // ignore: prefer_initializing_formals
@@ -110,6 +114,12 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
 
   /// Checks the stream URL a plugin hands back before anything opens it.
   final EgressPolicy _policy;
+
+  /// The LAN servers the user entered in the plugin's settings, which its
+  /// streams may come from (see [EgressPolicy.allowingLanHosts]).
+  final Future<Set<String>> Function() _lanHosts;
+
+  static Future<Set<String>> _noLanHosts() async => const {};
   final _items = BoundedCache<String, Map<String, Object?>>();
   final _topListItems = BoundedCache<String, Map<String, Object?>>();
   final _artwork = BoundedCache<String, String>();
@@ -285,7 +295,8 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
       );
     }
     final url = raw['url']?.toString();
-    final parsed = await checkedPluginStreamUri(url, policy: _policy);
+    final policy = _policy.allowingLanHosts(await _lanHosts());
+    final parsed = await checkedPluginStreamUri(url, policy: policy);
     final headers = <String, String>{};
     final rawHeaders = raw['headers'];
     if (rawHeaders is Map) {
@@ -301,7 +312,7 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     // not: it injects the headers per hop, and its client vets each redirect
     // hop against the egress policy, which libmpv opening the URL itself
     // would not.
-    final local = await _proxy.publish(parsed, headers);
+    final local = await _proxy.publish(parsed, headers, policy: policy);
     return ResolvedStream(uri: local, mimeType: _mimeType(url!));
   }
 

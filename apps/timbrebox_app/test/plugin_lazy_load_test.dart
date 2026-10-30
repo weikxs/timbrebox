@@ -38,7 +38,7 @@ void main() {
 
   PluginRepository repository({Duration? idleTimeout}) => PluginRepository(
     pluginsDirectory: () async => root,
-    createRuntime: (environment) {
+    createRuntime: (environment, _) {
       started++;
       return PluginRuntime(environment: environment);
     },

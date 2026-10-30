@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A plugin can reach a server on the home network (a NAS) when the user entered its IP address or `.local` name in
+  the plugin's settings, for the plugin's requests and its streams. The local machine, link-local addresses,
+  domain names and every LAN host the user did not enter stay blocked.
 - Plugins can ask for settings: a plugin declares `userVariables` (a server address, an account, a password), Settings
   shows a form for it, and the plugin reads the values with `env.getUserVariables()`. The values stay on the device in
   a file only the user can read, reach that plugin alone, survive its updates, and are never uploaded or logged.
@@ -73,6 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A plugin that names itself like an installed one no longer takes over its settings: a new script keeps the
+  settings stored beside a plugin only when it comes from the address that plugin was installed from.
 - Playback: a failed load stops the previous track, a superseded play never starts, and resume refuses after a
   failure or the end of a track.
 - The queue: a track queued twice no longer loops back to its first copy, removing the playing track no longer skips

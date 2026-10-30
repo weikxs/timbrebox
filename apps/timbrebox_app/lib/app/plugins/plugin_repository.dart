@@ -13,6 +13,7 @@ import '../state/atomic_file.dart';
 import '../state/private_file.dart';
 import 'plugin_catalog_source.dart';
 import 'plugin_environment.dart';
+import 'plugin_http.dart';
 import 'plugin_manifest.dart';
 import 'plugin_runtime.dart';
 
@@ -31,12 +32,16 @@ final class PluginRepository {
   PluginRepository({
     this.policy = const EgressPolicy(),
     Future<Directory> Function()? pluginsDirectory,
-    PluginRuntime Function(PluginEnvironment environment)? createRuntime,
+    PluginRuntime Function(PluginEnvironment environment, Set<String> lanHosts)?
+    createRuntime,
     @visibleForTesting Future<String> Function(Uri uri)? fetch,
     this.idleTimeout = PluginCatalogSource.defaultIdleTimeout,
   }) : _createRuntime =
            createRuntime ??
-           ((environment) => PluginRuntime(environment: environment)),
+           ((environment, lanHosts) => PluginRuntime(
+             environment: environment,
+             http: PluginHttpClient(policy: policy.allowingLanHosts(lanHosts)),
+           )),
        // ignore: prefer_initializing_formals
        _fetchOverride = fetch,
        // ignore: prefer_initializing_formals
@@ -45,7 +50,8 @@ final class PluginRepository {
 
   /// Plugin code is fetched over https from public hosts only, on every
   /// redirect hop too: a plain-http or LAN source could hand us any script.
-  /// Plugin stream URLs are held to the same public-hosts rule.
+  /// A plugin's requests and stream URLs are held to the same public-hosts
+  /// rule, except for the LAN servers the user entered in its settings.
   final EgressPolicy policy;
 
   /// The loopback proxy every plugin source relays its streams through. It
@@ -62,8 +68,13 @@ final class PluginRepository {
   /// Where plugins are stored; defaults to `<appSupport>/plugins`.
   final Future<Directory> Function()? _pluginsDirectory;
 
-  /// Starts an engine that tells the plugin about [PluginEnvironment].
-  final PluginRuntime Function(PluginEnvironment environment) _createRuntime;
+  /// Starts an engine that tells the plugin about [PluginEnvironment] and may
+  /// reach the LAN servers in the set (see [EgressPolicy.allowingLanHosts]).
+  final PluginRuntime Function(
+    PluginEnvironment environment,
+    Set<String> lanHosts,
+  )
+  _createRuntime;
 
   /// Replaces the download in tests; the https rule still applies.
   final Future<String> Function(Uri uri)? _fetchOverride;
@@ -146,7 +157,7 @@ final class PluginRepository {
     String? id,
     bool enabled = true,
   }) async {
-    final runtime = _createRuntime(PluginEnvironment.current());
+    final runtime = _createRuntime(PluginEnvironment.current(), const {});
     try {
       await runtime.load(source);
     } catch (error) {
@@ -176,20 +187,37 @@ final class PluginRepository {
       variables: PluginVariable.listFrom(runtime.declaredVariables()),
     );
     runtime.dispose();
-    final directory = await _store(manifest, source);
+    final directory = await _store(
+      manifest,
+      source,
+      keepFiles: await _isSameSource(manifest.id, origin),
+    );
     return _lazySource(manifest, File('${directory.path}/plugin.js'));
+  }
+
+  /// Whether the plugin installed as [id] came from [origin]. Only then does
+  /// a new script take over the files stored beside it (the user's settings):
+  /// another plugin that merely names itself the same must not get them.
+  Future<bool> _isSameSource(String id, Uri origin) async {
+    final installed = (await _storedManifest(id))?.srcUrl;
+    return installed != null && _normalize(installed) == origin;
   }
 
   PluginCatalogSource _lazySource(PluginManifest manifest, File script) =>
       PluginCatalogSource.lazy(
         manifest: manifest,
         functions: (manifest.functions ?? const []).toSet(),
-        loadRuntime: () async => _startRuntime(
-          await script.readAsString(),
-          userVariables: await variables(manifest.id),
-        ),
+        loadRuntime: () async {
+          final settings = await _settingsOf(manifest);
+          return _startRuntime(
+            await script.readAsString(),
+            userVariables: settings.values,
+            lanHosts: settings.lanHosts,
+          );
+        },
         proxy: streamProxy,
         policy: policy,
+        lanHosts: () async => (await _settingsOf(manifest)).lanHosts,
         idleTimeout: idleTimeout,
       );
 
@@ -276,6 +304,24 @@ final class PluginRepository {
     }
   }
 
+  /// The user's values for the settings [manifest] declares now (a value of
+  /// a setting an update dropped is left out), and the LAN servers they name:
+  /// only addresses in settings that are not secret count.
+  Future<({Map<String, String> values, Set<String> lanHosts})> _settingsOf(
+    PluginManifest manifest,
+  ) async {
+    final stored = await variables(manifest.id);
+    final values = {
+      for (final variable in manifest.variables)
+        variable.key: ?stored[variable.key],
+    };
+    final lanHosts = EgressPolicy.lanHostsIn([
+      for (final variable in manifest.variables)
+        if (!variable.isSecret) ?values[variable.key],
+    ]);
+    return (values: values, lanHosts: lanHosts);
+  }
+
   /// The values the user entered for plugin [id]'s settings.
   Future<Map<String, String>> variables(String id) async {
     final file = File('${(await _pluginsDir()).path}/$id/$_variablesFile');
@@ -360,9 +406,11 @@ final class PluginRepository {
   Future<PluginRuntime> _startRuntime(
     String script, {
     Map<String, String> userVariables = const {},
+    Set<String> lanHosts = const {},
   }) async {
     final runtime = _createRuntime(
       PluginEnvironment.current(userVariables: userVariables),
+      lanHosts,
     );
     try {
       await runtime.load(script);
@@ -374,15 +422,19 @@ final class PluginRepository {
   }
 
   /// Writes the plugin to a staging directory, along with the other files
-  /// the installed version keeps beside it, then swaps it in.
-  Future<Directory> _store(PluginManifest manifest, String source) async {
+  /// the installed version keeps beside it when [keepFiles], then swaps it in.
+  Future<Directory> _store(
+    PluginManifest manifest,
+    String source, {
+    required bool keepFiles,
+  }) async {
     final root = (await _pluginsDir()).path;
     final dir = Directory('$root/${manifest.id}');
     final staging = Directory('${dir.path}$_staging');
     final previous = Directory('${dir.path}$_previous');
     if (await staging.exists()) await staging.delete(recursive: true);
     await staging.create(recursive: true);
-    if (await dir.exists()) {
+    if (keepFiles && await dir.exists()) {
       for (final entry in await dir.list().toList()) {
         final name = _nameOf(entry);
         if (entry is File && name != 'plugin.js' && name != 'manifest.json') {
