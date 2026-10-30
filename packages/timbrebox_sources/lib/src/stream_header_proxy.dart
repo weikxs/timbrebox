@@ -28,10 +28,11 @@ final class StreamHeaderProxy {
 
   HttpServer? _server;
 
-  /// One upstream client for the proxy's lifetime, so window after window
-  /// (and seek after seek) reuses keep-alive connections. The policy is
-  /// attached to it, so every new connection and redirect hop is vetted.
-  HttpClient? _client;
+  /// Upstream clients for the proxy's lifetime, so window after window (and
+  /// seek after seek) reuses keep-alive connections; one per policy, by its
+  /// entered LAN hosts. The policy is attached to each, so every new
+  /// connection and redirect hop is vetted.
+  final _clients = <String, HttpClient>{};
   final _entries = <String, _ProxyTarget>{};
   final _random = Random.secure();
 
@@ -45,17 +46,28 @@ final class StreamHeaderProxy {
   /// small window is plenty; older tokens are evicted to bound memory.
   static const _maxEntries = 8;
 
+  ///
+  /// A stream from a LAN server the user entered for its plugin is published
+  /// with that plugin's [policy] (see [EgressPolicy.allowingLanHosts]); its
+  /// hops are then vetted against it instead of the proxy's own policy.
   Future<Uri> publish(
     Uri upstream,
     Map<String, String> headers, {
     bool chunked = false,
+    EgressPolicy? policy,
   }) async {
     final server = await _ensureStarted();
     final token = _newToken();
-    _entries[token] = _ProxyTarget(upstream, headers, chunked);
+    _entries[token] = _ProxyTarget(
+      upstream,
+      headers,
+      chunked,
+      policy?.lanHosts.isNotEmpty == true ? policy! : this.policy,
+    );
     while (_entries.length > _maxEntries) {
       _entries.remove(_entries.keys.first); // insertion order = oldest first
     }
+    _dropUnusedClients();
     return Uri.parse('http://127.0.0.1:${server.port}/s/$token');
   }
 
@@ -88,7 +100,7 @@ final class StreamHeaderProxy {
       await req.response.close();
       return;
     }
-    final client = _upstreamClient();
+    final client = _upstreamClient(target.policy);
     try {
       if (target.chunked) {
         final total = _totalBytes(target.upstream);
@@ -112,14 +124,34 @@ final class StreamHeaderProxy {
     }
   }
 
-  HttpClient _upstreamClient() {
-    final existing = _client;
+  /// How many upstream clients are open (one per policy in use).
+  int get upstreamClientCount => _clients.length;
+
+  /// Closes the clients of policies no published stream uses any more (the
+  /// user changed a plugin's settings), letting their transfers finish.
+  void _dropUnusedClients() {
+    final used = {for (final target in _entries.values) _keyOf(target.policy)};
+    _clients.removeWhere((key, client) {
+      if (used.contains(key)) return false;
+      client.close();
+      return true;
+    });
+  }
+
+  static String _keyOf(EgressPolicy policy) =>
+      (policy.lanHosts.toList()..sort()).join(' ');
+
+  /// One pooled client per set of entered LAN hosts (the proxy's own policy
+  /// has none), each vetting every hop against its policy.
+  HttpClient _upstreamClient(EgressPolicy policy) {
+    final key = _keyOf(policy);
+    final existing = _clients[key];
     if (existing != null) return existing;
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 15)
       ..idleTimeout = pooledIdleTimeout;
     policy.attach(client);
-    return _client = client;
+    return _clients[key] = client;
   }
 
   /// Simple mode: forward one request to upstream with headers injected and the
@@ -247,18 +279,21 @@ final class StreamHeaderProxy {
   Future<void> dispose() async {
     await _server?.close(force: true);
     _server = null;
-    _client?.close(force: true);
-    _client = null;
+    for (final client in _clients.values) {
+      client.close(force: true);
+    }
+    _clients.clear();
     _entries.clear();
   }
 }
 
 final class _ProxyTarget {
-  const _ProxyTarget(this.upstream, this.headers, this.chunked);
+  const _ProxyTarget(this.upstream, this.headers, this.chunked, this.policy);
 
   final Uri upstream;
   final Map<String, String> headers;
   final bool chunked;
+  final EgressPolicy policy;
 }
 
 final class _Range {

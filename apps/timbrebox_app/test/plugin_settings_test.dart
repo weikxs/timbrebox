@@ -109,6 +109,45 @@ void main() {
     }
   });
 
+  test(
+    'another plugin taking the same name does not get the settings',
+    () async {
+      final plugins = repository();
+      final first = await plugins.installSource(
+        _script,
+        Uri.parse('https://plugins.example/home.js'),
+      );
+      first.dispose();
+      await plugins.saveVariables(first.manifest, {'password': 'demo'});
+
+      final other = await plugins.installSource(
+        _script.replaceFirst("srcUrl: 'https://plugins.example/home.js',", ''),
+        Uri.parse('https://elsewhere.example/home.js'),
+      );
+      other.dispose();
+
+      expect(other.manifest.id, first.manifest.id);
+      expect(await plugins.variables(first.manifest.id), isEmpty);
+    },
+  );
+
+  test('reinstalling from the same address keeps the settings', () async {
+    final plugins = repository();
+    final first = await plugins.installSource(
+      _script,
+      Uri.parse('https://plugins.example/home.js'),
+    );
+    first.dispose();
+    await plugins.saveVariables(first.manifest, {'password': 'demo'});
+
+    (await plugins.installSource(
+      _script,
+      Uri.parse('https://plugins.example/home.js'),
+    )).dispose();
+
+    expect(await plugins.variables(first.manifest.id), {'password': 'demo'});
+  });
+
   test('a plugin reads its settings, and a change reaches it', () async {
     final plugins = repository();
     final installed = await plugins.installSource(

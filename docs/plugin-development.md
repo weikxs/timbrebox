@@ -107,6 +107,16 @@ Plugins are treated as **untrusted code**. The design assumptions:
     request body.
   - Responses are capped (**8 MB** for plugin requests; installs cap the script
     at **6 MB**) and each request has a **20-second** transport timeout.
+  - **A server on the user's home network** is reached only when the user
+    entered its address in the plugin's settings (`userVariables`): an
+    `http(s)` address there whose host is an IP address in a private LAN range
+    (10/8, 172.16/12, 192.168/16, 100.64/10, IPv6 unique local) or a `.local`
+    name may be reached on that port. A domain name never leads into the LAN
+    (whoever controls its DNS could point it at any device), and settings that
+    hold secrets (passwords, tokens) never count. That applies to that
+    plugin's requests and stream URLs only. The local machine (`localhost`, loopback),
+    link-local addresses and every LAN host the user did not enter stay
+    blocked, also on redirects.
 - **Isolation:** each plugin runs in its own runtime; a crash or exception in one
   plugin does not affect others or the app.
 - **User consent on install:** installing shows a confirmation dialog
@@ -116,7 +126,8 @@ Plugins are treated as **untrusted code**. The design assumptions:
 > Because all traffic is proxied through the host with your device's IP,
 > **install only sources you trust.** A malicious plugin can still exfiltrate the
 > queries you type or fetch tracking URLs — it just cannot touch your machine,
-> your LAN, or the filesystem.
+> the filesystem, or any device on your LAN other than the servers you entered
+> in its settings.
 
 ---
 
@@ -260,9 +271,10 @@ async function getMediaSource(musicItem, quality) {
   egress policy. `userAgent` is merged into the headers as `User-Agent`.
 - MIME type is inferred from the URL extension (`.m4a`/`.mp4`, `.mp3`, `.flac`,
   `.ogg`); include a recognizable extension when you can.
-- **The `url` must be a public `http(s)` URL.** It goes through the same egress
-  policy before anything plays, proxies or downloads it; `file://` and
-  local/LAN addresses are refused.
+- **The `url` must be a public `http(s)` URL**, or one on a LAN server the user
+  entered in the plugin's settings. It goes through the same egress policy
+  before anything plays, proxies or downloads it; `file://`, the local machine
+  and other LAN addresses are refused.
 
 ### `getTopLists() -> [ { title, data } ]`
 
@@ -594,7 +606,7 @@ present, it will work; unsupported hooks are simply ignored.
 | **"插件请求了不允许的模块：X"** | You `require`'d something outside the whitelist (`axios`, `crypto-js`, `cheerio`, `he`, `dayjs`, `qs`, `big-integer`). Node builtins (`fs`, `crypto`, `http`, `buffer`) are not available. |
 | **`cheerio`-style / `require` errors at runtime** | Ensure you `require('cheerio')` (bundled) and feed it `res.data` **as text** — set `responseType: 'text'` so the body isn't JSON-parsed into an object. |
 | **"插件未返回可播放的地址"** | `getMediaSource` returned no object, or no non-empty `url`, at any of the four probed qualities. Verify the media API is reachable (see geo-blocking) and that you return `{ url }`. Return `null` at a quality to let TimbreBox try the next. |
-| **"出于安全，禁止访问本机或内网地址：…" / "出于安全，不允许使用该协议：…"** (English UI: "Blocked for safety: …") | The egress policy blocked the request or the returned stream `url`: an internal/LAN/loopback host (also one a public name resolves to), a non-http(s) scheme, or a **redirect to an internal address**. Point the plugin at a public https endpoint. |
+| **"出于安全，禁止访问本机或内网地址：…" / "出于安全，不允许使用该协议：…"** (English UI: "Blocked for safety: …") | The egress policy blocked the request or the returned stream `url`: an internal/LAN/loopback host (also one a public name resolves to), a non-http(s) scheme, or a **redirect to an internal address**. Point the plugin at a public https endpoint, or, for a server on the home network, enter its address in the plugin's settings. |
 | **"曲目信息已过期，请重新搜索"** | Playback was attempted for an item TimbreBox no longer has in memory (e.g. after a reload). Re-run the search so the full `MusicItem` is re-cached. |
 | **Request "timed out" / hangs** | Requests have a 20s transport cap and each function call a 25s cap; responses over 8 MB are rejected. Avoid downloading large bodies inside the plugin. |
 | **Search returns nothing but no error** | `search` returned a non-object, `data` wasn't an array, or every item was missing an `id`/`title`. Every item needs a non-empty `id` **and** `title`. |
