@@ -166,13 +166,15 @@ extension AppControllerSearch on AppController {
     }
   }
 
-  /// Loads a hot-library category's playlist on demand. A category is either an
-  /// Audius genre (real genre trending) or a plugin's chart. Cached after the
-  /// first load.
+  /// Loads a hot-library category's playlist on demand. A category is an
+  /// Audius genre (real genre trending), a plugin's chart, or a region's most
+  /// voted radio stations ([radioCountry] a country code, empty for
+  /// worldwide). Cached after the first load.
   Future<void> loadCategory(
     String key, {
     String? audiusGenre,
     PluginTopListItem? pluginTopList,
+    String? radioCountry,
     bool force = false,
   }) async {
     if (!force && _categoryTracks.containsKey(key)) return;
@@ -193,6 +195,11 @@ extension AppControllerSearch on AppController {
       } else if (audiusGenre != null && catalog is ChartMusicCatalog) {
         tracks = await (catalog as ChartMusicCatalog).trendingByGenre(
           audiusGenre,
+          cancellation: cancellation,
+        );
+      } else if (radioCountry != null && catalog is ChartMusicCatalog) {
+        tracks = await (catalog as ChartMusicCatalog).topStations(
+          countryCode: radioCountry,
           cancellation: cancellation,
         );
       }

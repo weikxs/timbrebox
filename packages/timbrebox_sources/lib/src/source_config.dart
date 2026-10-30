@@ -76,6 +76,7 @@ final class BuiltInSourceConfig {
     host: 'de1.api.radio-browser.info',
     paths: {
       'search': '/json/stations/byname/{query}',
+      'top': '/json/stations/search',
       'station': '/json/stations/byuuid/{id}',
     },
   );

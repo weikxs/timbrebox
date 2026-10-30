@@ -176,6 +176,38 @@ class RadioBrowserCatalogSource implements CatalogSource {
     return SearchPage(items: [for (final entry in data) ?_summaryFrom(entry)]);
   }
 
+  /// The most voted working stations of a region (a country code), or
+  /// worldwide without one, for the hot library.
+  Future<List<TrackSummary>> topStations(
+    CancellationToken cancellation, {
+    String? countryCode,
+    int limit = BuiltInSourceConfig.pageSize,
+  }) async {
+    final uri = BuiltInSourceConfig.radioBrowser.uri(
+      'top',
+      query: {
+        if (countryCode != null && countryCode.isNotEmpty)
+          'countrycode': countryCode,
+        'hidebroken': 'true',
+        'order': 'votes',
+        'reverse': 'true',
+        'limit': '$limit',
+      },
+    );
+    final data = _decodeJson(
+      await _readJson(uri, cancellation),
+      message: SourceStrings.t('source.radio.badResponse'),
+    );
+    if (data is! List) {
+      throw SourceException(
+        SourceStrings.t('source.radio.badResponse'),
+        retryable: true,
+        code: 'invalid_catalog_response',
+      );
+    }
+    return [for (final entry in data) ?_summaryFrom(entry)];
+  }
+
   @override
   CatalogTrack toCatalogTrack(TrackSummary summary) {
     if (!_streams.containsKey(summary.ref.itemId)) {

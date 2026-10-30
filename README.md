@@ -88,7 +88,7 @@ A uniform `MusicSource` / `CatalogSource` contract normalizes every source into 
 | Audius | `audius` | Open music network; also powers real trending in the hot library. |
 | Openverse | `openverse` | Openly licensed music from Jamendo, Freesound, Wikimedia Commons and ccMixter; each track shows its licence (for example CC BY 4.0). No account; anonymous use allows 20 results a page, 12 pages deep and about 200 requests a day. |
 | Internet Archive | `internet_archive` | Public audio search (`mediatype:audio`), resolved at play time. |
-| Radio Browser | `radio_browser` | Global live-radio directory (discovery only, not part of song fan-out search). |
+| Radio Browser | `radio_browser` | Global live-radio directory (discovery only, not part of song fan-out search); also powers Chinese radio in the hot library. |
 
 Video and streaming platforms (YouTube, Bilibili, Douyin, TikTok and others) are not built in. Tracks you saved from them before stay in your library and explain, when played, that a plugin can add their source back.
 
@@ -100,6 +100,7 @@ Video and streaming platforms (YouTube, Bilibili, Douyin, TikTok and others) are
 
 ### Hot library (discovery)
 - Genre / trending playlists backed by real source data (Audius trending, by genre).
+- Chinese radio: the most voted working stations of mainland China, Taiwan and Hong Kong, and worldwide (Radio Browser).
 - Static, versioned chart definitions as a graceful fallback when dynamic charts are unavailable.
 - Plugin-provided charts via `getTopLists` / `getTopListDetail` surfaced as `PluginTopListItem`.
 
