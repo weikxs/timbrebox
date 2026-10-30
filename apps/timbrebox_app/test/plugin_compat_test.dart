@@ -7,8 +7,8 @@ import 'package:timbrebox_app/app/plugins/plugin_environment.dart';
 import 'package:timbrebox_app/app/plugins/plugin_http.dart';
 import 'package:timbrebox_app/app/plugins/plugin_runtime.dart';
 
-/// Plugins written for other players in the same format run unchanged: the
-/// module shapes, globals and axios usage they rely on are provided.
+/// The plugin format's module shapes, globals and axios usage, as plugins
+/// rely on them.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -89,18 +89,16 @@ module.exports = {
       expect(runtime.meta('platform'), 'Plain');
     });
 
-    test('__plugin_require is the same whitelist as require', () async {
+    test('require resolves the whitelist and refuses anything else', () async {
       expect(
         await run(
-          "return typeof __plugin_require('cheerio').load;",
+          "return typeof require('cheerio').load;",
           setup: "const c = require('cheerio');",
         ),
         'function',
       );
       expect(
-        await run(
-          "try { __plugin_require('fs'); } catch (e) { return 'refused'; }",
-        ),
+        await run("try { require('fs'); } catch (e) { return 'refused'; }"),
         'refused',
       );
     });
