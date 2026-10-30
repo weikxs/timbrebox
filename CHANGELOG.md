@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The hot library has Chinese radio: the most voted working stations of mainland China, Taiwan and Hong Kong, and
+  the top stations worldwide, from Radio Browser, one tap away without searching.
 - Openverse is built in: openly licensed music from Jamendo, Freesound, Wikimedia Commons and ccMixter, searched
   without an account. Each track shows its licence (CC BY 4.0, CC0, public domain and so on); mature tracks and
   audio not served over HTTPS are left out. A source that answers "too many requests" now says so.

@@ -14,14 +14,15 @@ const _indigo = Color(0xff8b7bff);
 const _magenta = Color(0xffc06bff);
 const _cyan = Color(0xff5cd0ff);
 
-/// A hot-library category = a playlist. It resolves either to an Audius genre
-/// (real genre trending) or to a plugin's chart.
+/// A hot-library category = a playlist. It resolves to an Audius genre (real
+/// genre trending), a plugin's chart, or a region's top radio stations.
 class _Category {
   const _Category(
     this.key,
     this.label, {
     this.localized = false,
     this.audiusGenre,
+    this.radioCountry,
     this.pluginRef,
     this.pluginSourceName,
     required this.gradient,
@@ -33,6 +34,9 @@ class _Category {
   final String label;
   final bool localized;
   final String? audiusGenre;
+
+  /// The country code of a radio category; empty for worldwide.
+  final String? radioCountry;
   final PluginTopListItem? pluginRef;
   final String? pluginSourceName;
   final List<Color> gradient;
@@ -41,6 +45,8 @@ class _Category {
 
   String get source => pluginRef != null
       ? (pluginSourceName ?? AppStrings.t('hot.plugin'))
+      : radioCountry != null
+      ? 'Radio Browser'
       : 'Audius';
 }
 
@@ -123,6 +129,37 @@ const _audiusCategories = <_Category>[
   ),
 ];
 
+const _radioCategories = <_Category>[
+  _Category(
+    'radio_cn',
+    'hot.radio.cn',
+    localized: true,
+    radioCountry: 'CN',
+    gradient: [Color(0xffe52d27), Color(0xffb31217)],
+  ),
+  _Category(
+    'radio_tw',
+    'hot.radio.tw',
+    localized: true,
+    radioCountry: 'TW',
+    gradient: [Color(0xff1d976c), Color(0xff93f9b9)],
+  ),
+  _Category(
+    'radio_hk',
+    'hot.radio.hk',
+    localized: true,
+    radioCountry: 'HK',
+    gradient: [Color(0xffda4453), Color(0xff89216b)],
+  ),
+  _Category(
+    'radio_world',
+    'hot.radio.world',
+    localized: true,
+    radioCountry: '',
+    gradient: [Color(0xff2193b0), Color(0xff6dd5ed)],
+  ),
+];
+
 Color _sourceColor(String sourceId) => switch (sourceId) {
   'audius' => _magenta,
   'openverse' => const Color(0xff2ec4b6),
@@ -159,6 +196,7 @@ class _HotViewState extends State<HotView> {
       category.key,
       audiusGenre: category.audiusGenre,
       pluginTopList: category.pluginRef,
+      radioCountry: category.radioCountry,
     );
   }
 
@@ -236,6 +274,10 @@ class _CategoryGrid extends StatelessWidget {
         _GroupLabel(AppStrings.t('hot.genresGroup'), color: _magenta),
         const SizedBox(height: 12),
         _Tiles(categories: _audiusCategories, onOpen: onOpen),
+        const SizedBox(height: 26),
+        _GroupLabel(AppStrings.t('hot.radioGroup'), color: _cyan),
+        const SizedBox(height: 12),
+        _Tiles(categories: _radioCategories, onOpen: onOpen),
         if (pluginCats.isNotEmpty ||
             controller.pluginTopListFailures.isNotEmpty) ...[
           const SizedBox(height: 26),
@@ -460,6 +502,7 @@ class _Playlist extends StatelessWidget {
               category.key,
               audiusGenre: category.audiusGenre,
               pluginTopList: category.pluginRef,
+              radioCountry: category.radioCountry,
               force: true,
             ),
           )
