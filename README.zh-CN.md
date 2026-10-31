@@ -199,6 +199,29 @@ curl -fsSL https://raw.githubusercontent.com/weikxs/timbrebox/main/install.sh | 
 | `--dir <folder>` | macOS：`TimbreBox.app` 的安装位置；`.tar.gz`：`timbrebox-app` 的位置 |
 | `--no-modify-path` | `.tar.gz`：不把该目录加入 shell 的 `PATH` |
 
+### Windows，全自动安装
+
+在 PowerShell 中运行：
+
+```powershell
+irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1 | iex
+```
+
+脚本会下载 Windows 安装包，用发布中的 `checksums.txt` 校验，把 TimbreBox 放进
+`%LOCALAPPDATA%\Programs\TimbreBox`，并添加到开始菜单。不需要管理员权限，不改动其他任何东西；Arm 版
+Windows 11 通过系统自带的 x64 模拟运行。再运行一次即可升级。带选项运行，比如安装指定版本：
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1))) -Version v0.1.0
+```
+
+| 选项 | 含义 |
+|---|---|
+| `-Version <tag>` | 安装这个版本，而不是最新版 |
+| `-Dir <文件夹>` | TimbreBox 的安装位置 |
+| `-NoShortcut` | 不添加到开始菜单 |
+| `-Uninstall` | 卸载 TimbreBox 并移除开始菜单项 |
+
 ### Homebrew（macOS）
 
 ```sh
@@ -233,6 +256,7 @@ macOS 应用没有经过 Apple 签名或公证，也不打算签名。安装脚�
 | Homebrew | `brew uninstall --cask timbrebox` |
 | `.deb` | `sudo apt remove timbrebox` |
 | `.tar.gz`（用安装脚本安装） | `rm -r ~/.local/share/timbrebox ~/.local/bin/timbrebox-app ~/.local/share/applications/timbrebox.desktop ~/.local/share/icons/hicolor/512x512/apps/timbrebox.png` |
+| 安装脚本（Windows） | 退出 TimbreBox，然后带 `-Uninstall` 运行脚本：`& ([scriptblock]::Create((irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1))) -Uninstall` |
 | `.zip`（Windows） | 删除解压出的 `TimbreBox` 文件夹 |
 
 卸载不会动你的收藏、歌单、下载和设置：它们保存在应用自己的目录里。
