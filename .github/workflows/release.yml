@@ -149,20 +149,10 @@ jobs:
           for mode in ${{ matrix.modes }}; do
             scripts/release/verify-install.sh "$GITHUB_REF_NAME" dist "$mode"
           done
-      - name: Unzip and start the app
+      - name: Install with install.ps1, start the app and uninstall it
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          $zip = Get-ChildItem dist -Filter 'timbrebox_*_windows_amd64.zip' | Select-Object -First 1
-          Expand-Archive $zip.FullName -DestinationPath "$env:RUNNER_TEMP\app"
-          $app = Start-Process -FilePath "$env:RUNNER_TEMP\app\TimbreBox\timbrebox_app.exe" -PassThru
-          Start-Sleep -Seconds 15
-          if ($app.HasExited) {
-            Write-Error "the app exited within 15s (exit code $($app.ExitCode))"
-            exit 1
-          }
-          Stop-Process -Id $app.Id -Force
-          Write-Output "the app started and kept running for 15s"
+        run: scripts/release/verify-install.ps1 -Tag "$env:GITHUB_REF_NAME" -Dist dist
 
   publish:
     name: publish the GitHub release

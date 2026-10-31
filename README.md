@@ -201,6 +201,30 @@ Run it again to upgrade. Options go after `sh -s --`, for example `sh -s -- --ve
 | `--dir <folder>` | macOS: where `TimbreBox.app` goes; `.tar.gz`: where `timbrebox-app` goes |
 | `--no-modify-path` | `.tar.gz`: do not add the folder to your shell's `PATH` |
 
+### Windows, fully automatic
+
+In PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1 | iex
+```
+
+The script downloads the Windows package, checks it against the release's `checksums.txt`, puts TimbreBox into
+`%LOCALAPPDATA%\Programs\TimbreBox` and adds it to the Start menu. It needs no administrator rights and changes
+nothing else; Windows 11 on Arm runs it through its x64 emulation. Run it again to upgrade. Options, for example
+a given release:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1))) -Version v0.1.0
+```
+
+| Option | Meaning |
+|---|---|
+| `-Version <tag>` | install this release instead of the latest |
+| `-Dir <folder>` | where TimbreBox goes |
+| `-NoShortcut` | do not add TimbreBox to the Start menu |
+| `-Uninstall` | remove TimbreBox and its Start menu entry |
+
 ### Homebrew (macOS)
 
 ```sh
@@ -236,6 +260,7 @@ stops it, choose **More info** → **Run anyway**. Details in [SECURITY.md](SECU
 | Homebrew | `brew uninstall --cask timbrebox` |
 | `.deb` | `sudo apt remove timbrebox` |
 | `.tar.gz` (with the script) | `rm -r ~/.local/share/timbrebox ~/.local/bin/timbrebox-app ~/.local/share/applications/timbrebox.desktop ~/.local/share/icons/hicolor/512x512/apps/timbrebox.png` |
+| The script (Windows) | Quit TimbreBox, then run the script with `-Uninstall`: `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1))) -Uninstall` |
 | `.zip` (Windows) | Delete the unzipped `TimbreBox` folder |
 
 Uninstalling never touches your favorites, playlists, downloads or settings: they stay in the app's own folder.
