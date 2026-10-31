@@ -39,6 +39,7 @@ part 'app_controller_appearance.dart';
 part 'app_controller_session.dart';
 part 'app_controller_settings.dart';
 part 'app_controller_system.dart';
+part 'app_controller_playback_status.dart';
 
 class AppController extends ChangeNotifier {
   AppController({

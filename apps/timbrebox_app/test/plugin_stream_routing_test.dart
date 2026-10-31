@@ -43,6 +43,7 @@ void main() {
   Future<PluginCatalogSource> source(
     String streamUrl, {
     StreamHeaderProxy? proxy,
+    String? mimeType,
   }) async {
     final runtime = PluginRuntime();
     await runtime.load('''
@@ -51,7 +52,7 @@ module.exports = {
   search: async function () {
     return { isEnd: true, data: [{ id: 'x', title: 'Song' }] };
   },
-  getMediaSource: async function () { return { url: '$streamUrl' }; },
+  getMediaSource: async function () { return { url: '$streamUrl', mimeType: ${jsonEncode(mimeType)} }; },
 };
 ''');
     final plugin = PluginCatalogSource(
@@ -87,6 +88,39 @@ module.exports = {
     expect(stream.uri.host, '127.0.0.1');
     expect(stream.uri.path, startsWith('/s/'));
     expect(stream.mimeType, 'audio/mpeg');
+  });
+
+  test(
+    'an allowed declared MIME supports extensionless audio streams',
+    () async {
+      final plugin = await source(
+        'https://93.184.216.34/audio?id=demo',
+        mimeType: 'audio/webm',
+      );
+      addTearDown(plugin.dispose);
+      expect((await resolve(plugin)).mimeType, 'audio/webm');
+    },
+  );
+
+  test(
+    'audio playback preserves an explicitly declared video container MIME',
+    () async {
+      final plugin = await source(
+        'https://93.184.216.34/media?id=demo',
+        mimeType: 'video/mp4',
+      );
+      addTearDown(plugin.dispose);
+      expect((await resolve(plugin)).mimeType, 'video/mp4');
+    },
+  );
+
+  test('untrusted MIME values do not override the safe inference', () async {
+    final plugin = await source(
+      'https://93.184.216.34/audio.mp3',
+      mimeType: 'text/html',
+    );
+    addTearDown(plugin.dispose);
+    expect((await resolve(plugin)).mimeType, 'audio/mpeg');
   });
 
   test('updating a plugin keeps its playing stream alive', () async {

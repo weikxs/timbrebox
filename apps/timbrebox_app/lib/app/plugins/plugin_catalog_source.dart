@@ -142,12 +142,18 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
   );
 
   /// Calls a plugin function, starting the runtime first if needed.
-  Future<Object?> _call(String function, List<Object?> args) async {
+  Future<Object?> _call(
+    String function,
+    List<Object?> args, {
+    CancellationToken? cancellation,
+  }) async {
+    cancellation?.throwIfCancelled();
     _idleTimer?.cancel();
     _activeCalls++;
     try {
       final runtime = await _started();
-      return await runtime.call(function, args);
+      cancellation?.throwIfCancelled();
+      return await runtime.call(function, args, cancellation: cancellation);
     } on PluginScriptTimeout {
       // A script stopped mid-run may have left the engine in any state:
       // the next call starts a fresh one.
@@ -210,12 +216,18 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
   Future<SearchPage> search(SearchRequest request) async {
     final Object? raw;
     try {
-      raw = await _call('search', [request.query, request.page, 'music']);
+      raw = await _call('search', [
+        request.query,
+        request.page,
+        'music',
+      ], cancellation: request.cancellation);
+    } on OperationCancelled {
+      rethrow;
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.searchFailed').replaceFirst('{e}', '$error'),
-        retryable: true,
-        code: 'plugin_error',
+        retryable: _retryable(error),
+        code: _errorCode(error),
       );
     }
     if (raw is! Map) return const SearchPage(items: []);
@@ -242,7 +254,9 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     sourceName: descriptor.name,
     duration: summary.duration ?? Duration.zero,
     quality: AppStrings.t(
-      'plugin.src.qualityFmt',
+      _items[summary.ref.itemId]?['contentKind'] == 'video_audio'
+          ? 'plugin.src.videoAudioFmt'
+          : 'plugin.src.qualityFmt',
     ).replaceFirst('{p}', manifest.platform),
     artworkUrl: _artwork[summary.ref.itemId],
     resolveHint: pluginResolveHint(_items[summary.ref.itemId]),
@@ -275,7 +289,10 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
       for (final quality in const ['standard', 'high', 'super', 'low']) {
         // A newer track was chosen: stop trying further qualities.
         request.cancellation.throwIfCancelled();
-        raw = await _call('getMediaSource', [item, quality]);
+        raw = await _call('getMediaSource', [
+          item,
+          quality,
+        ], cancellation: request.cancellation);
         if (raw is Map && (raw['url']?.toString().isNotEmpty ?? false)) break;
       }
     } on OperationCancelled {
@@ -283,8 +300,8 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     } catch (error) {
       throw SourceException(
         AppStrings.t('plugin.src.resolveFailed').replaceFirst('{e}', '$error'),
-        retryable: true,
-        code: 'plugin_error',
+        retryable: _retryable(error),
+        code: _errorCode(error),
       );
     }
     if (raw is! Map) {
@@ -297,6 +314,7 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     final url = raw['url']?.toString();
     final policy = _policy.allowingLanHosts(await _lanHosts());
     final parsed = await checkedPluginStreamUri(url, policy: policy);
+    request.cancellation.throwIfCancelled();
     final headers = <String, String>{};
     final rawHeaders = raw['headers'];
     if (rawHeaders is Map) {
@@ -312,8 +330,36 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     // not: it injects the headers per hop, and its client vets each redirect
     // hop against the egress policy, which libmpv opening the URL itself
     // would not.
-    final local = await _proxy.publish(parsed, headers, policy: policy);
-    return ResolvedStream(uri: local, mimeType: _mimeType(url!));
+    final rawLength = raw['contentLength'];
+    final length = rawLength is int && rawLength > 0 && rawLength < (1 << 40)
+        ? rawLength
+        : null;
+    final local = await _proxy.publish(
+      parsed,
+      headers,
+      policy: policy,
+      chunked: raw['boundedRanges'] == true && length != null,
+      contentLength: length,
+    );
+    request.cancellation.throwIfCancelled();
+    final declaredMime = raw['mimeType'];
+    final mime =
+        declaredMime is String &&
+            const {
+              'audio/mp4',
+              'audio/mpeg',
+              'audio/webm',
+              'audio/ogg',
+              'audio/flac',
+              'audio/aac',
+              // MP4/WebM video containers may supply an audio track. The
+              // shared native backend always disables video decoding/output.
+              'video/mp4',
+              'video/webm',
+            }.contains(declaredMime)
+        ? declaredMime
+        : _mimeType(url!);
+    return ResolvedStream(uri: local, mimeType: mime);
   }
 
   /// Flattens the plugin's `getTopLists` groups into a single list of charts.
@@ -398,6 +444,28 @@ final class PluginCatalogSource implements CatalogSource, HintedCatalogSource {
     final seconds = text == null ? null : num.tryParse(text);
     return seconds == null ? null : Duration(seconds: seconds.round());
   }
+
+  static String _errorCode(Object error) => error is PluginRuntimeException
+      ? error.code ?? 'plugin_error'
+      : 'plugin_error';
+
+  static bool _retryable(Object error) => !const {
+    'content_excluded',
+    'content_unverified',
+    'content_unavailable',
+    'anonymous_access_unavailable',
+    'platform_search_unavailable',
+    'guest_search_unavailable',
+    'guest_search_access_required',
+    'search_access_required',
+    'extractor_unconfigured',
+    'extractor_unavailable',
+    'extractor_start_failed',
+    'extractor_unsupported',
+    'extractor_integrity',
+    'invalid_media_request',
+    'invalid_media_reference',
+  }.contains(_errorCode(error));
 
   String? _mimeType(String url) {
     final lower = url.toLowerCase();

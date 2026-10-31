@@ -3,6 +3,8 @@
 set -euo pipefail
 
 readonly MESSAGE_FILE=$1
+root=$(git rev-parse --show-toplevel)
+python3 "$root/tools/check_repository_text.py" --root "$root" --message "$MESSAGE_FILE" --staged
 subject=$(head -n 1 "$MESSAGE_FILE")
 
 if ! grep -Eq '^(feat|fix|docs|refactor|test|chore|perf|ci|build|style|revert)(\([a-z0-9-]+\))?!?: .+' <<<"$subject"; then

@@ -7,6 +7,7 @@ class PlaybackState {
     required this.status,
     this.candidate,
     this.errorMessage,
+    this.errorCode,
   });
 
   const PlaybackState.idle() : this(status: PlaybackStatus.idle);
@@ -14,6 +15,7 @@ class PlaybackState {
   final PlaybackStatus status;
   final StreamCandidate? candidate;
   final String? errorMessage;
+  final String? errorCode;
 
   bool get isPlaying => status == PlaybackStatus.playing;
 }

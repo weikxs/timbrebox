@@ -25,6 +25,48 @@ class MiniPlayer extends StatelessWidget {
             compact: constraints.maxWidth < 560,
           ),
           PlayerProgressBar(controller: controller, showLabels: false),
+          if (controller.isLoading)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      AppStrings.t(
+                        controller.playbackDiagnostics['stage'] == 'opening'
+                            ? 'player.openingAudio'
+                            : 'player.resolvingAudio',
+                      ),
+                      key: const ValueKey('mini-player-loading'),
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (controller.playbackError case final error?)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Tooltip(
+                message: error,
+                child: Text(
+                  error,
+                  key: const ValueKey('mini-player-error'),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     ),
@@ -71,10 +113,16 @@ class _PlayerRow extends StatelessWidget {
       IconButton(
         onPressed: controller.togglePlayback,
         tooltip: AppStrings.t(
-          controller.isPlaying ? 'player.pause' : 'player.play',
+          controller.isLoading
+              ? 'player.cancelLoading'
+              : controller.isPlaying
+              ? 'player.pause'
+              : 'player.play',
         ),
         icon: Icon(
-          controller.isPlaying
+          controller.isLoading
+              ? Icons.cancel_outlined
+              : controller.isPlaying
               ? Icons.pause_circle_filled
               : Icons.play_circle_fill,
           color: TimbreColors.gold,

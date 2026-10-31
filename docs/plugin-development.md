@@ -77,8 +77,8 @@ Keep state that must survive that in the items you return, not in globals.
 Your plugin never talks to the network directly. When you call `axios(...)`, the
 shim posts the request description to the Dart host (`__hostHttp`), Dart runs
 the request **off the runtime thread** through the egress policy, then settles the
-promise (`__resolveHost`). This is the *only* capability that crosses the sandbox
-boundary.
+promise (`__resolveHost`). An optional, unconfigured-by-default desktop media RPC is also exposed;
+plugins still have no arbitrary process or filesystem access.
 
 ---
 
@@ -86,10 +86,10 @@ boundary.
 
 Plugins are treated as **untrusted code**. The design assumptions:
 
-- **Only HTTP is exposed.** No `fs`, no `process`, no raw sockets, no arbitrary
-  `require`, no timers-to-native, no access to other plugins or app state. The
-  engine's own `fetch` / `XMLHttpRequest` are removed — `axios` is the only way
-  out.
+- **General network access is HTTP; media extensions use fixed RPC operations.** No `fs`, real `process`, raw
+  sockets, arbitrary `require`, native timers, or other plugin/app data access. Built-in `fetch` and
+  `XMLHttpRequest` are removed. The optional native media tool's internal networking does not pass through
+  the Dart HTTP egress policy: it is an explicit binary/dependency trust boundary, not equivalent isolation.
 - **Egress policy** (enforced in Dart, in one place, on *every* request and
   *every* redirect hop):
   - Only `http` / `https` schemes are allowed.
@@ -269,8 +269,8 @@ async function getMediaSource(musicItem, quality) {
   and/or `userAgent` you return on every request hop (the media player cannot
   attach arbitrary headers itself) and checks every redirect hop against the
   egress policy. `userAgent` is merged into the headers as `User-Agent`.
-- MIME type is inferred from the URL extension (`.m4a`/`.mp4`, `.mp3`, `.flac`,
-  `.ogg`); include a recognizable extension when you can.
+- Optional `mimeType` accepts `audio/mp4`, `audio/mpeg`, `audio/webm`, `audio/ogg`, `audio/flac`, `audio/aac`.
+  Other values are ignored, falling back to the URL extension.
 - **The `url` must be a public `http(s)` URL**, or one on a LAN server the user
   entered in the plugin's settings. It goes through the same egress policy
   before anything plays, proxies or downloads it; `file://`, the local machine
@@ -374,15 +374,20 @@ api.interceptors.request.use(fn); api.interceptors.response.use(fn, onError);
 - **Response**: `{ data, status, statusText, headers, config }`. `data` is
   JSON-parsed when it parses; set `responseType: 'text'` (or `'arraybuffer'` /
   `'blob'`) to keep the raw text. The bridge carries text only, so binary
-  bodies arrive as a UTF-8 string.
+  bodies arrive as a UTF-8 string. `response.request.responseURL` is the final URL after the host's
+  egress-checked redirects; validate its platform/identity before importing a short link.
 - **Errors**: as in axios, a status outside 2xx **rejects** with an error that
   has `isAxiosError: true`, `code` (`ERR_BAD_REQUEST` / `ERR_BAD_RESPONSE`),
   `message` (`Request failed with status code 404`) and `response`. Pass
   `validateStatus: () => true` (or `null`) to resolve every status. A
   `timeout` that runs out rejects with `code: 'ECONNABORTED'`; a refused or
-  failed request with `code: 'ERR_NETWORK'`.
-- **Headers you set are sent as they are**, `Cookie` included; nothing is
-  stored or added between requests.
+  failed request with `code: 'ERR_NETWORK'`. Host cancellation aborts the active invocation's HTTP
+  connections and rejects with `ERR_CANCELED` (`axios.isCancel(error) === true`); a cancelled
+  continuation cannot start another request or delay the next serialized call.
+- **Headers you set are sent as they are** to the original origin, `Cookie` included; nothing is
+  stored or added between requests. On a cross-origin redirect (scheme, host or port change), only
+  `Accept`, `Accept-Language`, `User-Agent` and `Range` survive. Authentication, cookies, referrer
+  and custom headers are stripped rather than leaking source credentials to another origin.
 
 ```js
 const res = await axios.get('https://api.example.com/search', {
@@ -491,6 +496,21 @@ An **HTML-scraping** variant would instead `require('cheerio')` and parse
 `res.data` (returned as text) with `cheerio.load(html)`.
 
 ---
+
+### Optional desktop media bridge (experimental)
+
+`env.media.search(platform, query, page)` performs fixed platform searches;
+`env.media.resolve(platform, itemOrLink)` returns `{item, media}`; `env.media.source(platform)` provides the
+shared search/link-import/playback adapter. No executable paths, command switches or shell are exposed.
+
+A build must explicitly configure a local tool and SHA-256; no default execution or download. The backend is
+desktop-only; mobile reports a clear error. Only YouTube/Bilibili keyword-search backend routes are implemented;
+Douyin/TikTok search remains unavailable. Insufficient access/preview evidence blocks playback. Core wiring
+is not a claim of live four-platform support.
+
+The shared adapter imports supported links inside `search`, using the existing search box as a link entry;
+the app still has no separate UI dispatch of `importMusicItem`. See [desktop media backend](desktop-media-backend.md)
+for configuration, limitations and rollback.
 
 ## 7. Installing, Updating & Managing
 

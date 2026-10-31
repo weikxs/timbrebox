@@ -19,7 +19,8 @@ final class MediaKitBackend
         AudioBackend,
         ProgressAudioBackend,
         RateAudioBackend,
-        StartPositionAudioBackend {
+        StartPositionAudioBackend,
+        AudioFailureEvents {
   /// [createPlayer] makes the libmpv player when it is first needed.
   MediaKitBackend({Player Function()? createPlayer})
     : _createPlayer = createPlayer ?? _createLibmpvPlayer;
@@ -47,8 +48,15 @@ final class MediaKitBackend
       unawaited(_samplePositions(native, player));
     }
     _forwards.addAll([
+      player.stream.error.listen((message) {
+        if (!_sourceActive || _sourceFailed || message.trim().isEmpty) return;
+        _sourceFailed = true;
+        _failures.add(null); // Never forward raw decoder text or media URLs.
+      }),
       player.stream.position.listen(_positions.add),
-      player.stream.completed.where((done) => done).listen(_completed.add),
+      player.stream.completed
+          .where((done) => done && _sourceActive && !_sourceFailed)
+          .listen(_completed.add),
       player.stream.duration.listen(_durations.add),
       player.stream.audioDevices.listen(_audioDevices.add),
     ]);
@@ -82,6 +90,11 @@ final class MediaKitBackend
   };
 
   var _disposed = false;
+  var _sourceActive = false;
+  var _sourceFailed = false;
+  final _failures = StreamController<void>.broadcast();
+  @override
+  Stream<void> get failures => _failures.stream;
 
   /// Applied when the player starts; kept current after that as well.
   var _volume = 100.0;
@@ -160,6 +173,8 @@ final class MediaKitBackend
 
   Future<void> _open(AudioSourceSpec source, Duration? start) {
     _ensureLive();
+    _sourceActive = true;
+    _sourceFailed = false;
     return switch (source) {
       RemoteAudioSource(:final uri, :final headers) => _player.open(
         Media(
@@ -185,10 +200,13 @@ final class MediaKitBackend
   Future<void> pause() async => _started?.pause();
 
   @override
-  Future<void> stop() async => _started?.stop();
+  Future<void> stop() async {
+    _sourceActive = false;
+    await _started?.stop();
+  }
 
   @override
-  Future<void> releaseSource() async => _started?.stop();
+  Future<void> releaseSource() => stop();
 
   @override
   Future<void> setVolume(double volume) async {
@@ -209,6 +227,8 @@ final class MediaKitBackend
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _sourceActive = false;
+    await _failures.close();
     await _sampleForward?.cancel();
     _sampler?.dispose();
     for (final forward in _forwards) {

@@ -69,7 +69,7 @@ await 等待网络请求，不要忙等。
 
 你的插件从不直接与网络通信。当你调用 `axios(...)` 时，垫片把请求描述投递给 Dart
 宿主（`__hostHttp`），Dart 在**运行时线程之外**按出网策略执行该请求，然后结算
-promise（`__resolveHost`）。这是*唯一*一个跨越沙箱边界的能力。
+promise（`__resolveHost`）。另外提供默认未配置的受限桌面媒体 RPC，见下文；插件仍无任意进程或文件访问权限。
 
 ---
 
@@ -77,9 +77,7 @@ promise（`__resolveHost`）。这是*唯一*一个跨越沙箱边界的能力�
 
 插件被视为**不可信代码**。设计上的假设：
 
-- **只暴露 HTTP。** 没有 `fs`、没有 `process`、没有原始套接字、没有任意 `require`、
-  没有指向原生的定时器、无法访问其他插件或应用状态。JS 引擎自带的 `fetch` /
-  `XMLHttpRequest` 已被移除——`axios` 是唯一的出网途径。
+- **通用出网只暴露 HTTP，媒体扩展为固定 RPC。** 没有 `fs`、真实 `process`、原始套接字、任意 `require`、原生定时器或其他插件/App 数据访问。引擎的 `fetch` / `XMLHttpRequest` 已移除。可选桌面解析工具的内部网络不经过 Dart HTTP 出网策略，属于显式的二进制及依赖信任边界，不能宣称同等网络沙箱隔离。
 - **出网策略**（在 Dart 层集中实现，作用于*每一个*请求和*每一跳*重定向）：
   - 只允许 `http` / `https` 协议。
   - **内部目标被封禁**：`localhost`、`*.localhost`、`*.local`、`*.internal`，以及所有
@@ -234,8 +232,7 @@ async function getMediaSource(musicItem, quality) {
 - **所有 URL 都经由回环代理播放。** 代理会在每一跳注入你返回的 `headers` 和/或
   `userAgent`（媒体播放器自身无法附加任意请求头），并用出网策略检查每一个重定向跳转。
   `userAgent` 会作为 `User-Agent` 并入 headers。
-- MIME 类型由 URL 后缀推断（`.m4a`/`.mp4`、`.mp3`、`.flac`、`.ogg`）；尽量带上可识别
-  的后缀。
+- 可选 `mimeType` 支持 `audio/mp4`、`audio/mpeg`、`audio/webm`、`audio/ogg`、`audio/flac`、`audio/aac`；其他值忽略，并回退到 URL 后缀推断。
 - **`url` 必须是公网的 `http(s)` 地址**，或者是用户在插件设置里填写的局域网服务器上的地址。
   在播放、代理或下载之前，它会经过同样的出网策略；`file://`、本机和其他局域网地址会被拒绝。
 
@@ -334,13 +331,17 @@ api.interceptors.request.use(fn); api.interceptors.response.use(fn, onError);
   并带上 `Content-Type: application/json`（你自己设置了内容类型时除外）。
 - **响应**：`{ data, status, statusText, headers, config }`。`data` 能解析为 JSON 时会被
   解析；设置 `responseType: 'text'`（或 `'arraybuffer'` / `'blob'`）可保留原始文本。桥接只
-  传输文本，所以二进制内容会以 UTF-8 字符串到达。
+  传输文本，所以二进制内容会以 UTF-8 字符串到达。`response.request.responseURL` 是宿主逐跳出网
+  校验后的最终 URL；短链接导入前应再核对目标平台和内容标识。
 - **错误**：与 axios 一致，2xx 以外的状态码会**被拒绝（reject）**，错误对象带有
   `isAxiosError: true`、`code`（`ERR_BAD_REQUEST` / `ERR_BAD_RESPONSE`）、`message`
   （`Request failed with status code 404`）和 `response`。传入 `validateStatus: () => true`
   （或 `null`）可让所有状态码都正常返回。`timeout` 到期会以 `code: 'ECONNABORTED'` 拒绝；
-  请求被拒绝或失败则为 `code: 'ERR_NETWORK'`。
-- **你设置的请求头会原样发送**，包括 `Cookie`；请求之间不会存储或追加任何内容。
+  请求被拒绝或失败则为 `code: 'ERR_NETWORK'`。宿主取消调用时会关闭该调用的 HTTP 连接，报
+  `ERR_CANCELED`，可用 `axios.isCancel(error)` 识别；已取消的后续逻辑不能继续发请求或阻塞下一次调用。
+- **你设置的请求头会原样发送到原始源站**，包括 `Cookie`；请求之间不会存储或追加任何内容。
+  跨源重定向（协议、主机或端口变化）仅保留 `Accept`、`Accept-Language`、`User-Agent`、`Range`，
+  剥离认证、Cookie、Referer 和自定义请求头，避免向其他源泄漏凭据。
 
 ```js
 const res = await axios.get('https://api.example.com/search', {
@@ -446,6 +447,14 @@ module.exports = {
 `res.data`（以文本形式返回）。
 
 ---
+
+### 可选桌面媒体桥接（实验性）
+
+`env.media.search(platform, query, page)` 提供固定平台搜索；`env.media.resolve(platform, itemOrLink)` 返回 `{item, media}`；`env.media.source(platform)` 提供共享的搜索/链接导入/播放适配。它不提供 shell、命令参数或工具路径权限。
+
+构建时必须显式配置本地工具路径和 SHA-256；默认不执行、不下载。仅桌面后端已实现，移动端报明确错误。当前仅 YouTube/B 站接通后端关键词搜索入口；抖音/TikTok 搜索尚未实现。权限/试听证据缺失时拒绝播放，实际平台仍需验证，不能把核心接线当作四源已可用。
+
+共享适配器会在 `search` 内识别链接并导入，现有搜索框因此可以作为链接入口；App 尚无独立调用 `importMusicItem` 的 UI。更多配置、限制与回退见 [桌面媒体后端](desktop-media-backend.md)。
 
 ## 七、安装、更新与管理
 

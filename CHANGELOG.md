@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Opt-in local metadata and media bridges for plugins, with stable references, access checks,
+  bounded requests and process cleanup. Experimental paths do not install or enable plugins.
+- Isolated runtime callbacks, cancellable requests and bounded audio stream proxying.
+- Visible playback loading, cancellation and failure states, plus protected read-only diagnostics.
+  See `docs/desktop-media-backend.md` for configuration and current limitations.
 - Windows has an install script too: `irm https://raw.githubusercontent.com/weikxs/timbrebox/main/install.ps1 | iex`
   downloads the Windows package, checks it against the release's checksums, installs it for the current user
   without administrator rights and adds it to the Start menu; run it again to upgrade, or with `-Uninstall` to

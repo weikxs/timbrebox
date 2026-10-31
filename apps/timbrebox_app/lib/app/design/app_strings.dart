@@ -207,6 +207,8 @@ abstract final class AppStrings {
     'search.readyTitle': '准备搜索',
     'search.readyDetailFmt': '输入关键词，{name} 的结果会独立呈现。',
     'search.sourceUnavailableFmt': '{name} 暂时不可用',
+    'search.noMatchesTitle': '没有找到匹配内容',
+    'search.noMatchesDetail': '已启用的音源均未找到匹配内容，请换个关键词。',
     'search.noMatchFmt': '{name} 没有找到匹配内容',
     'search.noMatchDetail': '换一个关键词，或切换到其他来源继续搜索。',
     'search.allLoaded': '已加载全部结果',
@@ -539,6 +541,9 @@ abstract final class AppStrings {
     'search.readyDetailFmt':
         'Enter a keyword — {name} results appear on their own.',
     'search.sourceUnavailableFmt': '{name} is unavailable',
+    'search.noMatchesTitle': 'No matching results',
+    'search.noMatchesDetail':
+        'No enabled source found a match. Try another keyword.',
     'search.noMatchFmt': 'No matches on {name}',
     'search.noMatchDetail':
         'Try another keyword, or switch to a different source.',

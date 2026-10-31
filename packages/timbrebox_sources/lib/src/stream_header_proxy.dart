@@ -54,8 +54,17 @@ final class StreamHeaderProxy {
     Uri upstream,
     Map<String, String> headers, {
     bool chunked = false,
+    int? contentLength,
     EgressPolicy? policy,
   }) async {
+    if (contentLength != null &&
+        (contentLength <= 0 || contentLength >= (1 << 40))) {
+      throw ArgumentError.value(
+        contentLength,
+        'contentLength',
+        'Invalid stream byte length',
+      );
+    }
     final server = await _ensureStarted();
     final token = _newToken();
     _entries[token] = _ProxyTarget(
@@ -63,6 +72,7 @@ final class StreamHeaderProxy {
       headers,
       chunked,
       policy?.lanHosts.isNotEmpty == true ? policy! : this.policy,
+      contentLength,
     );
     while (_entries.length > _maxEntries) {
       _entries.remove(_entries.keys.first); // insertion order = oldest first
@@ -103,7 +113,7 @@ final class StreamHeaderProxy {
     final client = _upstreamClient(target.policy);
     try {
       if (target.chunked) {
-        final total = _totalBytes(target.upstream);
+        final total = target.contentLength ?? _totalBytes(target.upstream);
         final range = _parseRange(
           req.headers.value(HttpHeaders.rangeHeader),
           total,
@@ -206,9 +216,12 @@ final class StreamHeaderProxy {
       target.headers.forEach(upstream.headers.set);
       upstream.headers.set(HttpHeaders.rangeHeader, 'bytes=$cursor-$windowEnd');
       final upstreamResponse = await upstream.close();
-      if (upstreamResponse.statusCode != HttpStatus.partialContent &&
-          upstreamResponse.statusCode != HttpStatus.ok) {
-        if (!wroteHeaders) response.statusCode = upstreamResponse.statusCode;
+      if (upstreamResponse.statusCode != HttpStatus.partialContent) {
+        if (!wroteHeaders) {
+          response.statusCode = upstreamResponse.statusCode == HttpStatus.ok
+              ? HttpStatus.badGateway
+              : upstreamResponse.statusCode;
+        }
         await upstreamResponse.drain<void>();
         return;
       }
@@ -288,12 +301,19 @@ final class StreamHeaderProxy {
 }
 
 final class _ProxyTarget {
-  const _ProxyTarget(this.upstream, this.headers, this.chunked, this.policy);
+  const _ProxyTarget(
+    this.upstream,
+    this.headers,
+    this.chunked,
+    this.policy,
+    this.contentLength,
+  );
 
   final Uri upstream;
   final Map<String, String> headers;
   final bool chunked;
   final EgressPolicy policy;
+  final int? contentLength;
 }
 
 final class _Range {

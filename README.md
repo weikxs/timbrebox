@@ -336,9 +336,9 @@ timbrebox/
 TimbreBox supports third-party source plugins in the TimbreBox plugin format. A plugin is a single CommonJS `.js` file exporting metadata (`platform`, `version`, `srcUrl`, …) plus async functions — at minimum `search(query, page, type)` and `getMediaSource(item, quality)`, with optional `getLyric`, `getTopLists`, and `getTopListDetail`.
 
 **How it works**
-- Each plugin's JavaScript runs in a sandboxed JavaScript engine (a native JS runtime on each platform). The *only* capability injected into the sandbox is HTTP, through a pending-promise bridge — no filesystem, process, socket, or FFI access.
+- Plugin JavaScript runs in a sandbox with a host HTTP bridge and an optional fixed desktop media RPC. No arbitrary filesystem, process, socket or FFI access is exposed. The media backend is disabled unless the build configures a reviewed local tool and checksum; its internal networking is a separate trust boundary.
 - A whitelisted `require` exposes a small set of bundled, pure-JS modules — an HTTP client shim, `crypto-js`, `cheerio`, `he`, `dayjs`, `qs`, and `big-integer`; anything else throws.
-- Outbound requests are governed at the Dart layer (public hosts only, checked after DNS resolution and on every redirect hop; size / redirect / timeout caps; plugins are installed over HTTPS only). Streams that need custom headers are routed through `StreamHeaderProxy` so the audio engine can play them.
+- Plugin HTTP-bridge requests are governed at the Dart layer (public hosts only, checked after DNS resolution and on every redirect hop; size / redirect / timeout caps; plugins are installed over HTTPS only). Streams that need custom headers are routed through `StreamHeaderProxy` so the audio engine can play them.
 
 **Installing a plugin**
 - In the app, paste a raw `.js` plugin URL (or a subscription JSON `{ desc, plugins: [...] }`). A repository `blob` URL is automatically rewritten to its raw form.
@@ -347,7 +347,7 @@ TimbreBox supports third-party source plugins in the TimbreBox plugin format. A 
 
 Plugin authoring and the full sandbox/security model are documented in [`docs/plugin-development.md`](./docs/plugin-development.md).
 
-> Security: on every platform a plugin runs in its own sandboxed engine with HTTP as its only capability, a time limit on each run (not yet on Windows), and an explicit consent step before install.
+> Security: plugins run in sandboxed engines with bounded host bridges, a script time limit (not yet on Windows), and explicit install consent. The optional desktop media backend and its limitations are documented [here](docs/desktop-media-backend.md); it does not establish release readiness for an integration.
 
 ## Configuration & Permissions
 
@@ -381,7 +381,7 @@ See [`AGENTS.md`](./AGENTS.md) and [`docs/DESIGN.md`](./docs/DESIGN.md). Core ru
 - **Immutable data** — UI renders immutable state; `PlaybackState` is projected immutably.
 - **Small, cohesive files** — a single file stays **≤ 800 lines**; split as it grows.
 - **DRY / KISS / YAGNI** — reuse before writing new code (Rule of Three); no dead, placeholder, mock, or hardcoded data — every value comes from a real source with honest loading/error/empty states.
-- **Hard boundaries** — no collecting source accounts, cookies, API keys, or device IDs; no built-in source that works around a platform's restrictions; no DRM bypass; plugins run only inside the sandbox.
+- **Security boundaries** — no silent browser-credential collection, secret logging, DRM bypass, or unauthorized paid access. User-provided plugin settings stay local and are exposed only to that plugin; plugins run inside the sandbox.
 - **Test target** — 80%+ coverage goal; parsing is tested against recorded fixtures; network integration tests are separately tagged.
 
 ### Commands
@@ -450,10 +450,10 @@ Notable changes are recorded in the [changelog](CHANGELOG.md).
 
 ## Sources and plugins
 
-TimbreBox is a player. Its built-in sources are open services with public APIs only; it builds in no video or streaming platform, and it neither provides nor maintains plugins for one.
+TimbreBox is a player and general-purpose source-plugin host. Its current built-ins are Audius, Openverse, Internet Archive, and Radio Browser. Platform-specific plugins are maintained separately in [HomePlay Plugins](https://github.com/weikxs/homeplay-plugins).
 
-- Plugins are written and published by third parties, and you choose which to install. A plugin, and any data it produces, has nothing to do with TimbreBox. Check a plugin before you install it, and use it within the law and the rules of the services it reaches.
-- TimbreBox does not encourage, and will not build in, anything that works around a platform's restrictions or unlocks paid content. Your own music library is always the safest source.
+- Platform-specific integrations remain experimental and opt-in. Tested local behavior is not a promise of general availability; access requirements and playback support must be verified independently.
+- The design separates optional plugin capabilities, on-demand media resolution, and subscription updates from the player. Choose trusted plugins; each implementation must document its access requirements, tested capabilities, rights/distribution considerations, and limitations. Roadmap inclusion is not permission to extract or download content.
 
 ## Security policy
 

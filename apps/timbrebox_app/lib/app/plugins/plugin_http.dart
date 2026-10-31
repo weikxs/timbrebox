@@ -115,7 +115,22 @@ final class PluginHttpClient {
               AppStrings.t('plugin.http.redirectMissing'),
             );
           }
-          uri = uri.resolve(location);
+          final next = uri.resolve(location);
+          if (next.scheme != uri.scheme ||
+              next.host != uri.host ||
+              next.port != uri.port) {
+            // Custom headers may carry credentials too. Only public transport
+            // preferences survive an origin change (including a port change).
+            headers.removeWhere(
+              (name, _) => !const {
+                'accept',
+                'accept-language',
+                'user-agent',
+                'range',
+              }.contains(name.toLowerCase()),
+            );
+          }
+          uri = next;
           method = 'GET'; // Follow redirects as GET, drop the body.
           body = null;
           continue;
@@ -123,6 +138,7 @@ final class PluginHttpClient {
         final bytes = await _readCapped(response, timeout);
         return {
           'status': response.statusCode,
+          'url': uri.toString(),
           'headers': _responseHeaders(response),
           'data': utf8.decode(bytes, allowMalformed: true),
         };

@@ -12,7 +12,7 @@
 # handed to curl on stdin, never on its command line.
 #
 # Usage:
-#   timbrebox-ctl status
+#   timbrebox-ctl status | search-status | playback-status
 #   timbrebox-ctl search "周杰伦"
 #   timbrebox-ctl play-ref <source> <item>
 #   timbrebox-ctl play | pause | toggle | next | prev | stop
@@ -108,7 +108,7 @@ main() {
   esac
   local BASE; BASE="$(base_url)"
   case "${cmd}" in
-    status|queue|sources|lyric)
+    status|search-status|playback-status|queue|sources|lyric)
       req "${BASE}/${cmd}" ;;
     play|pause|toggle|next|previous|stop|quit)
       act "${BASE}/${cmd}" ;;

@@ -81,6 +81,34 @@ void main() {
     expect(completions, hasLength(1));
   });
 
+  test(
+    'asynchronous native errors become one safe failure and suppress false completion',
+    () async {
+      var failed = 0, ended = 0;
+      backend.failures.listen((_) => failed++);
+      backend.completed.listen((_) => ended++);
+      await backend.setSource(LocalAudioSource('/music/a.mp3'));
+      final player = created.single;
+      player.errors.add(
+        'Failed https://fixture.example/private-signed-address',
+      );
+      await pumpEventQueue();
+      player.errors.add('Repeated error');
+      player.completions.add(true);
+      await pumpEventQueue();
+      expect(failed, 1);
+      expect(ended, 0);
+      await backend.stop();
+      player.errors.add('Obsolete failure after stop');
+      await pumpEventQueue();
+      expect(failed, 1);
+      await backend.setSource(LocalAudioSource('/music/b.mp3'));
+      player.errors.add('New source failed');
+      await pumpEventQueue();
+      expect(failed, 2);
+    },
+  );
+
   test('controls reach the player once it has started', () async {
     await backend.setSource(LocalAudioSource('/music/a.mp3'));
     await backend.resume();
@@ -93,6 +121,7 @@ void main() {
 
 final class _FakePlayer extends Fake implements Player {
   final positions = StreamController<Duration>.broadcast();
+  final errors = StreamController<String>.broadcast();
   final durations = StreamController<Duration>.broadcast();
   final completions = StreamController<bool>.broadcast();
   final devices = StreamController<List<AudioDevice>>.broadcast();
@@ -128,7 +157,11 @@ final class _FakePlayer extends Fake implements Player {
   Future<void> play() async => calls.add('play');
 
   @override
+  Future<void> stop() async => calls.add('stop');
+
+  @override
   Future<void> dispose() async {
+    await errors.close();
     await positions.close();
     await durations.close();
     await completions.close();
@@ -140,6 +173,9 @@ final class _FakeStream extends Fake implements PlayerStream {
   _FakeStream(this._player);
 
   final _FakePlayer _player;
+
+  @override
+  Stream<String> get error => _player.errors.stream;
 
   @override
   Stream<Duration> get position => _player.positions.stream;
