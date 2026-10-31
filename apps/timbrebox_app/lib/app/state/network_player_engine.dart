@@ -20,7 +20,8 @@ class NetworkPlayerEngine
         RateControllablePlayerEngine,
         PlaybackCompletionEvents,
         PlaybackProgressEvents,
-        StartPositionLoad {
+        StartPositionLoad,
+        PlaybackFailureEvents {
   NetworkPlayerEngine({
     required AudioBackend backend,
     PlayerSourceResolver? resolver,
@@ -30,6 +31,12 @@ class NetworkPlayerEngine
        _resolveTimeout = resolveTimeout,
        // ignore: prefer_initializing_formals
        _backend = backend {
+    final native = _backend;
+    if (native is AudioFailureEvents) {
+      _failureSubscription = (native as AudioFailureEvents).failures.listen(
+        (_) => _nativeFailed(),
+      );
+    }
     _completionSubscription = _backend.completed.listen((_) {
       if (!_completed.isClosed) _completed.add(null);
     });
@@ -46,9 +53,47 @@ class NetworkPlayerEngine
   var _loadGeneration = 0;
   final StreamController<void> _completed = StreamController.broadcast();
   StreamSubscription<void>? _completionSubscription;
+  StreamSubscription<void>? _failureSubscription;
+  final _failures = StreamController<SourceException>.broadcast();
+  @override
+  Stream<SourceException> get failures => _failures.stream;
+  Completer<SourceException>? _openFailure;
+  bool _opening = false;
+  String _stage = 'idle';
+  String? _failureStage, _errorCode;
+  Map<String, Object?> get diagnostics => {
+    'stage': _stage,
+    'failureStage': ?_failureStage,
+    'errorCode': ?_errorCode,
+  };
+  static const maxOpenTime = Duration(seconds: 15);
+
+  SourceException _nativeError() => SourceException(
+    AppStrings.t('stream.err.nativePlaybackFailed'),
+    retryable: true,
+    code: 'native_playback_failed',
+  );
+
+  void _nativeFailed() {
+    if (_disposed || (!_loaded && !_opening)) return;
+    final error = _nativeError();
+    _failureStage = _opening ? 'opening' : 'playing';
+    _stage = 'failed';
+    _errorCode = error.code;
+    _loadGeneration++;
+    _loadCancellation?.cancel();
+    _loaded = false;
+    _opening = false;
+    final opening = _openFailure;
+    if (opening != null && !opening.isCompleted) opening.complete(error);
+    _failures.add(error);
+    unawaited(_run(() => _backend.stop()).catchError((_) {}));
+  }
+
   Timer? _releaseTimer;
   Future<void> _operations = Future.value();
   var _loaded = false;
+  var _sourceAssigned = false;
   var _releaseAfterPause = true;
   var _disposed = false;
   var _generation = 0;
@@ -87,26 +132,58 @@ class NetworkPlayerEngine
     _ensureLive();
     final cancellation = _beginLoad();
     final generation = _loadGeneration;
-    // Stop the previous track first: if resolving the new one fails,
-    // nothing must keep playing (or be resumable) under the new name.
+    _failureStage = null;
+    _errorCode = null;
     await _run(_releaseLoadedSource);
-    final source = await _resolveWithin(candidate, cancellation);
-    await _run(() async {
-      _ensureLive();
-      // A newer load or a stop took over while this one resolved.
-      if (generation != _loadGeneration) throw const OperationCancelled();
-      await _backend.setReleaseMode(AudioReleaseMode.stop);
-      final backend = _backend;
-      if (start != null && backend is StartPositionAudioBackend) {
-        await (backend as StartPositionAudioBackend).setSourceFrom(
-          source,
-          start,
-        );
-      } else {
-        await backend.setSource(source);
+    _stage = 'resolving';
+    try {
+      final source = await _resolveWithin(candidate, cancellation);
+      await _run(() async {
+        _ensureLive();
+        if (generation != _loadGeneration) throw const OperationCancelled();
+        await _backend.setReleaseMode(AudioReleaseMode.stop);
+        _stage = 'opening';
+        _opening = true;
+        _sourceAssigned = true;
+        final failed = _openFailure = Completer<SourceException>();
+        try {
+          final backend = _backend;
+          final open = start != null && backend is StartPositionAudioBackend
+              ? (backend as StartPositionAudioBackend).setSourceFrom(
+                  source,
+                  start,
+                )
+              : backend.setSource(source);
+          await Future.any<void>([
+            open,
+            failed.future.then((error) => throw error),
+            cancellation.whenCancelled.then(
+              (_) => throw const OperationCancelled(),
+            ),
+          ]).timeout(maxOpenTime, onTimeout: () => throw _nativeError());
+          if (generation != _loadGeneration) throw const OperationCancelled();
+          _loaded = true;
+          _stage = 'ready';
+        } finally {
+          if (identical(_openFailure, failed)) _openFailure = null;
+          _opening = false;
+        }
+      });
+    } catch (error) {
+      if (generation == _loadGeneration) {
+        _failureStage = _stage == 'resolving' ? 'resolving' : 'opening';
+        _stage = 'failed';
+        _errorCode = error is SourceException ? error.code : 'playback_failed';
+        if (_failureStage == 'opening') {
+          unawaited(_run(() => _backend.stop()).catchError((_) {}));
+          if (error is! SourceException) {
+            _errorCode = 'native_playback_failed';
+            throw _nativeError();
+          }
+        }
       }
-      _loaded = true;
-    });
+      rethrow;
+    }
   }
 
   /// Cancels the load in flight (if any) and returns the next one's token.
@@ -143,12 +220,14 @@ class NetworkPlayerEngine
     _releaseTimer?.cancel();
     if (!_loaded) throw StateError(AppStrings.t('stream.err.notLoaded'));
     await _backend.resume();
+    if (_loaded) _stage = 'playing';
   });
 
   @override
   Future<void> pause() => _run(() async {
     _ensureLive();
     await _backend.pause();
+    _stage = 'paused';
     if (_releaseAfterPause) {
       final generation = _generation;
       _releaseTimer = Timer(const Duration(seconds: 30), () {
@@ -160,7 +239,12 @@ class NetworkPlayerEngine
   @override
   Future<void> stop() {
     _beginLoad().cancel();
-    return _run(_releaseLoadedSource);
+    return _run(() async {
+      await _releaseLoadedSource();
+      _stage = 'idle';
+      _failureStage = null;
+      _errorCode = null;
+    });
   }
 
   @override
@@ -174,6 +258,8 @@ class NetworkPlayerEngine
     await _releaseLoadedSource();
     _disposed = true;
     await _completionSubscription?.cancel();
+    await _failureSubscription?.cancel();
+    await _failures.close();
     await _completed.close();
     await _backend.dispose();
   }
@@ -199,10 +285,12 @@ class NetworkPlayerEngine
   Future<void> _releaseLoadedSource() async {
     _generation++;
     _releaseTimer?.cancel();
-    if (!_loaded) return;
+    if (!_loaded && !_sourceAssigned) return;
     await _backend.stop();
     await _backend.releaseSource();
     _loaded = false;
+    _sourceAssigned = false;
+    if (_stage != 'failed') _stage = 'released';
   }
 
   void _ensureLive() {

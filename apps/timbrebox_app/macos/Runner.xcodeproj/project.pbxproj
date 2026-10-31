@@ -21,6 +21,7 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		F078A0010000000000000001 /* GuestSearchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F078A0010000000000000002 /* GuestSearchBridge.swift */; };
 		19E0643EE5ED6B639A6E7BBA /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C05D9500235E23B35B236AC /* Pods_Runner.framework */; };
 		331C80D8294CF71000263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C80D7294CF71000263BE5 /* RunnerTests.swift */; };
 		335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335BBD1A22A9A15E00E9071D /* GeneratedPluginRegistrant.swift */; };
@@ -63,6 +64,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F078A0010000000000000002 /* GuestSearchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GuestSearchBridge.swift; sourceTree = "<group>"; };
 		07ACF498B324E3179A2F60CE /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		11AE4DAC18BDB26677F349E1 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		2FAF2427656644C6B32FF54E /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 			children = (
 				33CC10F02044A3C60003C045 /* AppDelegate.swift */,
 				33CC11122044BFA00003C045 /* MainFlutterWindow.swift */,
+				F078A0010000000000000002 /* GuestSearchBridge.swift */,
 				33E51913231747F40026EE4D /* DebugProfile.entitlements */,
 				33E51914231749380026EE4D /* Release.entitlements */,
 				33CC11242044D66E0003C045 /* Resources */,
@@ -245,6 +248,7 @@
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
 				458396D2170BADE953F712CD /* [CP] Embed Pods Frameworks */,
+				B70DAB1E2026103000000001 /* Optional Media Tools */,
 			);
 			buildRules = (
 			);
@@ -432,6 +436,18 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		B70DAB1E2026103000000001 /* Optional Media Tools */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ();
+			name = "Optional Media Tools";
+			outputPaths = ();
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$SRCROOT/../../../scripts/media/embed.sh\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -448,6 +464,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				33CC11132044BFA00003C045 /* MainFlutterWindow.swift in Sources */,
+				F078A0010000000000000001 /* GuestSearchBridge.swift in Sources */,
 				33CC10F12044A3C60003C045 /* AppDelegate.swift in Sources */,
 				335BBD1B22A9A15E00E9071D /* GeneratedPluginRegistrant.swift in Sources */,
 			);

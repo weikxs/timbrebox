@@ -7,9 +7,21 @@ import 'player_engine.dart';
 class PlayerController {
   PlayerController(this._engine) {
     final engine = _engine;
+    if (engine is PlaybackFailureEvents) {
+      _failureSubscription = (engine as PlaybackFailureEvents).failures.listen((
+        error,
+      ) {
+        if (_value.candidate == null || _value.status == PlaybackStatus.idle)
+          return;
+        _generation++;
+        _ended = true;
+        _fail(error);
+      });
+    }
     if (engine is PlaybackCompletionEvents) {
       final completionEvents = engine as PlaybackCompletionEvents;
       _completionSubscription = completionEvents.completed.listen((_) {
+        if (_value.status == PlaybackStatus.failed) return;
         _ended = true;
         _emit(
           PlaybackState(
@@ -26,6 +38,7 @@ class PlayerController {
   final StreamController<PlaybackState> _states = StreamController.broadcast();
   final StreamController<void> _completions = StreamController.broadcast();
   StreamSubscription<void>? _completionSubscription;
+  StreamSubscription<SourceException>? _failureSubscription;
   PlaybackState _value = const PlaybackState.idle();
 
   /// Bumped by every [play]; a load that finishes after a newer [play] began
@@ -67,6 +80,7 @@ class PlayerController {
           status: PlaybackStatus.failed,
           candidate: candidate,
           errorMessage: error.toString(),
+          errorCode: error is SourceException ? error.code : 'playback_failed',
         ),
       );
     }
@@ -79,8 +93,10 @@ class PlayerController {
   Future<bool> resume() async {
     if (_value.candidate == null || _ended) return false;
     if (_value.status == PlaybackStatus.failed) return false;
+    final generation = _generation;
     try {
       await _engine.play();
+      if (generation != _generation) return false;
       _emit(
         PlaybackState(
           status: PlaybackStatus.playing,
@@ -95,8 +111,10 @@ class PlayerController {
 
   Future<void> pause() async {
     if (!_value.isPlaying) return;
+    final generation = _generation;
     try {
       await _engine.pause();
+      if (generation != _generation) return;
       _emit(
         PlaybackState(
           status: PlaybackStatus.paused,
@@ -157,6 +175,7 @@ class PlayerController {
 
   Future<void> dispose() async {
     await _completionSubscription?.cancel();
+    await _failureSubscription?.cancel();
     await _completions.close();
     await _engine.release();
     await _states.close();
@@ -173,6 +192,7 @@ class PlayerController {
         status: PlaybackStatus.failed,
         candidate: _value.candidate,
         errorMessage: error.toString(),
+        errorCode: error is SourceException ? error.code : 'playback_failed',
       ),
     );
   }

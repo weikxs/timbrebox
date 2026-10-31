@@ -18,7 +18,15 @@ import 'package:timbrebox_sources/timbrebox_sources.dart' show isLoopbackHost;
 import 'control_token.dart';
 
 /// Endpoints that only read state. Every other endpoint needs POST.
-const controlReadPaths = {'/', '/status', '/queue', '/sources', '/lyric'};
+const controlReadPaths = {
+  '/',
+  '/status',
+  '/search-status',
+  '/playback-status',
+  '/queue',
+  '/sources',
+  '/lyric',
+};
 
 typedef ControlRejection = ({int status, String error});
 

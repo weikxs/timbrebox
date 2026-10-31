@@ -61,10 +61,8 @@ void main() {
     final client = HttpClient();
     addTearDown(() => client.close(force: true));
 
-    Future<int> status({String? withToken}) async {
-      final request = await client.getUrl(
-        Uri.parse('${server.address}/status'),
-      );
+    Future<int> status({String? withToken, String path = '/status'}) async {
+      final request = await client.getUrl(Uri.parse('${server.address}$path'));
       if (withToken != null) {
         request.headers.set(controlTokenHeader, withToken);
       }
@@ -76,6 +74,38 @@ void main() {
     expect(await status(), HttpStatus.unauthorized);
     expect(await status(withToken: 'wrong'), HttpStatus.unauthorized);
     expect(await status(withToken: token), HttpStatus.ok);
+    expect(await status(path: '/search-status'), HttpStatus.unauthorized);
+    expect(
+      await status(path: '/search-status', withToken: token),
+      HttpStatus.ok,
+    );
+    final queryBefore = controller.query;
+    final request = await client.getUrl(
+      Uri.parse('${server.address}/search-status'),
+    );
+    request.headers.set(controlTokenHeader, token);
+    final response = await request.close();
+    final search = jsonDecode(await utf8.decoder.bind(response).join()) as Map;
+    expect(search['hasQuery'], false);
+    expect(search['isSearching'], false);
+    expect(search['sources'], isA<List>());
+    expect(search.containsKey('query'), false);
+    expect(search.containsKey('results'), false);
+    expect(controller.query, queryBefore);
+    expect(controller.isPlaying, false);
+    expect(await status(path: '/playback-status'), HttpStatus.unauthorized);
+    final playbackRequest = await client.getUrl(
+      Uri.parse('${server.address}/playback-status'),
+    );
+    playbackRequest.headers.set(controlTokenHeader, token);
+    final playbackResponse = await playbackRequest.close();
+    final playback =
+        jsonDecode(await utf8.decoder.bind(playbackResponse).join()) as Map;
+    expect(playback['state'], 'idle');
+    expect(playback['hasError'], false);
+    expect(playback.containsKey('errorMessage'), false);
+    expect(playback.containsKey('track'), false);
+    expect(controller.query, queryBefore);
     final discovery =
         jsonDecode(await File('${root.path}/control.json').readAsString())
             as Map;

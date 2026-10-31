@@ -6,6 +6,7 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   private let initialContentSize = NSSize(width: 974, height: 614)
   // Strong reference so the CoreAudio route listener stays alive.
   private var audioRouteHandler: AudioRouteStreamHandler?
+  private var guestSearchBridge: GuestSearchBridge?
 
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -25,6 +26,10 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
       binaryMessenger: registrar.messenger)
     channel.setStreamHandler(handler)
     self.audioRouteHandler = handler
+
+    let guestSearch = GuestSearchBridge()
+    guestSearch.register(registrar.messenger)
+    guestSearchBridge = guestSearch
 
     super.awakeFromNib()
   }

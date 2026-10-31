@@ -13,12 +13,17 @@ help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 .PHONY: check
-check: privacy ## Everything CI runs: privacy, analysis, formatting and tests of every package
+check: privacy text-policy ## Everything CI runs: privacy, text policy, analysis, formatting and tests
 	tools/check.sh
 
 .PHONY: privacy
 privacy: ## Block real identities, local paths and secrets from being committed
 	scripts/check-privacy.sh
+
+.PHONY: text-policy
+text-policy: ## Check current text, full history and policy regression tests
+	python3 tools/check_repository_text.py --worktree --history
+	python3 -m unittest discover -s tools -p 'test_repository_text.py'
 
 .PHONY: analyze
 analyze: ## Static analysis of every package

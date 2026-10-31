@@ -90,6 +90,8 @@ server answers `405` to the other method.
 |---|---|---|
 | GET | `/` | Discovery document (endpoints + current status) |
 | GET | `/status` | Playback state: `playing`, `positionMs`, `volume`, `loop`, `queueLength`, `track` |
+| GET | `/playback-status` | Read-only `state`, `hasError`, optional `stage`, `failureStage`, safe `errorCode`. Distinguishes resolving/opening/native failure without raw error text, track identities or URLs. Does not start playback. CLI: `timbrebox-ctl playback-status`. |
+| GET | `/search-status` | Read-only latest search: `hasQuery`, `isSearching`, per-source `status`, `count`, optional `failure.code/retryable`. No query, titles, URLs, credentials or raw error messages; does not start a search. CLI: `timbrebox-ctl search-status`. |
 | GET | `/queue` | The play queue (`items[]`) |
 | GET | `/sources` | Sources with `id`, `name`, `enabled` |
 | GET | `/lyric` | Current track's lyric (plugin sources only), or `null` |

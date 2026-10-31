@@ -1,9 +1,9 @@
 name: CI
 
-# One job per pull request, on Linux: the privacy check, then static analysis,
-# formatting and the tests of every Dart package (tools/check.sh). A change to
-# documentation alone runs only the privacy check, in seconds; a draft runs
-# nothing. Merging to main starts nothing, since the pull request was already
+# One job per pull request, on Linux: repository text/history policy and privacy,
+# then static analysis, formatting and tests of every Dart package (tools/check.sh).
+# Documentation-only changes still run metadata/privacy checks but skip Dart;
+# a draft runs nothing. Merging to main starts nothing, since the pull request was already
 # tested. macOS and Windows and the release builds are in full.yml, started by
 # hand before a release; the release workflow runs every check again before it
 # publishes anything. Branch rules require this job, `check`.
@@ -30,12 +30,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      - name: Repository text policy
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 tools/check_repository_text.py --worktree --history
+          python3 -m unittest discover -s tools -p 'test_repository_text.py'
       - name: What changed
         id: diff
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           files=$(git diff --name-only "$BASE"...HEAD)
           printf '%s\n' "$files"
           docs='\.md$|^docs/|^LICENSE|^\.claude/|^\.github/(ISSUE_TEMPLATE|release-notes)/|^\.github/(CODEOWNERS|pull_request_template\.md)$'

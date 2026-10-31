@@ -2,6 +2,22 @@ part of 'app_controller.dart';
 
 /// Search across sources, per-source paging and hot-library categories.
 extension AppControllerSearch on AppController {
+  /// A per-query UI projection; never disables a source in the registry.
+  List<SourceDescriptor> get visibleSearchSources {
+    final sources = searchableSources;
+    if (_query.isEmpty || (_searchError != null && _searchBatch == null)) {
+      return sources;
+    }
+    return sources
+        .where(
+          (source) =>
+              isSearchingSource(source.id) ||
+              searchResultCount(source.id) > 0 ||
+              searchGroupFor(source.id)?.status == SourceSearchStatus.failure,
+        )
+        .toList(growable: false);
+  }
+
   Future<void> search(String value) async {
     _query = value.trim();
     if (_query.isNotEmpty) _recordSearch(_query);
@@ -31,6 +47,8 @@ extension AppControllerSearch on AppController {
     }
     _isSearching = true;
     _searchError = null;
+    _searchBatch = null;
+    _results = [];
     _notify();
     try {
       final groupedCatalog = _catalog is GroupedMusicCatalog
@@ -40,7 +58,6 @@ extension AppControllerSearch on AppController {
         // Results show per source as each one finishes; the previous query's
         // results are gone from the start so the two never mix.
         _searchBatch = CatalogSearchBatch(query: _query, groups: const []);
-        _results = [];
         await for (final batch in groupedCatalog.searchGrouped(
           _query,
           cancellation: cancellation,

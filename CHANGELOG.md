@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Opt-in local metadata and media bridges for plugins, with stable references, access checks,
+  bounded requests and process cleanup. Experimental paths do not install or enable plugins.
+- Isolated runtime callbacks, cancellable requests and bounded audio stream proxying.
+- Visible playback loading, cancellation and failure states, plus protected read-only diagnostics.
+  See `docs/desktop-media-backend.md` for configuration and current limitations.
 - A plugin can reach a server on the home network (a NAS) when the user entered its IP address or `.local` name in
   the plugin's settings, for the plugin's requests and its streams. The local machine, link-local addresses,
   domain names and every LAN host the user did not enter stay blocked.

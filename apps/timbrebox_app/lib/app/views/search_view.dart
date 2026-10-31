@@ -30,9 +30,13 @@ class _SearchViewState extends State<SearchView> {
 
   @override
   Widget build(BuildContext context) {
-    final sources = widget.controller.searchableSources;
+    final sources = widget.controller.visibleSearchSources;
     final selectedSource = _sourceFor(sources);
     final query = widget.controller.query;
+    final emptyResults =
+        query.isNotEmpty &&
+        sources.isEmpty &&
+        widget.controller.searchableSources.isNotEmpty;
 
     _scheduleAutofill(selectedSource);
 
@@ -44,18 +48,21 @@ class _SearchViewState extends State<SearchView> {
         slivers: [
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
           SliverToBoxAdapter(
-            child: _SourceTabs(
-              sources: sources,
-              selectedSourceId: selectedSource?.id,
-              onSelected: (sourceId) =>
-                  setState(() => _selectedSourceId = sourceId),
-            ),
+            child: emptyResults
+                ? const SizedBox.shrink()
+                : _SourceTabs(
+                    sources: sources,
+                    selectedSourceId: selectedSource?.id,
+                    onSelected: (sourceId) =>
+                        setState(() => _selectedSourceId = sourceId),
+                  ),
           ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(top: 20, bottom: 12),
               child: _ResultHeader(
                 query: query,
+                emptyResults: emptyResults,
                 source: selectedSource,
                 isSearching:
                     selectedSource != null &&
@@ -122,7 +129,10 @@ class _SearchViewState extends State<SearchView> {
     for (final source in sources) {
       if (source.id == _selectedSourceId) return source;
     }
-    return sources.first;
+    return sources.firstWhere(
+      (source) => widget.controller.searchResultCount(source.id) > 0,
+      orElse: () => sources.first,
+    );
   }
 }
 
@@ -260,8 +270,10 @@ class _ResultHeader extends StatelessWidget {
     required this.query,
     required this.source,
     required this.isSearching,
+    required this.emptyResults,
   });
 
+  final bool emptyResults;
   final String query;
   final SourceDescriptor? source;
   final bool isSearching;
@@ -273,7 +285,9 @@ class _ResultHeader extends StatelessWidget {
         : '“$query”';
     final sourceName = source?.name;
     final detail = sourceName == null
-        ? AppStrings.t('search.sourceDisabled')
+        ? AppStrings.t(
+            emptyResults ? 'search.noMatchesTitle' : 'search.sourceDisabled',
+          )
         : isSearching
         ? AppStrings.t('search.searchingFmt').replaceFirst('{name}', sourceName)
         : AppStrings.t('search.fromFmt').replaceFirst('{name}', sourceName);
@@ -320,6 +334,16 @@ Widget _resultSliver(AppController controller, SourceDescriptor? source) {
       Icons.wifi_off_rounded,
       AppStrings.t('search.errorTitle'),
       error,
+    );
+  }
+  if (source == null &&
+      controller.query.isNotEmpty &&
+      controller.searchableSources.isNotEmpty &&
+      !controller.isSearching) {
+    return notice(
+      Icons.search_off_rounded,
+      AppStrings.t('search.noMatchesTitle'),
+      AppStrings.t('search.noMatchesDetail'),
     );
   }
   if (source == null) {

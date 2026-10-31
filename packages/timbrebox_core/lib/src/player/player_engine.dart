@@ -37,6 +37,12 @@ abstract interface class PlaybackCompletionEvents {
   Stream<void> get completed;
 }
 
+/// Asynchronous failures after a native source has begun opening or playing.
+/// Errors must be sanitized by the adapter; never expose transient media URLs.
+abstract interface class PlaybackFailureEvents {
+  Stream<SourceException> get failures;
+}
+
 /// Optional capability for engines that can open a source at a position, so
 /// resuming does not depend on a seek that a not-yet-loaded stream may drop.
 abstract interface class StartPositionLoad {

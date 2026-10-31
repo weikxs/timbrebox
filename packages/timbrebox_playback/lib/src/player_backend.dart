@@ -27,6 +27,12 @@ abstract interface class AudioBackend {
   Future<void> dispose();
 }
 
+/// Safe signal for an asynchronous native media failure. Raw decoder messages
+/// may contain signed addresses and must not be forwarded to callers.
+abstract interface class AudioFailureEvents {
+  Stream<void> get failures;
+}
+
 /// Optional native capability to change the playback rate (speed). Separate so
 /// the core AudioBackend contract (and its test fakes) stays minimal.
 abstract interface class RateAudioBackend {

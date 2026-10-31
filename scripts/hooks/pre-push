@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Inspect all reachable local refs before a push; never print matched text.
+set -euo pipefail
+root=$(git rev-parse --show-toplevel)
+exec python3 "$root/tools/check_repository_text.py" --root "$root" --worktree --history

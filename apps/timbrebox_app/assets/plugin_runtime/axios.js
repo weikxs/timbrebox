@@ -159,7 +159,7 @@
         statusText: raw.statusText || '',
         headers: raw.headers || {},
         config: config,
-        request: {}
+        request: { responseURL: raw.url || fullUrl(config) }
       };
       // validateStatus: null accepts every status, as in axios.
       var validate = config.validateStatus;
@@ -173,6 +173,11 @@
     }, function (failure) {
       if (failure && failure.code === 'timeout') {
         throw AxiosError('timeout of ' + timeout + 'ms exceeded', 'ECONNABORTED', config);
+      }
+      if (failure && failure.code === 'cancelled') {
+        var cancelled = AxiosError('canceled', 'ERR_CANCELED', config);
+        cancelled.__CANCEL__ = true;
+        throw cancelled;
       }
       throw AxiosError((failure && failure.message) || 'Network Error', 'ERR_NETWORK', config);
     });
@@ -249,6 +254,7 @@
   var axios = create({});
   axios.AxiosError = AxiosError;
   axios.isAxiosError = function (value) { return !!(value && value.isAxiosError); };
+  axios.isCancel = function (value) { return !!(value && value.__CANCEL__); };
   axios.all = function (promises) { return Promise.all(promises); };
   axios.spread = function (callback) { return function (args) { return callback.apply(null, args); }; };
   axios.default = axios;

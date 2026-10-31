@@ -4,14 +4,14 @@
 
 ## Project Goal
 
-For now we ship only the lightweight music-player loop for Windows, macOS, Linux,
-iOS, and Android. TimbreBox is a player: its built-in sources are open services
-with public APIs only (Audius, Internet Archive, Radio Browser). Video and
-streaming platforms are never built in and the project provides no plugins for
-them; users add sources with plugins at their own choice. Never add a built-in
-source, or code, that works around a platform's restrictions (risk control,
-anti-bot checks, page scraping, signing tricks) or unlocks paid content. Nothing
-may be presented as a shipped capability ahead of time.
+TimbreBox is a lightweight player and general-purpose source-plugin host for
+Windows, macOS, Linux, iOS, and Android. Current built-ins are Audius, Openverse,
+Internet Archive, and Radio Browser. YouTube, Bilibili, Douyin, and TikTok are
+explicit plugin targets, maintained and distributed through `homeplay-plugins`,
+not mandatory built-ins. Do not reject a source solely by platform name, lack of
+a public API, user-configuration needs, or obsolete release-stage restrictions.
+Investigate each implementation's access requirements, rights, and distribution
+conditions separately. Nothing may be presented as shipped before verification.
 
 The detailed specs and design (scope source-of-truth, implementation boundaries,
 phase plan, source admission, etc.) live in the **local internal docs** under
@@ -35,7 +35,7 @@ gstack is installed for Codex. Pick the minimal necessary workflow per task:
 Routine small fixes do not require the full workflow. Do not pull in unrelated
 browsers, telemetry, remote services, or long-running processes just to "use a
 skill". Every external tool must still honor the internal spec's low-resource,
-no-user-credential, local-first constraints; any anonymous temporary session
+credential-protection, local-first constraints; any anonymous temporary session
 state a source adapter produces must stay in memory only.
 
 ### TimbreBox control skill (drive the running player)
@@ -100,13 +100,18 @@ The playback engine must decouple its directories by "platform" and "source":
 
 ## Non-negotiable Boundaries
 
-- Do not collect source accounts, browser cookies, user-imported cookies, API
-  keys, tokens, or device identifiers. If a source adapter genuinely needs one,
-  it may create an anonymous temporary cookie on demand, use it in this
-  process's memory only, clear it on exit, and never write it to disk, logs, or
-  a database.
-- Do not introduce DRM circumvention, paid-content scraping, dynamic `eval`,
-  unsigned plugins, or downloaded-and-executed code on mobile.
+- Plugins may request user-provided configuration through `userVariables`;
+  protect it locally and expose it only to that plugin. Never silently read
+  browser credentials or log secrets. Anonymous temporary sessions stay in memory.
+  Additional login, cookie-import, or device capabilities need explicit design.
+- Preserve sandbox, egress, credential, and access-control protections. Platform
+  inclusion does not authorize DRM circumvention or unauthorized paid access.
+  CommonJS scripts run in the existing JS sandbox on all five target platforms;
+  signatures and desktop process IPC are not prerequisites of the current format.
+  An optional desktop media RPC may invoke only an explicitly configured,
+  checksum-pinned local tool with fixed operations; no arbitrary process API.
+  Its internal networking is a separate trust boundary, not Dart HTTP egress.
+  Verify each distribution channel separately; do not claim store approval.
 - The desktop CLI is a one-shot control client; it must not start the player or
   leave a background process behind.
 - Unused sources, plugins, resolvers, and network requests must have zero

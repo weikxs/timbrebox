@@ -16,7 +16,7 @@ import 'control_token.dart';
 /// user-only token file (header [controlTokenHeader]). On by default.
 ///
 /// Endpoints (all return JSON):
-///   GET  / /status /queue /sources /lyric
+///   GET  / /status /search-status /playback-status /queue /sources /lyric
 ///   POST /search?q= /play /pause /toggle /next /previous /stop /quit
 ///   POST /seek?ms= /volume?level= /mode?loop= /play-ref?source=&item=
 ///   POST /play-queue?i= /source?id=&enabled=
@@ -160,6 +160,10 @@ final class PlayerControlServer {
           return _json(request, HttpStatus.ok, _discovery());
         case '/status':
           return _json(request, HttpStatus.ok, _status());
+        case '/playback-status':
+          return _json(request, HttpStatus.ok, _controller.playbackDiagnostics);
+        case '/search-status':
+          return _json(request, HttpStatus.ok, _searchStatus());
         case '/queue':
           return _json(request, HttpStatus.ok, {
             'items': [for (final track in _controller.queue) _trackJson(track)],
@@ -322,6 +326,9 @@ final class PlayerControlServer {
     'endpoints': const {
       'GET /': 'this discovery document',
       'GET /status': 'current playback state',
+      'GET /playback-status': 'read-only playback phase and safe failure code',
+      'GET /search-status':
+          'read-only per-source search state without query or payloads',
       'GET /queue': 'the play queue',
       'GET /sources': 'sources with enabled state',
       'GET /lyric': "current track's lyric (plugin sources)",
@@ -345,6 +352,28 @@ final class PlayerControlServer {
     'artist': track.artist,
     'sourceName': track.sourceName,
     'durationMs': track.duration.inMilliseconds,
+  };
+
+  Map<String, Object?> _searchStatus() => {
+    'hasQuery': _controller.query.isNotEmpty,
+    'isSearching': _controller.isSearching,
+    'sources': [
+      for (final source in _controller.searchableSources)
+        {
+          'source': source.id,
+          'status': _controller.isSearchingSource(source.id)
+              ? 'pending'
+              : _controller.searchGroupFor(source.id)?.status.name ?? 'idle',
+          'count': _controller.searchResultCount(source.id),
+          if (_controller.searchFailureFor(source.id) case final failure?)
+            'failure': {
+              'code': RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(failure.code)
+                  ? failure.code
+                  : 'source_error',
+              'retryable': failure.retryable,
+            },
+        },
+    ],
   };
 
   Map<String, Object?> _status() {
