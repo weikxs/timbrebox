@@ -32,6 +32,17 @@ Map<String, Object?> muxed({
 Matcher code(String value) =>
     isA<MediaExtractionException>().having((e) => e.code, 'code', value);
 
+/// The exact shape the TikTok extractor returns: no availability, no price or
+/// trial booleans, and no live status.
+Map<String, Object?> publicTikTok() => {
+  '_type': 'video',
+  '_has_drm': null,
+  'extractor_key': 'TikTok',
+  'duration': 62,
+  'webpage_url': 'https://www.tiktok.com/@demo/video/7600000000000000000',
+  'formats': [muxed()],
+};
+
 void main() {
   test('real-schema public proof does not invent paid or preview fields', () {
     final raw = publicVideo();
@@ -41,6 +52,51 @@ void main() {
     expect(mediaAccess(raw), MediaAccess.unknown);
     expect(mediaAccess(raw, platform: 'tiktok'), MediaAccess.unknown);
   });
+  test('the TikTok extractor schema is accepted only as that schema', () {
+    final raw = publicTikTok();
+    expect(mediaAccess(raw, platform: 'tiktok'), MediaAccess.allowed);
+    // The same body never authorizes another platform.
+    expect(mediaAccess(raw, platform: 'douyin'), MediaAccess.unknown);
+    expect(mediaAccess(raw), MediaAccess.unknown);
+  });
+  for (final key in [
+    '_type',
+    'extractor_key',
+    'duration',
+    'formats',
+    'webpage_url',
+  ]) {
+    test('missing TikTok evidence stays unknown: $key', () {
+      final raw = publicTikTok()..remove(key);
+      expect(mediaAccess(raw, platform: 'tiktok'), MediaAccess.unknown);
+    });
+  }
+  test(
+    'TikTok proof is rejected for slideshows, formats without a URL and live',
+    () {
+      for (final raw in [
+        publicTikTok()..['_type'] = 'playlist',
+        publicTikTok()..['duration'] = 0,
+        publicTikTok()..['formats'] = <Object>[],
+        publicTikTok()
+          ..['formats'] = [
+            {'url': 1},
+          ],
+        publicTikTok()..['_has_drm'] = true,
+        publicTikTok()..['has_drm'] = true,
+        publicTikTok()..['live_status'] = 'is_live',
+        publicTikTok()
+          ..['webpage_url'] =
+              'https://www.douyin.com/video/7600000000000000000',
+      ]) {
+        expect(
+          mediaAccess(raw, platform: 'tiktok'),
+          MediaAccess.unknown,
+          reason: '$raw',
+        );
+      }
+    },
+  );
   for (final key in [
     '_type',
     'extractor_key',
