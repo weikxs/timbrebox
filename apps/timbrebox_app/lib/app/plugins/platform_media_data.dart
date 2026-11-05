@@ -90,6 +90,29 @@ MediaAccess mediaAccess(Map raw, {String? platform}) {
       (raw['formats'] as List).isNotEmpty) {
     return MediaAccess.allowed;
   }
+  // The TikTok extractor reports neither availability nor price/trial flags for
+  // ordinary public posts; those keys are absent, not false, so the generic rule
+  // below can never clear them. Accept only what that extractor actually proves:
+  // an anonymous page read that yielded a non-live, non-slideshow post of known
+  // duration with real formats. Anything else stays unknown.
+  if (platform == 'tiktok' &&
+      raw['extractor_key'] == 'TikTok' &&
+      raw['_type'] == 'video' &&
+      raw['has_drm'] != true &&
+      raw['_has_drm'] != true &&
+      availability == null &&
+      raw['live_status'] == null &&
+      raw['duration'] is num &&
+      (raw['duration'] as num).isFinite &&
+      (raw['duration'] as num) > 0 &&
+      raw['formats'] is List &&
+      (raw['formats'] as List).isNotEmpty &&
+      (raw['formats'] as List).every(
+        (format) => format is Map && format['url'] is String,
+      ) &&
+      Uri.tryParse('${raw['webpage_url'] ?? ''}')?.host == 'www.tiktok.com') {
+    return MediaAccess.allowed;
+  }
   bool explicitlyClear(List<String> keys) =>
       keys.any((key) => flag(raw[key]) == false) &&
       keys.every((key) => !raw.containsKey(key) || flag(raw[key]) == false);
